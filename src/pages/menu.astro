@@ -1,0 +1,10 @@
+---
+import StoreLayout from "../layouts/StoreLayout.astro";
+import MenuCatalog from "../components/svelte/store/MenuCatalog.svelte";
+---
+
+<StoreLayout title="IshosFactory - Menu">
+  <main class="container mx-auto px-4 py-8">
+    <MenuCatalog client:load />
+  </main>
+</StoreLayout>
