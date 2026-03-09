@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { formatCurrency } from "../../../lib/utils/formatters";
   import { listPublicCategories, listPublicProducts, type PublicCategory, type PublicProduct } from "../../../lib/api/store";
-  import { addCartItem } from "../../../lib/storefront/cart";
+  import { addCartItem } from "../../../lib/store/cart";
 
   let loading = $state(true);
   let loadingError = $state("");

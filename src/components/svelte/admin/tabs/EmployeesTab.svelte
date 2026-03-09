@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Employee } from "../../../lib/api/admin";
+  import type { Employee } from "../../../../lib/api/admin";
 
   interface Props {
     employees: Employee[];

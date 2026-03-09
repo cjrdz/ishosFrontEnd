@@ -1,8 +1,10 @@
 ---
-import AppLayout from "../../layouts/AppLayout.astro";
-import AdminDashboard from "../../components/svelte/AdminDashboard.svelte";
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import AdminDashboard from "../../components/svelte/admin/AdminDashboard.svelte";
 ---
 
-<AppLayout title="Admin Panel - IshosFactory">
+<AdminLayout title="Admin Panel - IshosFactory">
   <AdminDashboard client:load />
-</AppLayout>
+</AdminLayout>

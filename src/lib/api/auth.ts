@@ -1,35 +1,42 @@
-import { apiRequest } from "./client";
+/**
+ * Authentication API calls to backend
+ * 
+ * Note: Backend handles HttpOnly cookie setting on login.
+ * No need to manually manage tokens here.
+ */
 
-export interface EmployeeSession {
-  id: string;
-  email: string;
-  name: string;
-  phone: string;
-  role: "admin" | "employee";
-  active?: boolean;
-}
+import { apiRequest } from './client';
+import type { Session, LoginRequest, LoginResponse } from '../types/auth';
 
-interface LoginResponse {
-  token: string;
-  employee: EmployeeSession;
-}
-
+/**
+ * Login with email and password
+ * Backend will set HttpOnly cookie automatically
+ */
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  return apiRequest<LoginResponse>("/auth/login", {
-    method: "POST",
-    body: { email, password },
+  return apiRequest<LoginResponse>('/auth/login', {
+    method: 'POST',
+    body: { email, password } as LoginRequest,
   });
 }
 
-export async function getSession(token: string): Promise<EmployeeSession> {
-  return apiRequest<EmployeeSession>("/auth/session", {
+/**
+ * Get current session information
+ * Requires valid HttpOnly cookie or Bearer token
+ */
+export async function getSession(token?: string): Promise<Session> {
+  return apiRequest<Session>('/auth/session', {
+    method: 'GET',
     token,
   });
 }
 
-export async function logout(token: string): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>("/auth/logout", {
-    method: "POST",
+/**
+ * Logout current session
+ * Backend will clear the HttpOnly cookie
+ */
+export async function logout(token?: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>('/auth/logout', {
+    method: 'POST',
     token,
   });
 }

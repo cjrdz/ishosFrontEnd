@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { ApiError } from "../../../lib/api/client";
+  import { ApiError } from "../../../lib/errors";
   import { createPublicOrder } from "../../../lib/api/store";
-  import { clearCartItems, getCartItems, removeCartItem, setCartItems, type StoreCartItem } from "../../../lib/storefront/cart";
-  import { saveTracking } from "../../../lib/storefront/tracking";
+  import { clearCartItems, getCartItems, removeCartItem, setCartItems, type StoreCartItem } from "../../../lib/store/cart";
+  import { saveTracking } from "../../../lib/store/tracking";
   import { formatCurrency } from "../../../lib/utils/formatters";
 
   type CheckoutForm = {
@@ -86,7 +86,7 @@
       clearCartItems();
       items = [];
       message = `${created.message} N° ${created.order_number}`;
-    } catch (requestError) {
+    } catch (requestError: unknown) {
       if (requestError instanceof ApiError && requestError.status === 429) {
         error = "Has alcanzado el límite de pedidos. Intenta más tarde.";
       } else {

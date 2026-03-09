@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { login } from "../../lib/api/auth";
-  import { setToken } from "../../lib/auth/session";
-  import ThemeToggle from "./shared/ThemeToggle.svelte";
+  import { setCachedSession, setToken } from "../../../lib/auth/session";
+  import ThemeToggle from "../shared/ThemeToggle.svelte";
 
   let email = $state("");
   let password = $state("");
@@ -29,7 +28,33 @@
     isLoading = true;
 
     try {
-      const result = await login(email.trim(), password);
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
+
+      const result = (await response.json()) as {
+        token: string;
+        employee: {
+          id: string;
+          email: string;
+          name: string;
+          phone: string;
+          role: "admin" | "manager" | "staff";
+          active: boolean;
+        };
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.error || "No se pudo iniciar sesion");
+      }
+
+      setCachedSession(result.employee);
       setToken(result.token);
       window.location.href = "/admin";
     } catch (error) {

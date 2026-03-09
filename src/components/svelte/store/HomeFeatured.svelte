@@ -19,7 +19,7 @@
       const products = await listPublicProducts();
       featured = products
         .filter((product) => product.is_available && product.stock_status === "in_stock")
-        .slice(0, 3);
+        .slice(0, 4);
     } catch (requestError) {
       error = requestError instanceof Error ? requestError.message : "No se pudo cargar el menú.";
     } finally {
@@ -49,23 +49,39 @@
     {:else if error}
       <div class="alert alert-error">{error}</div>
     {:else}
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {#each featured as product (product.id)}
-          <article class="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow duration-300 h-full flex flex-col">
-            {#if product.image_url}
-              <figure class="overflow-hidden">
-                <img src={product.image_url} alt={product.name} class="w-full h-32 sm:h-40 md:h-48 object-contain bg-base-200" loading="lazy" />
-              </figure>
-            {/if}
-            <div class="card-body grow">
-              <h3 class="card-title">{product.name}</h3>
-              <p class="text-sm text-base-content/70 grow">{product.description}</p>
-              <div class="card-actions justify-between items-center mt-4">
-                <span class="text-2xl font-bold text-primary">{formatCurrency(product.price)}</span>
-                <span class="badge badge-success">Disponible</span>
+          <div class="hover-3d h-full">
+            <article class="card card-sm bg-base-200 w-full max-w-64 mx-auto shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden h-full">
+              {#if product.image_url}
+                <figure class="bg-base-100 w-full aspect-3/4 overflow-hidden">
+                  <img
+                    src={product.image_url}
+                    alt={product.name}
+                    class="w-full h-full object-cover object-center"
+                    loading="lazy"
+                  />
+                </figure>
+              {/if}
+              <div class="card-body p-4">
+                <h3 class="card-title">{product.name}</h3>
+                <p class="text-sm text-base-content/70">{product.description}</p>
+                <div class="card-actions justify-between items-center mt-2">
+                  <span class="text-2xl font-bold text-primary">{formatCurrency(product.price)}</span>
+                  <span class="badge badge-success">Disponible</span>
+                </div>
               </div>
-            </div>
-          </article>
+            </article>
+
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+          </div>
         {/each}
       </div>
     {/if}

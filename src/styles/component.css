@@ -23,3 +23,13 @@
 .navbar .menu a:hover {
   transform: translateY(-2px);
 }
+
+/* Card 3D hover effect */
+.hover-3d {
+  position: relative;
+  transition: transform 0.3s ease;
+}
+
+.hover-3d:hover {
+  transform: translateY(-4px);
+}

@@ -1,8 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { getSession, logout } from "../../lib/api/auth";
-  import { ApiError } from "../../lib/api/client";
-  import { clearToken, getToken } from "../../lib/auth/session";
+  import { clearToken, getToken } from "../../../lib/auth/session";
   import {
     approveOrder,
     createCategory,
@@ -33,12 +31,12 @@
     type Employee,
     type Order,
     type Product,
-  } from "../../lib/api/admin";
-  import AdminHeader, { type TabKey } from "./admin/AdminHeader.svelte";
-  import OrdersTab from "./admin/OrdersTab.svelte";
-  import CategoriesTab from "./admin/CategoriesTab.svelte";
-  import ProductsTab from "./admin/ProductsTab.svelte";
-  import EmployeesTab from "./admin/EmployeesTab.svelte";
+  } from "../../../lib/api/admin";
+  import AdminHeader, { type TabKey } from "./AdminHeader.svelte";
+  import OrdersTab from "./tabs/OrdersTab.svelte";
+  import CategoriesTab from "./tabs/CategoriesTab.svelte";
+  import ProductsTab from "./tabs/ProductsTab.svelte";
+  import EmployeesTab from "./tabs/EmployeesTab.svelte";
 
   type Session = {
     id: string;
@@ -143,48 +141,49 @@
   async function loadSession() {
     loading = true;
     sessionError = "";
-
-    const token = getToken();
-    if (!token) {
-      stopOrdersPolling();
-      sessionError = "No hay sesion activa. Inicia sesion para acceder al panel.";
-      loading = false;
-      return;
-    }
-
     try {
-      session = await getSession(token);
+      const response = await fetch("/api/admin/session", {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Sesion invalida");
+      }
+
+      session = payload as Session;
     } catch (requestError) {
       stopOrdersPolling();
-      const apiError = requestError as ApiError;
-      if (apiError?.status === 401 || apiError?.status === 403) {
-        clearToken();
-      }
+      clearToken();
       sessionError = requestError instanceof Error ? requestError.message : "Sesion invalida";
       loading = false;
       return;
     }
 
-    await Promise.all([
-      loadOrders(),
-      loadProducts(),
-    ]);
-    if (session?.role === "admin") {
-      await Promise.all([loadCategories(), loadEmployees(), loadProductImages()]);
-    }
-
-    startOrdersPolling();
-
+    // Show dashboard immediately after session resolves.
     loading = false;
+
+    // Load modules in background so a slow endpoint cannot block the UI forever.
+    void (async () => {
+      await Promise.allSettled([
+        loadOrders(),
+        loadProducts(),
+      ]);
+      if (session?.role === "admin") {
+        await Promise.allSettled([loadCategories(), loadEmployees(), loadProductImages()]);
+      }
+      startOrdersPolling();
+    })();
   }
 
   async function handleLogout() {
-    const token = getToken();
-    if (token) {
-      try {
-        await logout(token);
-      } catch {
-      }
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch {
     }
     clearToken();
     window.location.href = "/admin/login";

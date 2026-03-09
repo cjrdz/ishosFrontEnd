@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Category } from "../../../lib/api/admin";
-  import { toSlug } from "../../../lib/utils/formatters";
+  import type { Category } from "../../../../lib/api/admin";
+  import { toSlug } from "../../../../lib/utils/formatters";
 
   interface Props {
     categories: Category[];

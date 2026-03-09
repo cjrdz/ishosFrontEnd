@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Employee, Order, Product } from "../../../lib/api/admin";
-  import { formatCurrency } from "../../../lib/utils/formatters";
+  import type { Employee, Order, Product } from "../../../../lib/api/admin";
+  import { formatCurrency } from "../../../../lib/utils/formatters";
 
   interface CreateOrderPayload {
     customer_name: string;

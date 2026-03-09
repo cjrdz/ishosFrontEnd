@@ -1,10 +1,12 @@
 ---
-import AppLayout from "../../layouts/AppLayout.astro";
-import AdminLoginForm from "../../components/svelte/AdminLoginForm.svelte";
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import AdminLoginForm from "../../components/svelte/admin/AdminLoginForm.svelte";
 ---
 
-<AppLayout title="Admin Login - IshosFactory">
+<AdminLayout title="Admin Login - IshosFactory">
   <section class="min-h-[70vh] flex items-center justify-center">
     <AdminLoginForm client:load />
   </section>
-</AppLayout>
+</AdminLayout>

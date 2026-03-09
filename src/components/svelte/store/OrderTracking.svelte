@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { trackPublicOrder, type PublicOrderStatus, type PublicOrderTrackingResponse } from "../../../lib/api/store";
-  import { getTracking, saveTracking } from "../../../lib/storefront/tracking";
+  import { getTracking, saveTracking } from "../../../lib/store/tracking";
 
   const STATUS_FLOW: PublicOrderStatus[] = [
     "pendiente_revision",

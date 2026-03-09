@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { AdminImage, Category, Product } from "../../../lib/api/admin";
-  import { formatCurrency } from "../../../lib/utils/formatters";
+  import type { AdminImage, Category, Product } from "../../../../lib/api/admin";
+  import { formatCurrency } from "../../../../lib/utils/formatters";
 
   interface Props {
     categories: Category[];
