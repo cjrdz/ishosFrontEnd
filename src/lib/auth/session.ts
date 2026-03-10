@@ -39,8 +39,8 @@ export function clearCachedSession(): void {
 }
 
 // Backward-compatible token helpers used by existing admin dashboard flows.
-// The backend uses HttpOnly cookies, but we keep this in-memory token for
-// existing API methods that still expect a token argument.
+// The backend uses HttpOnly cookies, so these are DEPRECATED.
+// New code should NOT use these functions - tokens are now handled via HttpOnly cookies automatically.
 export function getToken(): string | null {
   if (typeof window !== "undefined") {
     const stored = localStorage.getItem(tokenKey);

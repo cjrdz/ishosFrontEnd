@@ -6,6 +6,7 @@
   let loading = $state(true);
   let error = $state("");
   let featured = $state<PublicProduct[]>([]);
+  const featuredSkeletonCards = Array.from({ length: 4 }, (_, index) => index);
 
   onMount(() => {
     void loadFeatured();
@@ -45,7 +46,24 @@
     <h2 class="text-3xl font-bold text-center mb-8">Productos Destacados</h2>
 
     {#if loading}
-      <div class="skeleton h-48 w-full rounded-xl"></div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {#each featuredSkeletonCards as cardIndex (cardIndex)}
+          <article class="card card-sm bg-base-200 w-full max-w-64 mx-auto shadow-md overflow-hidden h-full" aria-hidden="true">
+            <div class="skeleton w-full aspect-3/4"></div>
+            <div class="card-body p-4 space-y-3">
+              <div class="skeleton h-5 w-3/4"></div>
+              <div class="space-y-2">
+                <div class="skeleton h-4 w-full"></div>
+                <div class="skeleton h-4 w-5/6"></div>
+              </div>
+              <div class="card-actions justify-between items-center mt-2">
+                <div class="skeleton h-8 w-20"></div>
+                <div class="skeleton h-6 w-24 rounded-full"></div>
+              </div>
+            </div>
+          </article>
+        {/each}
+      </div>
     {:else if error}
       <div class="alert alert-error">{error}</div>
     {:else}

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { clearToken, getToken } from "../../../lib/auth/session";
   import {
     approveOrder,
     createCategory,
@@ -26,11 +25,14 @@
     updateOrderNotes,
     updateOrderStatus,
     updateProduct,
-    type AdminImage,
-    type Category,
-    type Employee,
-    type Order,
-    type Product,
+  } from "../../../lib/bff/admin";
+  // Re-export types from the original admin API for compatibility
+  import type {
+    AdminImage,
+    Category,
+    Employee,
+    Order,
+    Product,
   } from "../../../lib/api/admin";
   import AdminHeader, { type TabKey } from "./AdminHeader.svelte";
   import OrdersTab from "./tabs/OrdersTab.svelte";
@@ -89,14 +91,6 @@
     setTimeout(() => {
       notice = "";
     }, 3000);
-  }
-
-  function tokenOrThrow(): string {
-    const token = getToken();
-    if (!token) {
-      throw new Error("Sesion invalida, inicia sesion de nuevo");
-    }
-    return token;
   }
 
   function setModuleError(module: keyof typeof moduleErrors, message: string) {
@@ -158,7 +152,6 @@
       session = payload as Session;
     } catch (requestError) {
       stopOrdersPolling();
-      clearToken();
       sessionError = requestError instanceof Error ? requestError.message : "Sesion invalida";
       loading = false;
       return;
@@ -185,7 +178,6 @@
       await fetch("/api/admin/logout", { method: "POST" });
     } catch {
     }
-    clearToken();
     window.location.href = "/admin/login";
   }
 
@@ -194,7 +186,7 @@
     busy.categorias = true;
     clearModuleError("categorias");
     try {
-      categories = await listCategories(tokenOrThrow(), true);
+      categories = await listCategories(true);
     } catch (requestError) {
       setModuleError("categorias", requestError instanceof Error ? requestError.message : "No se pudieron cargar categorias");
     } finally {
@@ -206,7 +198,7 @@
     busy.productos = true;
     clearModuleError("productos");
     try {
-      products = await listProducts(tokenOrThrow());
+      products = await listProducts();
     } catch (requestError) {
       setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudieron cargar productos");
     } finally {
@@ -219,7 +211,8 @@
     productGalleryBusy = true;
     clearModuleError("productos");
     try {
-      productImages = await listAdminImages(tokenOrThrow());
+      const response = await listAdminImages();
+      productImages = response.images || [];
     } catch (requestError) {
       setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo cargar galeria de imagenes");
     } finally {
@@ -235,17 +228,17 @@
     }
 
     try {
-      const response = await listOrders(tokenOrThrow(), orderStatusFilter);
+      const response = await listOrders(orderStatusFilter);
       const incomingOrders = response.orders;
 
       if (hasLoadedOrdersOnce) {
-        const freshOrders = incomingOrders.filter((order) => !knownOrderIds.has(order.id));
+        const freshOrders = incomingOrders.filter((order: Order) => !knownOrderIds.has(order.id));
         if (freshOrders.length > 0) {
           showNewOrdersToast(freshOrders.length, freshOrders[0]);
         }
       }
 
-      knownOrderIds = new Set(incomingOrders.map((order) => order.id));
+      knownOrderIds = new Set(incomingOrders.map((order: Order) => order.id));
       hasLoadedOrdersOnce = true;
       orders = incomingOrders;
     } catch (requestError) {
@@ -264,7 +257,7 @@
     busy.empleados = true;
     clearModuleError("empleados");
     try {
-      employees = await listEmployees(tokenOrThrow());
+      employees = await listEmployees();
     } catch (requestError) {
       setModuleError("empleados", requestError instanceof Error ? requestError.message : "No se pudieron cargar empleados");
     } finally {
@@ -272,11 +265,11 @@
     }
   }
 
-  async function handleCreateOrder(payload: Parameters<typeof createOrder>[1]) {
+  async function handleCreateOrder(payload: Parameters<typeof createOrder>[0]) {
     busy.ordenes = true;
     clearModuleError("ordenes");
     try {
-      await createOrder(tokenOrThrow(), payload);
+      await createOrder(payload);
       setNotice("Orden creada");
       await loadOrders();
       return true;
@@ -293,7 +286,7 @@
     busy.ordenes = true;
     clearModuleError("ordenes");
     try {
-      await deleteOrder(tokenOrThrow(), orderId);
+      await deleteOrder(orderId);
       if (selectedOrder?.id === orderId) {
         selectedOrder = null;
       }
@@ -310,7 +303,7 @@
     busy.ordenes = true;
     clearModuleError("ordenes");
     try {
-      selectedOrder = await getOrder(tokenOrThrow(), orderId);
+      selectedOrder = await getOrder(orderId);
       return selectedOrder;
     } catch (requestError) {
       setModuleError("ordenes", requestError instanceof Error ? requestError.message : "No se pudo cargar detalle de orden");
@@ -324,7 +317,7 @@
     busy.ordenes = true;
     clearModuleError("ordenes");
     try {
-      const updated = await approveOrder(tokenOrThrow(), orderId);
+      const updated = await approveOrder(orderId);
       let finalUpdated = updated;
 
       if (reactivationReason?.trim()) {
@@ -334,7 +327,7 @@
         const mergedNotes = currentNotes
           ? `${currentNotes}\n\n${reactivationEntry}`
           : reactivationEntry;
-        finalUpdated = await updateOrderNotes(tokenOrThrow(), orderId, mergedNotes);
+        finalUpdated = await updateOrderNotes(orderId, mergedNotes);
       }
 
       if (selectedOrder?.id === orderId) {
@@ -357,7 +350,7 @@
     busy.ordenes = true;
     clearModuleError("ordenes");
     try {
-      const updated = await rejectOrder(tokenOrThrow(), orderId, reason);
+      const updated = await rejectOrder(orderId, reason);
       if (selectedOrder?.id === orderId) {
         selectedOrder = { ...selectedOrder, ...updated };
       }
@@ -374,7 +367,7 @@
     busy.ordenes = true;
     clearModuleError("ordenes");
     try {
-      const updated = await updateOrderStatus(tokenOrThrow(), orderId, status);
+      const updated = await updateOrderStatus(orderId, status);
       if (selectedOrder?.id === orderId) {
         selectedOrder = { ...selectedOrder, ...updated };
       }
@@ -389,11 +382,11 @@
     }
   }
 
-  async function handleUpdateOrder(orderId: string, payload: Parameters<typeof updateOrder>[2]) {
+  async function handleUpdateOrder(orderId: string, payload: Parameters<typeof updateOrder>[1]) {
     busy.ordenes = true;
     clearModuleError("ordenes");
     try {
-      const updated = await updateOrder(tokenOrThrow(), orderId, payload);
+      const updated = await updateOrder(orderId, payload);
       if (selectedOrder?.id === orderId) {
         selectedOrder = { ...selectedOrder, ...updated };
       }
@@ -408,12 +401,12 @@
     }
   }
 
-  async function handleCreateCategory(payload: Parameters<typeof createCategory>[1]) {
+  async function handleCreateCategory(payload: Parameters<typeof createCategory>[0]) {
     if (!isAdmin) return;
     busy.categorias = true;
     clearModuleError("categorias");
     try {
-      await createCategory(tokenOrThrow(), payload);
+      await createCategory(payload);
       setNotice("Categoria creada");
       await loadCategories();
     } catch (requestError) {
@@ -423,12 +416,12 @@
     }
   }
 
-  async function handleUpdateCategory(id: string, payload: Parameters<typeof updateCategory>[2]) {
+  async function handleUpdateCategory(id: string, payload: Parameters<typeof updateCategory>[1]) {
     if (!isAdmin) return;
     busy.categorias = true;
     clearModuleError("categorias");
     try {
-      await updateCategory(tokenOrThrow(), id, payload);
+      await updateCategory(id, payload);
       setNotice("Categoria actualizada");
       await loadCategories();
     } catch (requestError) {
@@ -443,7 +436,7 @@
     busy.categorias = true;
     clearModuleError("categorias");
     try {
-      await deleteCategory(tokenOrThrow(), id);
+      await deleteCategory(id);
       setNotice("Categoria eliminada");
       await loadCategories();
     } catch (requestError) {
@@ -453,12 +446,12 @@
     }
   }
 
-  async function handleCreateProduct(payload: Parameters<typeof createProduct>[1]) {
+  async function handleCreateProduct(payload: Parameters<typeof createProduct>[0]) {
     if (!isAdmin) return;
     busy.productos = true;
     clearModuleError("productos");
     try {
-      await createProduct(tokenOrThrow(), payload);
+      await createProduct(payload);
       setNotice("Producto creado");
       await loadProducts();
     } catch (requestError) {
@@ -468,12 +461,12 @@
     }
   }
 
-  async function handleUpdateProduct(id: string, payload: Parameters<typeof updateProduct>[2]) {
+  async function handleUpdateProduct(id: string, payload: Parameters<typeof updateProduct>[1]) {
     if (!isAdmin) return;
     busy.productos = true;
     clearModuleError("productos");
     try {
-      await updateProduct(tokenOrThrow(), id, payload);
+      await updateProduct(id, payload);
       setNotice("Producto actualizado");
       await loadProducts();
     } catch (requestError) {
@@ -488,7 +481,7 @@
     busy.productos = true;
     clearModuleError("productos");
     try {
-      await deleteProduct(tokenOrThrow(), id);
+      await deleteProduct(id);
       setNotice("Producto eliminado");
       await loadProducts();
     } catch (requestError) {
@@ -503,7 +496,7 @@
     productGalleryBusy = true;
     clearModuleError("productos");
     try {
-      const uploaded = await uploadAdminImage(tokenOrThrow(), file, "menu");
+      const uploaded = await uploadAdminImage(file, "menu");
       setNotice("Imagen subida al bucket");
       await loadProductImages();
       return uploaded.path;
@@ -520,7 +513,7 @@
     productGalleryBusy = true;
     clearModuleError("productos");
     try {
-      await deleteAdminImage(tokenOrThrow(), path);
+      await deleteAdminImage(path);
       setNotice("Imagen eliminada del bucket");
       await loadProductImages();
       return true;
@@ -532,12 +525,12 @@
     }
   }
 
-  async function handleCreateEmployee(payload: Parameters<typeof createEmployee>[1]) {
+  async function handleCreateEmployee(payload: Parameters<typeof createEmployee>[0]) {
     if (!isAdmin) return;
     busy.empleados = true;
     clearModuleError("empleados");
     try {
-      await createEmployee(tokenOrThrow(), payload);
+      await createEmployee(payload);
       setNotice("Empleado creado");
       await loadEmployees();
     } catch (requestError) {
@@ -547,12 +540,12 @@
     }
   }
 
-  async function handleUpdateEmployee(id: string, payload: Parameters<typeof updateEmployee>[2]) {
+  async function handleUpdateEmployee(id: string, payload: Parameters<typeof updateEmployee>[1]) {
     if (!isAdmin) return;
     busy.empleados = true;
     clearModuleError("empleados");
     try {
-      await updateEmployee(tokenOrThrow(), id, payload);
+      await updateEmployee(id, payload);
       setNotice("Empleado actualizado");
       await loadEmployees();
     } catch (requestError) {
@@ -567,7 +560,7 @@
     busy.empleados = true;
     clearModuleError("empleados");
     try {
-      await deleteEmployee(tokenOrThrow(), id);
+      await deleteEmployee(id);
       setNotice("Empleado eliminado permanentemente");
       await loadEmployees();
     } catch (requestError) {

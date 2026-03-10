@@ -1,17 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { setCachedSession, setToken } from "../../../lib/auth/session";
+  import { setCachedSession } from "../../../lib/auth/session";
   import ThemeToggle from "../shared/ThemeToggle.svelte";
+  import { COLOR_THEME, DARK_THEME, type ThemeMode } from "../../../lib/theme/constants";
 
   let email = $state("");
   let password = $state("");
   let isLoading = $state(false);
   let errorMessage = $state("");
-  let theme = $state<"valentine" | "night">("valentine");
+  let theme = $state<ThemeMode>(COLOR_THEME);
 
   function syncTheme() {
     const current = document.documentElement.getAttribute("data-theme");
-    theme = current === "night" ? "night" : "valentine";
+    theme = (current === DARK_THEME ? DARK_THEME : COLOR_THEME) as ThemeMode;
   }
 
   onMount(() => {
@@ -55,7 +56,6 @@
       }
 
       setCachedSession(result.employee);
-      setToken(result.token);
       window.location.href = "/admin";
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : "No se pudo iniciar sesión";
@@ -71,7 +71,7 @@
       <ThemeToggle />
     </div>
     <div class="flex justify-center -mt-2 mb-2">
-      {#if theme === "night"}
+      {#if theme === DARK_THEME}
         <img src="/images/whiteicon.png" alt="Isho's" width="86" height="86" />
       {:else}
         <img src="/images/blackicon.png" alt="Isho's" width="86" height="86" />

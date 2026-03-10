@@ -531,7 +531,7 @@
               </div>
               <ul tabindex="-1" class="dropdown-content menu bg-base-100 rounded-box z-50 w-52 p-2 shadow-sm border border-base-300">
                 <li><button type="button" onclick={() => onFilterChange("")}>Todos</button></li>
-                <li><button type="button" onclick={() => onFilterChange("pendiente_revision")}>pendiente_revision</button></li>
+                <li><button type="button" onclick={() => onFilterChange("pendiente_revision")}>pendiente</button></li>
                 <li><button type="button" onclick={() => onFilterChange("recibida")}>recibida</button></li>
                 <li><button type="button" onclick={() => onFilterChange("en_proceso")}>preparando</button></li>
                 <li><button type="button" onclick={() => onFilterChange("lista")}>lista</button></li>
