@@ -6,7 +6,7 @@
  */
 
 import { apiRequest } from './client';
-import type { Session, LoginRequest, LoginResponse } from '../types/auth';
+import type { Session, LoginRequest, LoginResponse } from '../../types/auth';
 
 /**
  * Login with email and password

@@ -19,7 +19,7 @@
     try {
       const products = await listPublicProducts();
       featured = products
-        .filter((product) => product.is_available && product.stock_status === "in_stock")
+        .filter((product) => product.is_available)
         .slice(0, 4);
     } catch (requestError) {
       error = requestError instanceof Error ? requestError.message : "No se pudo cargar el menú.";
@@ -84,28 +84,29 @@
               <div class="card-body p-4">
                 <h3 class="card-title">{product.name}</h3>
                 <p class="text-sm text-base-content/70">{product.description}</p>
+                
+                {#if product.flavors && product.flavors.length > 0}
+                  <div class="flex flex-wrap gap-2 my-2">
+                    {#each product.flavors.slice(0, 2) as flavor (flavor.id)}
+                      <div class="flex items-center gap-1">
+                        <span class="text-xs text-base-content/60">{flavor.name}</span>
+                        {#if flavor.is_seasonal}
+                          <span class="badge badge-sm badge-warning">Temporada</span>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+                
                 <div class="card-actions justify-between items-center mt-2">
                   <span class="text-2xl font-bold text-primary">{formatCurrency(product.price)}</span>
                   <span class="badge badge-success">Disponible</span>
                 </div>
               </div>
             </article>
-
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
           </div>
         {/each}
       </div>
     {/if}
-
-    <div class="text-center">
-      <a href="/menu" class="btn btn-outline">Ir al menú</a>
-    </div>
   </section>
 </div>

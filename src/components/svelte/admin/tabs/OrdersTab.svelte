@@ -10,7 +10,11 @@
     order_type: "en_local" | "para_llevar";
     table_number?: number;
     notes?: string;
-    items: Array<{ product_id: string; quantity: number }>;
+    items: Array<{
+      product_id: string;
+      quantity: number;
+      customizations?: Record<string, unknown>;
+    }>;
   }
 
   interface Props {
@@ -82,6 +86,82 @@
   let editError = $state("");
   let editNotice = $state("");
   let orderSearch = $state("");
+  let selectedFlavorId = $state("");
+  let includedToppingId = $state("");
+  let includedJaleaId = $state("");
+  let selectedExtraAddonIds = $state<string[]>([]);
+  let lastSelectedProductId = $state("");
+
+  const DEFAULT_ADDON_GROUP_NAME = "extras";
+  const ADDON_GROUP_LABELS: Record<string, string> = {
+    toppings: "Toppings",
+    jalea: "Jalea",
+    extras: "Extras",
+  };
+
+  type ProductAddon = NonNullable<Product["addons"]>[number];
+
+  function normalizeAddonGroupName(value: string): string {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+      return DEFAULT_ADDON_GROUP_NAME;
+    }
+
+    switch (normalized) {
+      case "topping":
+      case "toppings":
+        return "toppings";
+      case "jalea":
+      case "jaleas":
+        return "jalea";
+      case "extra":
+      case "extras":
+        return "extras";
+      default:
+        if (normalized.includes("topping")) {
+          return "toppings";
+        }
+        if (normalized.includes("jalea")) {
+          return "jalea";
+        }
+        if (normalized.includes("extra")) {
+          return "extras";
+        }
+        return normalized;
+    }
+  }
+
+  function addonGroupLabel(value: string): string {
+    const normalized = normalizeAddonGroupName(value);
+    if (ADDON_GROUP_LABELS[normalized]) {
+      return ADDON_GROUP_LABELS[normalized];
+    }
+
+    return normalized
+      .split(/[\s_-]+/)
+      .filter(Boolean)
+      .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+      .join(" ");
+  }
+
+  function groupAddonsByGroup(source: ProductAddon[]): Array<{ key: string; label: string; items: ProductAddon[] }> {
+    const grouped = new Map<string, ProductAddon[]>();
+
+    for (const addon of source) {
+      const key = normalizeAddonGroupName(addon.group_name);
+      const current = grouped.get(key) ?? [];
+      current.push(addon);
+      grouped.set(key, current);
+    }
+
+    return Array.from(grouped.entries())
+      .sort((left, right) => left[0].localeCompare(right[0]))
+      .map(([key, items]) => ({
+        key,
+        label: addonGroupLabel(key),
+        items: items.slice().sort((left, right) => left.display_order - right.display_order || left.name.localeCompare(right.name)),
+      }));
+  }
   let orderForm = $state({
     customer_name: "",
     customer_phone: "",
@@ -109,6 +189,45 @@
   const selectedProduct = $derived(
     products.find((product) => product.id === orderForm.product_id) || null,
   );
+  const selectedProductFlavors = $derived(
+    (selectedProduct?.flavors ?? [])
+      .filter((flavor) => flavor.is_active)
+      .slice()
+      .sort((left, right) => left.display_order - right.display_order || left.name.localeCompare(right.name)),
+  );
+  const selectedProductAddons = $derived(
+    (selectedProduct?.addons ?? [])
+      .filter((addon) => addon.is_active)
+      .slice()
+      .sort((left, right) => {
+        const leftGroup = normalizeAddonGroupName(left.group_name);
+        const rightGroup = normalizeAddonGroupName(right.group_name);
+        return (
+          leftGroup.localeCompare(rightGroup) ||
+          left.display_order - right.display_order ||
+          left.name.localeCompare(right.name)
+        );
+      }),
+  );
+  const selectedProductAddonGroups = $derived(groupAddonsByGroup(selectedProductAddons));
+  const toppingAddons = $derived(
+    selectedProductAddons.filter((addon) => normalizeAddonGroupName(addon.group_name) === "toppings"),
+  );
+  const jaleaAddons = $derived(
+    selectedProductAddons.filter((addon) => normalizeAddonGroupName(addon.group_name) === "jalea"),
+  );
+  const paidAddonGroups = $derived(
+    selectedProductAddonGroups.filter((group) => group.key !== "toppings" && group.key !== "jalea"),
+  );
+  const hasCustomizationOptions = $derived(
+    selectedProductFlavors.length > 0 || selectedProductAddons.length > 0,
+  );
+  const customizationDebugSummary = $derived({
+    flavors: selectedProductFlavors.length,
+    toppings: toppingAddons.length,
+    jaleas: jaleaAddons.length,
+    extras: paidAddonGroups.reduce((sum, group) => sum + group.items.length, 0),
+  });
   const normalizedOrderSearch = $derived(orderSearch.trim().toLowerCase());
   const filteredOrders = $derived(
     !normalizedOrderSearch
@@ -117,7 +236,15 @@
   );
 
   const pricePreview = $derived(selectedProduct ? selectedProduct.price : 0);
-  const totalPreview = $derived((selectedProduct ? selectedProduct.price : 0) * Number(orderForm.quantity || 0));
+  const addonsPreviewTotal = $derived(
+    selectedExtraAddonIds.reduce((sum, addonId) => {
+      const addon = selectedProductAddons.find((candidate) => candidate.id === addonId);
+      return sum + (addon?.price ?? 0);
+    }, 0),
+  );
+  const totalPreview = $derived(
+    ((selectedProduct ? selectedProduct.price : 0) + addonsPreviewTotal) * Number(orderForm.quantity || 0),
+  );
   const isEditing = $derived(!!editOrderId);
   const employeeById = $derived(
     employees.reduce((acc, employee) => {
@@ -125,6 +252,43 @@
       return acc;
     }, {} as Record<string, string>),
   );
+
+  $effect(() => {
+    const currentProductId = selectedProduct?.id ?? "";
+    if (currentProductId !== lastSelectedProductId) {
+      lastSelectedProductId = currentProductId;
+      selectedFlavorId = "";
+      includedToppingId = "";
+      includedJaleaId = "";
+      selectedExtraAddonIds = [];
+      return;
+    }
+
+    if (selectedFlavorId && !selectedProductFlavors.some((flavor) => flavor.id === selectedFlavorId)) {
+      selectedFlavorId = "";
+    }
+
+    const normalizedAddonIds = selectedExtraAddonIds.filter((addonId) =>
+      selectedProductAddons.some((addon) => addon.id === addonId),
+    );
+    if (normalizedAddonIds.length !== selectedExtraAddonIds.length) {
+      selectedExtraAddonIds = normalizedAddonIds;
+    }
+
+    if (includedToppingId && !toppingAddons.some((addon) => addon.id === includedToppingId)) {
+      includedToppingId = "";
+    }
+    if (includedJaleaId && !jaleaAddons.some((addon) => addon.id === includedJaleaId)) {
+      includedJaleaId = "";
+    }
+
+    if (includedToppingId) {
+      selectedExtraAddonIds = selectedExtraAddonIds.filter((addonId) => addonId !== includedToppingId);
+    }
+    if (includedJaleaId) {
+      selectedExtraAddonIds = selectedExtraAddonIds.filter((addonId) => addonId !== includedJaleaId);
+    }
+  });
 
   const linearStatuses: Array<"pendiente_revision" | "recibida" | "en_proceso" | "lista" | "entregada"> = [
     "pendiente_revision",
@@ -222,6 +386,10 @@
     editOrderId = null;
     editError = "";
     editNotice = "";
+    selectedFlavorId = "";
+    includedToppingId = "";
+    includedJaleaId = "";
+    selectedExtraAddonIds = [];
     orderForm = {
       customer_name: "",
       customer_phone: "",
@@ -233,6 +401,35 @@
       product_id: products[0]?.id || "",
       quantity: 1,
     };
+  }
+
+  function toggleExtraAddonSelection(addonId: string, checked: boolean) {
+    if (addonId === includedToppingId || addonId === includedJaleaId) {
+      return;
+    }
+
+    if (checked) {
+      if (!selectedExtraAddonIds.includes(addonId)) {
+        selectedExtraAddonIds = [...selectedExtraAddonIds, addonId];
+      }
+      return;
+    }
+
+    selectedExtraAddonIds = selectedExtraAddonIds.filter((currentAddonId) => currentAddonId !== addonId);
+  }
+
+  function changeIncludedTopping(addonId: string) {
+    includedToppingId = addonId;
+    if (addonId) {
+      selectedExtraAddonIds = selectedExtraAddonIds.filter((currentAddonId) => currentAddonId !== addonId);
+    }
+  }
+
+  function changeIncludedJalea(addonId: string) {
+    includedJaleaId = addonId;
+    if (addonId) {
+      selectedExtraAddonIds = selectedExtraAddonIds.filter((currentAddonId) => currentAddonId !== addonId);
+    }
   }
 
   function openCreateOrderModal() {
@@ -272,6 +469,18 @@
       return;
     }
 
+    const customizations: Record<string, unknown> = {};
+    if (selectedFlavorId) {
+      customizations.flavor_id = selectedFlavorId;
+    }
+    const includedAddonIDs = [includedToppingId, includedJaleaId].filter((value) => value);
+    if (includedAddonIDs.length > 0) {
+      customizations.included_addon_ids = includedAddonIDs;
+    }
+    if (selectedExtraAddonIds.length > 0) {
+      customizations.extra_addon_ids = selectedExtraAddonIds;
+    }
+
     const created = await onCreate({
       customer_name: orderForm.customer_name.trim(),
       customer_phone: orderForm.customer_phone.trim(),
@@ -286,6 +495,7 @@
         {
           product_id: orderForm.product_id,
           quantity: Number(orderForm.quantity),
+          customizations: Object.keys(customizations).length > 0 ? customizations : undefined,
         },
       ],
     });
@@ -425,7 +635,25 @@
 
   function renderReceipt(order: Order) {
     const itemsMarkup = (order.items || []).map((item) => {
-      return `<tr><td>${item.product_name}</td><td>${item.quantity}</td><td>${formatCurrency(item.subtotal)}</td></tr>`;
+      let details = "";
+      if (item.customizations) {
+        const parts: string[] = [];
+        if (item.customizations.flavor_name) parts.push(`Sabor: ${item.customizations.flavor_name}`);
+        if (Array.isArray(item.customizations.included_addon_names) && item.customizations.included_addon_names.length > 0) {
+          parts.push(`Incluidos: ${(item.customizations.included_addon_names as string[]).join(", ")}`);
+        }
+        if (Array.isArray(item.customizations.extra_addon_names) && item.customizations.extra_addon_names.length > 0) {
+          parts.push(`Extras: ${(item.customizations.extra_addon_names as string[]).join(", ")}`);
+        }
+        if (Array.isArray(item.customizations.addon_names) && item.customizations.addon_names.length > 0) {
+          parts.push(`Complementos: ${(item.customizations.addon_names as string[]).join(", ")}`);
+        }
+        if (item.customizations.notes) parts.push(`Nota: ${item.customizations.notes}`);
+        if (parts.length > 0) {
+          details = `<br><span style="font-size:11px;color:#666">${parts.join(" | ")}</span>`;
+        }
+      }
+      return `<tr><td>${item.product_name}${details}</td><td>${item.quantity}</td><td>${formatCurrency(item.subtotal)}</td></tr>`;
     }).join("");
 
     const itemsTable = itemsMarkup || `<tr><td colspan="3">Sin items</td></tr>`;
@@ -738,7 +966,26 @@
               {:else}
                 {#each selectedOrder.items as item}
                   <tr>
-                    <td>{item.product_name}</td>
+                    <td>
+                      <div>{item.product_name}</div>
+                      {#if item.customizations}
+                        {#if item.customizations.flavor_name}
+                          <div class="text-xs text-base-content/60">Sabor: {item.customizations.flavor_name}</div>
+                        {/if}
+                        {#if Array.isArray(item.customizations.addon_names) && item.customizations.addon_names.length > 0}
+                          <div class="text-xs text-base-content/60">Complementos: {item.customizations.addon_names.join(", ")}</div>
+                        {/if}
+                        {#if Array.isArray(item.customizations.included_addon_names) && item.customizations.included_addon_names.length > 0}
+                          <div class="text-xs text-base-content/60">Incluidos: {item.customizations.included_addon_names.join(", ")}</div>
+                        {/if}
+                        {#if Array.isArray(item.customizations.extra_addon_names) && item.customizations.extra_addon_names.length > 0}
+                          <div class="text-xs text-base-content/60">Extras: {item.customizations.extra_addon_names.join(", ")}</div>
+                        {/if}
+                        {#if item.customizations.notes}
+                          <div class="text-xs text-base-content/60">Nota: {item.customizations.notes}</div>
+                        {/if}
+                      {/if}
+                    </td>
                     <td class="text-center">{item.quantity}</td>
                     <td class="text-right">{formatCurrency(item.subtotal)}</td>
                   </tr>
@@ -822,6 +1069,119 @@
             <input id="order-quantity" class="input input-bordered" type="number" min="1" bind:value={orderForm.quantity} required disabled={isEditing} aria-labelledby="order-quantity-label" />
           </div>
         </div>
+        {#if !isEditing && hasCustomizationOptions}
+          <section class="rounded-2xl border border-base-300 bg-base-200/60 p-4 space-y-4">
+            <div class="flex flex-wrap gap-2">
+              <span class="badge badge-outline">Sabores: {customizationDebugSummary.flavors}</span>
+              <span class="badge badge-outline">Toppings: {customizationDebugSummary.toppings}</span>
+              <span class="badge badge-outline">Jaleas: {customizationDebugSummary.jaleas}</span>
+              <span class="badge badge-outline">Extras: {customizationDebugSummary.extras}</span>
+            </div>
+
+            {#if selectedProductFlavors.length > 0}
+              <div class="form-control">
+                <span id="order-flavor-label" class="label-text mb-1">Sabor opcional</span>
+                <select id="order-flavor" class="select select-bordered" bind:value={selectedFlavorId} aria-labelledby="order-flavor-label">
+                  <option value="">Sin sabor seleccionado</option>
+                  {#each selectedProductFlavors as flavor}
+                    <option value={flavor.id}>{flavor.name}</option>
+                  {/each}
+                </select>
+              </div>
+            {/if}
+            {#if toppingAddons.length > 0}
+              <div class="form-control">
+                <span id="order-included-topping-label" class="label-text mb-1">Topping opcional</span>
+                <select id="order-included-topping" class="select select-bordered" bind:value={includedToppingId} onchange={(event) => changeIncludedTopping((event.currentTarget as HTMLSelectElement).value)} aria-labelledby="order-included-topping-label">
+                  <option value="">Sin topping</option>
+                  {#each toppingAddons as addon}
+                    <option value={addon.id}>{addon.name}</option>
+                  {/each}
+                </select>
+              </div>
+            {/if}
+            {#if jaleaAddons.length > 0}
+              <div class="form-control">
+                <span id="order-included-jalea-label" class="label-text mb-1">Jalea opcional</span>
+                <select id="order-included-jalea" class="select select-bordered" bind:value={includedJaleaId} onchange={(event) => changeIncludedJalea((event.currentTarget as HTMLSelectElement).value)} aria-labelledby="order-included-jalea-label">
+                  <option value="">Sin jalea</option>
+                  {#each jaleaAddons as addon}
+                    <option value={addon.id}>{addon.name}</option>
+                  {/each}
+                </select>
+              </div>
+            {/if}
+            {#if selectedProductAddons.length > 0}
+              <div class="form-control">
+                <span class="label-text mb-2">Extras con costo</span>
+                <p class="text-xs text-base-content/60 mb-1">Usa estos toggles para agregar toppings, jaleas u otros extras adicionales que sí deben cobrarse.</p>
+                <div class="space-y-3">
+              {#if toppingAddons.length > 0}
+                <div class="space-y-2">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Toppings extra</p>
+                  <div class="grid gap-2 md:grid-cols-2">
+                    {#each toppingAddons as addon}
+                      <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          checked={selectedExtraAddonIds.includes(addon.id)}
+                          disabled={addon.id === includedToppingId}
+                          onchange={(event) => toggleExtraAddonSelection(addon.id, (event.currentTarget as HTMLInputElement).checked)}
+                        />
+                        <span class="label-text flex-1">{addon.name}</span>
+                        <span class="text-xs font-medium text-base-content/70">+{formatCurrency(addon.price)}</span>
+                      </label>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+
+              {#if jaleaAddons.length > 0}
+                <div class="space-y-2">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Jalea extra</p>
+                  <div class="grid gap-2 md:grid-cols-2">
+                    {#each jaleaAddons as addon}
+                      <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          checked={selectedExtraAddonIds.includes(addon.id)}
+                          disabled={addon.id === includedJaleaId}
+                          onchange={(event) => toggleExtraAddonSelection(addon.id, (event.currentTarget as HTMLInputElement).checked)}
+                        />
+                        <span class="label-text flex-1">{addon.name}</span>
+                        <span class="text-xs font-medium text-base-content/70">+{formatCurrency(addon.price)}</span>
+                      </label>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+
+              {#each paidAddonGroups as group}
+                <div class="space-y-2">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">{group.label}</p>
+                  <div class="grid gap-2 md:grid-cols-2">
+                    {#each group.items as addon}
+                      <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          checked={selectedExtraAddonIds.includes(addon.id)}
+                          onchange={(event) => toggleExtraAddonSelection(addon.id, (event.currentTarget as HTMLInputElement).checked)}
+                        />
+                        <span class="label-text flex-1">{addon.name}</span>
+                        <span class="text-xs font-medium text-base-content/70">+{formatCurrency(addon.price)}</span>
+                      </label>
+                    {/each}
+                  </div>
+                </div>
+              {/each}
+                </div>
+              </div>
+            {/if}
+          </section>
+        {/if}
         <div class="text-sm text-base-content/70">
           {#if isEditing}
             {#if selectedOrder && selectedOrder.id === editOrderId}
@@ -829,6 +1189,9 @@
             {/if}
           {:else}
             <p>Precio unitario: <strong>{formatCurrency(pricePreview)}</strong></p>
+            {#if selectedExtraAddonIds.length > 0}
+              <p>Extras: <strong>{formatCurrency(addonsPreviewTotal)}</strong></p>
+            {/if}
             <p>Total estimado: <strong>{formatCurrency(totalPreview)}</strong></p>
           {/if}
         </div>

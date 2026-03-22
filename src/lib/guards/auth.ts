@@ -12,7 +12,7 @@ import { getCachedSession, isAdmin, isManagerial } from '../auth/session';
 export async function requireAuth(context: APIContext): Promise<void> {
   const session = getCachedSession();
   if (!session) {
-    return context.redirect('/admin/login');
+    context.redirect('/admin/login');
   }
 }
 
@@ -23,7 +23,7 @@ export async function requireAuth(context: APIContext): Promise<void> {
 export async function requireAdmin(context: APIContext): Promise<void> {
   await requireAuth(context);
   if (!isAdmin()) {
-    return context.redirect('/admin/login');
+    context.redirect('/admin/login');
   }
 }
 
@@ -34,6 +34,6 @@ export async function requireAdmin(context: APIContext): Promise<void> {
 export async function requireManagerial(context: APIContext): Promise<void> {
   await requireAuth(context);
   if (!isManagerial()) {
-    return context.redirect('/admin/login');
+    context.redirect('/admin/login');
   }
 }

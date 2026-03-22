@@ -12,16 +12,18 @@
 
   let selectedProduct = $state<PublicProduct | null>(null);
   let modalQty = $state(1);
-  let modalNotes = $state("");
+  let showImageDetails = $state(false);
   let modalRef = $state<HTMLDialogElement | null>(null);
   const tabsGroupName = "store_menu_tabs";
-  const MAX_NOTES_LENGTH = 300;
   const catalogSkeletonCards = Array.from({ length: 10 }, (_, index) => index);
 
   const visibleProducts = $derived(
     activeCategory === "all"
       ? products
       : products.filter((product) => product.category_id === activeCategory),
+  );
+  const modalDisplayPrice = $derived(
+    selectedProduct ? selectedProduct.price * normalizeQty(modalQty) : 0,
   );
 
   onMount(() => {
@@ -41,9 +43,7 @@
       categories = allCategories
         .filter((category) => category.is_active)
         .sort((left, right) => left.display_order - right.display_order);
-      products = allProducts.filter(
-        (product) => product.is_available && product.stock_status === "in_stock",
-      );
+      products = allProducts.filter((product) => product.is_available);
     } catch (error) {
       loadingError =
         error instanceof Error
@@ -57,7 +57,7 @@
   function openProductModal(product: PublicProduct) {
     selectedProduct = product;
     modalQty = 1;
-    modalNotes = "";
+    showImageDetails = false;
     modalRef?.showModal();
   }
 
@@ -73,6 +73,14 @@
     return Math.max(1, Math.floor(value));
   }
 
+  function increaseModalQty() {
+    modalQty = normalizeQty(modalQty) + 1;
+  }
+
+  function decreaseModalQty() {
+    modalQty = Math.max(1, normalizeQty(modalQty) - 1);
+  }
+
   function getSafeImageUrl(url: string | null | undefined): string | undefined {
     if (!url) return undefined;
     if (url.startsWith("/") || url.startsWith("http://") || url.startsWith("https://")) {
@@ -81,11 +89,14 @@
     return undefined;
   }
 
+  function hasSeasonalFlavors(product: PublicProduct): boolean {
+    return (product.flavors ?? []).some((flavor) => flavor.is_active && flavor.is_seasonal);
+  }
+
   function addSelectedToCart(goCheckout = false) {
     if (!selectedProduct) return;
 
     const safeQty = normalizeQty(modalQty);
-    const notes = modalNotes.trim().slice(0, MAX_NOTES_LENGTH) || undefined;
 
     modalQty = safeQty;
 
@@ -95,7 +106,6 @@
       image_url: getSafeImageUrl(selectedProduct.image_url),
       unit_price: selectedProduct.price,
       quantity: safeQty,
-      notes,
     });
 
     modalRef?.close();
@@ -189,6 +199,9 @@
               <div class="card-body p-4">
                 <h3 class="card-title">{product.name}</h3>
                 <p class="text-sm text-base-content/70">{product.description}</p>
+                {#if hasSeasonalFlavors(product)}
+                  <div class="badge badge-warning badge-outline">Sabores de temporada</div>
+                {/if}
                 <div class="card-actions justify-between items-center mt-2">
                   <span class="text-2xl font-bold text-primary">{formatCurrency(product.price)}</span>
                   <button type="button" class="btn btn-primary btn-sm" onclick={(event) => { event.stopPropagation(); openProductModal(product); }}>
@@ -214,72 +227,90 @@
 </div>
 
 <dialog class="modal" bind:this={modalRef}>
-  <div class="modal-box max-w-3xl p-0">
+  <div class="modal-box w-[calc(100%-0.75rem)] sm:w-[min(96vw,980px)] max-w-6xl p-0 relative overflow-hidden max-h-[92dvh]">
+    <button
+      type="button"
+      class="btn btn-md btn-circle btn-primary text-primary-content shadow-md absolute right-2 top-2 sm:right-3 sm:top-3 z-10"
+      aria-label="Cerrar"
+      onclick={() => modalRef?.close()}
+    >
+      X
+    </button>
     {#if selectedProduct}
-      <div class="grid gap-0 md:grid-cols-2">
-        <div class="bg-base-200 p-5 md:p-6 flex items-center justify-center">
+      <div class="grid gap-0 md:grid-cols-[1.15fr_1fr] h-full">
+        <div class="bg-base-200 p-3 sm:p-5 md:p-8 flex flex-col items-center justify-center gap-3">
           {#if getSafeImageUrl(selectedProduct.image_url)}
-            <div class="hover-3d w-full max-w-sm rounded-2xl">
-              <figure class="w-full aspect-4/5 overflow-hidden rounded-2xl bg-base-100">
-                <img
-                  src={getSafeImageUrl(selectedProduct.image_url)}
-                  alt={selectedProduct.name}
-                  class="w-full h-full object-cover object-center"
-                  loading="lazy"
-                />
-              </figure>
+            <div class="flip-3d-card w-full max-w-[280px] sm:max-w-[340px] md:max-w-[420px]" data-flipped={showImageDetails ? "true" : "false"}>
+              <button
+                type="button"
+                class="flip-3d-toggle"
+                aria-label={showImageDetails ? "Ver imagen del producto" : "Ver descripcion del producto"}
+                onclick={() => {
+                  showImageDetails = !showImageDetails;
+                }}
+              >
+                <div class="flip-3d-inner aspect-[4/5]">
+                  <figure class="flip-3d-face overflow-hidden rounded-2xl bg-base-100 shadow-lg">
+                    <img
+                      src={getSafeImageUrl(selectedProduct.image_url)}
+                      alt={selectedProduct.name}
+                      class="w-full h-full object-cover object-center"
+                      loading="lazy"
+                    />
+                  </figure>
 
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
-              <div></div>
+                  <div class="flip-3d-face flip-3d-back rounded-2xl overflow-hidden border border-base-300/60 shadow-lg">
+                    <img
+                      src={getSafeImageUrl(selectedProduct.image_url)}
+                      alt={selectedProduct.name}
+                      class="absolute inset-0 w-full h-full object-cover object-center opacity-55"
+                      loading="lazy"
+                    />
+                    <div class="absolute inset-0 bg-base-100/25"></div>
+                    <div class="relative z-10 h-full w-full p-5 flex items-center justify-center text-center">
+                      <div class="space-y-3 rounded-2xl bg-base-100/55 backdrop-blur-md border border-base-content/10 p-4 sm:p-5">
+                        <h4 class="text-xl font-bold">{selectedProduct.name}</h4>
+                        <p class="text-sm text-base-content/75">{selectedProduct.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </button>
             </div>
+            <p class="text-xs text-base-content/60">Toca la tarjeta para ver descripcion</p>
           {:else}
-            <div class="w-full max-w-sm aspect-4/5 rounded-2xl bg-base-100 grid place-items-center text-base-content/50">
+            <div class="w-full max-w-[280px] sm:max-w-[340px] md:max-w-[420px] aspect-[4/5] rounded-2xl bg-base-100 grid place-items-center text-base-content/50">
               Sin imagen disponible
             </div>
           {/if}
         </div>
 
-        <div class="p-5 md:p-6 space-y-4">
-          <div class="space-y-2">
+        <div class="p-4 sm:p-5 md:p-7 space-y-4 sm:space-y-5 overflow-y-auto max-h-[92dvh]">
+          <div class="space-y-2 sm:space-y-3 pr-8 sm:pr-10">
             <h3 class="text-2xl font-bold leading-tight">{selectedProduct.name}</h3>
-            <p class="text-sm text-base-content/70">{selectedProduct.description}</p>
-            <p class="text-xl font-semibold text-primary">{formatCurrency(selectedProduct.price)}</p>
+            <p class="text-xl font-semibold text-primary">{formatCurrency(modalDisplayPrice)}</p>
+            <p class="text-xs text-base-content/60">Personaliza sabores y extras en el carrito.</p>
           </div>
 
-          <label class="form-control">
+          <div class="form-control space-y-1">
             <span class="label-text font-medium">Cantidad</span>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              inputmode="numeric"
-              class="input input-bordered w-full"
-              bind:value={modalQty}
-              onchange={() => {
-                modalQty = normalizeQty(modalQty);
-              }}
-            />
-          </label>
-
-          <label class="form-control">
-            <span class="label-text font-medium">Notas del producto (opcional)</span>
-            <textarea class="textarea textarea-bordered w-full" rows="3" placeholder="Ej: sin topping, extra servilletas" bind:value={modalNotes}></textarea>
-          </label>
-
-          <div class="rounded-lg bg-base-200 px-4 py-3 flex items-center justify-between">
-            <span class="text-sm text-base-content/70">Subtotal</span>
-            <span class="font-semibold text-lg text-primary">{formatCurrency(selectedProduct.price * normalizeQty(modalQty))}</span>
+            <div class="join w-full">
+              <button class="btn btn-md join-item" type="button" onclick={decreaseModalQty} aria-label="Reducir cantidad">-</button>
+              <span class="btn btn-md join-item no-animation flex-1 text-base">{normalizeQty(modalQty)}</span>
+              <button class="btn btn-md join-item" type="button" onclick={increaseModalQty} aria-label="Aumentar cantidad">+</button>
+            </div>
           </div>
 
-          <div class="flex flex-col sm:flex-row gap-2 pt-1">
-            <button type="button" class="btn btn-primary flex-1" onclick={() => addSelectedToCart(false)}>Agregar al carrito</button>
-            <button type="button" class="btn btn-outline sm:min-w-40" onclick={() => addSelectedToCart(true)}>Ir a checkout</button>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button type="button" class="btn btn-primary" onclick={() => addSelectedToCart(false)}>Agregar</button>
+            <button type="button" class="btn btn-outline gap-2" onclick={() => addSelectedToCart(true)}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="size-4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="8" cy="21" r="1"></circle>
+                <circle cx="19" cy="21" r="1"></circle>
+                <path d="M2.5 3H5l2.4 11.3a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L21 7H7"></path>
+              </svg>
+              Pagar
+            </button>
           </div>
         </div>
       </div>

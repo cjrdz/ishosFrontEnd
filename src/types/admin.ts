@@ -2,7 +2,7 @@
  * Admin dashboard types
  */
 
-import type { Product, Category, Order, OrderStatus } from './store';
+import type { Order } from './store';
 import type { UserRole } from './auth';
 
 /**

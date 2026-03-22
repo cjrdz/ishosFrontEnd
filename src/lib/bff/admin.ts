@@ -13,6 +13,34 @@ export interface BFFResponse<T> {
   code?: string;
 }
 
+export interface AnalyticsOverview {
+  period: 'week' | 'month' | 'year';
+  total_orders: number;
+  total_revenue: number;
+  avg_order_value: number;
+  status_breakdown: Record<string, number>;
+}
+
+export interface AnalyticsTimelinePoint {
+  date: string;
+  count: number;
+  revenue: number;
+}
+
+export interface AnalyticsTopProduct {
+  name: string;
+  total_sold: number;
+  total_value: number;
+}
+
+export type OrderStatus =
+  | 'pendiente_revision'
+  | 'recibida'
+  | 'en_proceso'
+  | 'lista'
+  | 'entregada'
+  | 'cancelada';
+
 async function bffRequest<T>(
   path: string,
   options: {
@@ -175,6 +203,31 @@ export async function deleteProduct(id: string) {
   });
 }
 
+// Product Flavors and Addons
+export async function linkProductFlavor(productId: string, flavorId: string) {
+  return bffRequest<any>(`/api/admin/products/${productId}/flavors/${flavorId}`, {
+    method: 'POST',
+  });
+}
+
+export async function unlinkProductFlavor(productId: string, flavorId: string) {
+  return bffRequest<any>(`/api/admin/products/${productId}/flavors/${flavorId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function linkProductAddon(productId: string, addonId: string) {
+  return bffRequest<any>(`/api/admin/products/${productId}/addons/${addonId}`, {
+    method: 'POST',
+  });
+}
+
+export async function unlinkProductAddon(productId: string, addonId: string) {
+  return bffRequest<any>(`/api/admin/products/${productId}/addons/${addonId}`, {
+    method: 'DELETE',
+  });
+}
+
 // Images
 export async function listAdminImages() {
   const response = await bffRequest<{ images?: any[] }>('/api/admin/images');
@@ -248,5 +301,146 @@ export async function deactivateEmployee(id: string) {
   return bffRequest<any>(`/api/admin/employees/${id}`, {
     method: 'DELETE',
     query: { action: 'deactivate' },
+  });
+}
+
+// Flavors
+export async function listFlavors(includeAll = false) {
+  const query = includeAll ? { all: true } : undefined;
+  return bffRequest<any>('/api/admin/flavors', { query });
+}
+
+export async function createFlavor(payload: any) {
+  return bffRequest<any>('/api/admin/flavors', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function updateFlavor(id: string, payload: any) {
+  return bffRequest<any>(`/api/admin/flavors/${id}`, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
+
+export async function deleteFlavor(id: string) {
+  return bffRequest<any>(`/api/admin/flavors/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+// Addons
+export async function listAddons(includeAll = false) {
+  const query = includeAll ? { all: true } : undefined;
+  return bffRequest<any>('/api/admin/addons', { query });
+}
+
+export async function createAddon(payload: any) {
+  return bffRequest<any>('/api/admin/addons', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function updateAddon(id: string, payload: any) {
+  return bffRequest<any>(`/api/admin/addons/${id}`, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
+
+export async function deleteAddon(id: string) {
+  return bffRequest<any>(`/api/admin/addons/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+// Analytics
+export async function getAnalyticsOverview(period: 'week' | 'month' | 'year') {
+  return bffRequest<AnalyticsOverview>('/api/admin/analytics/overview', {
+    query: { period },
+  });
+}
+
+export async function getAnalyticsOrdersOverTime(
+  start: string,
+  end: string,
+  groupBy: 'day' | 'week' | 'month' = 'day',
+) {
+  return bffRequest<AnalyticsTimelinePoint[]>('/api/admin/analytics/orders-over-time', {
+    query: { start, end, groupBy },
+  });
+}
+
+export async function getAnalyticsTopProducts(limit = 10) {
+  return bffRequest<AnalyticsTopProduct[]>('/api/admin/analytics/top-products', {
+    query: { limit },
+  });
+}
+
+// Export
+export async function exportOrders(
+  start: string,
+  end: string,
+  format: 'csv' | 'json',
+  statuses?: OrderStatus[],
+): Promise<Blob> {
+  const url = new URL('/api/admin/export/orders', window.location.origin);
+  url.searchParams.set('start', start);
+  url.searchParams.set('end', end);
+  url.searchParams.set('format', format);
+  if (statuses && statuses.length > 0) {
+    url.searchParams.set('statuses', statuses.join(','));
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    let message = 'Export failed';
+    try {
+      const payload = await response.json();
+      message = payload?.error || payload?.message || message;
+    } catch {
+    }
+    throw new ApiError(message, response.status, 'EXPORT_ERROR');
+  }
+
+  return response.blob();
+}
+
+export async function archiveExportedOrders(start: string, end: string) {
+  return bffRequest<{
+    message: string;
+    archived_count?: number;
+    deleted_count?: number;
+    deleted_items_count?: number;
+    statuses?: string[];
+  }>('/api/admin/export/orders', {
+    method: 'DELETE',
+    query: {
+      start,
+      end,
+    },
+  });
+}
+
+export async function purgeOrdersByStatuses(start: string, end: string, statuses: OrderStatus[]) {
+  return bffRequest<{
+    message: string;
+    archived_count?: number;
+    deleted_count?: number;
+    deleted_items_count?: number;
+    statuses?: string[];
+  }>('/api/admin/export/orders', {
+    method: 'DELETE',
+    query: {
+      start,
+      end,
+      statuses: statuses.join(','),
+    },
   });
 }

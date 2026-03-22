@@ -24,7 +24,27 @@ export interface Product {
   image_url?: string | null;
   image_path?: string | null;
   is_available: boolean;
-  stock_status: "in_stock" | "out_of_stock" | "discontinued";
+  flavors?: Flavor[];
+  addons?: Addon[];
+  created_at?: string;
+}
+
+export interface Flavor {
+  id: string;
+  name: string;
+  display_order: number;
+  is_seasonal: boolean;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface Addon {
+  id: string;
+  name: string;
+  price: number;
+  group_name: string;
+  display_order: number;
+  is_active: boolean;
   created_at?: string;
 }
 
@@ -151,7 +171,6 @@ export async function createProduct(
     price: number;
     category_id: string;
     image_path?: string;
-    stock_status?: Product["stock_status"];
   },
 ): Promise<Product> {
   return apiRequest<Product>("/products", {
@@ -170,7 +189,6 @@ export async function updateProduct(
     price: number;
     image_path: string;
     is_available: boolean;
-    stock_status: Product["stock_status"];
   }>,
 ): Promise<Product> {
   return apiRequest<Product>(`/products/${id}`, {
@@ -349,6 +367,157 @@ export async function deleteEmployee(token: string, id: string): Promise<{ messa
   });
 }
 
+// ─── Flavors ─────────────────────────────────────────────────────────────
+
+export async function listFlavors(token: string, includeAll = false): Promise<Flavor[]> {
+  const suffix = includeAll ? "?all=true" : "";
+  return apiRequest<Flavor[]>(`/flavors${suffix}`, { token });
+}
+
+export async function getFlavor(token: string, id: string): Promise<Flavor> {
+  return apiRequest<Flavor>(`/flavors/${id}`, { token });
+}
+
+export async function createFlavor(
+  token: string,
+  payload: {
+    name: string;
+    display_order?: number;
+    is_seasonal?: boolean;
+  },
+): Promise<Flavor> {
+  return apiRequest<Flavor>("/flavors", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function updateFlavor(
+  token: string,
+  id: string,
+  payload: Partial<{
+    name: string;
+    display_order: number;
+    is_seasonal: boolean;
+    is_active: boolean;
+  }>,
+): Promise<Flavor> {
+  return apiRequest<Flavor>(`/flavors/${id}`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
+export async function deleteFlavor(token: string, id: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/flavors/${id}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+// ─── Addons ──────────────────────────────────────────────────────────────
+
+export async function listAddons(token: string, includeAll = false): Promise<Addon[]> {
+  const suffix = includeAll ? "?all=true" : "";
+  return apiRequest<Addon[]>(`/addons${suffix}`, { token });
+}
+
+export async function getAddon(token: string, id: string): Promise<Addon> {
+  return apiRequest<Addon>(`/addons/${id}`, { token });
+}
+
+export async function createAddon(
+  token: string,
+  payload: {
+    name: string;
+    price?: number;
+    group_name?: string;
+    display_order?: number;
+  },
+): Promise<Addon> {
+  return apiRequest<Addon>("/addons", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function updateAddon(
+  token: string,
+  id: string,
+  payload: Partial<{
+    name: string;
+    price: number;
+    group_name: string;
+    display_order: number;
+    is_active: boolean;
+  }>,
+): Promise<Addon> {
+  return apiRequest<Addon>(`/addons/${id}`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
+export async function deleteAddon(token: string, id: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/addons/${id}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+// ─── Product-Flavor Links ────────────────────────────────────────────────
+
+export async function linkProductFlavor(
+  token: string,
+  productId: string,
+  flavorId: string,
+): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/products/${productId}/flavors/${flavorId}`, {
+    method: "POST",
+    token,
+  });
+}
+
+export async function unlinkProductFlavor(
+  token: string,
+  productId: string,
+  flavorId: string,
+): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/products/${productId}/flavors/${flavorId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+// ─── Product-Addon Links ─────────────────────────────────────────────────
+
+export async function linkProductAddon(
+  token: string,
+  productId: string,
+  addonId: string,
+): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/products/${productId}/addons/${addonId}`, {
+    method: "POST",
+    token,
+  });
+}
+
+export async function unlinkProductAddon(
+  token: string,
+  productId: string,
+  addonId: string,
+): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/products/${productId}/addons/${addonId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+// ─── Admin Images ─────────────────────────────────────────────────────────
 export async function listAdminImages(token: string): Promise<AdminImage[]> {
   const response = await apiRequest<{ images?: AdminImage[] }>("/upload/images", { token });
   return response.images ?? [];

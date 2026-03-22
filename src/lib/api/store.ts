@@ -10,6 +10,23 @@ export interface PublicCategory {
   is_active: boolean;
 }
 
+export interface PublicFlavor {
+  id: string;
+  name: string;
+  display_order: number;
+  is_seasonal: boolean;
+  is_active: boolean;
+}
+
+export interface PublicAddon {
+  id: string;
+  name: string;
+  price: number;
+  group_name: string;
+  display_order: number;
+  is_active: boolean;
+}
+
 export interface PublicProduct {
   id: string;
   name: string;
@@ -20,7 +37,8 @@ export interface PublicProduct {
   image_url?: string | null;
   image_path?: string | null;
   is_available: boolean;
-  stock_status: "in_stock" | "out_of_stock" | "discontinued";
+  flavors?: PublicFlavor[];
+  addons?: PublicAddon[];
 }
 
 export type PublicOrderStatus =
@@ -62,6 +80,10 @@ export interface PublicOrderTrackingResponse {
   order_type: "en_local" | "para_llevar";
 }
 
+export interface PublicOrderTrackingHistoryResponse {
+  orders: PublicOrderTrackingResponse[];
+}
+
 export async function listPublicCategories(): Promise<PublicCategory[]> {
   return apiRequest<PublicCategory[]>("/categories");
 }
@@ -89,4 +111,16 @@ export async function trackPublicOrder(
   });
 
   return apiRequest<PublicOrderTrackingResponse>(`/orders/track?${query.toString()}`);
+}
+
+export async function trackPublicOrdersByPhone(
+  customerPhone: string,
+  limit = 20,
+): Promise<PublicOrderTrackingHistoryResponse> {
+  const query = new URLSearchParams({
+    customer_phone: customerPhone,
+    limit: String(limit),
+  });
+
+  return apiRequest<PublicOrderTrackingHistoryResponse>(`/orders/track/history?${query.toString()}`);
 }

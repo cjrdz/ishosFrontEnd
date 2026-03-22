@@ -25,12 +25,26 @@
     updateOrderNotes,
     updateOrderStatus,
     updateProduct,
+    linkProductFlavor,
+    unlinkProductFlavor,
+    linkProductAddon,
+    unlinkProductAddon,
+    listFlavors,
+    listAddons,
+    createFlavor,
+    createAddon,
+    updateFlavor,
+    updateAddon,
+    deleteFlavor,
+    deleteAddon,
   } from "../../../lib/bff/admin";
   // Re-export types from the original admin API for compatibility
   import type {
+    Addon,
     AdminImage,
     Category,
     Employee,
+    Flavor,
     Order,
     Product,
   } from "../../../lib/api/admin";
@@ -39,6 +53,7 @@
   import CategoriesTab from "./tabs/CategoriesTab.svelte";
   import ProductsTab from "./tabs/ProductsTab.svelte";
   import EmployeesTab from "./tabs/EmployeesTab.svelte";
+  import ToolsTab from "./tabs/ToolsTab.svelte";
 
   type Session = {
     id: string;
@@ -61,6 +76,8 @@
   let productImages = $state<AdminImage[]>([]);
   let orders = $state<Order[]>([]);
   let employees = $state<Employee[]>([]);
+  let flavors = $state<Flavor[]>([]);
+  let addons = $state<Addon[]>([]);
   let selectedOrder = $state<Order | null>(null);
   let orderStatusFilter = $state("");
   let productGalleryBusy = $state(false);
@@ -74,12 +91,16 @@
     ordenes: "",
     categorias: "",
     productos: "",
+    sabores: "",
+    complementos: "",
     empleados: "",
   });
 
   let busy = $state({
     categorias: false,
     productos: false,
+    sabores: false,
+    complementos: false,
     ordenes: false,
     empleados: false,
   });
@@ -167,7 +188,7 @@
         loadProducts(),
       ]);
       if (session?.role === "admin") {
-        await Promise.allSettled([loadCategories(), loadEmployees(), loadProductImages()]);
+        await Promise.allSettled([loadCategories(), loadEmployees(), loadProductImages(), loadFlavors(), loadAddons()]);
       }
       startOrdersPolling();
     })();
@@ -262,6 +283,26 @@
       setModuleError("empleados", requestError instanceof Error ? requestError.message : "No se pudieron cargar empleados");
     } finally {
       busy.empleados = false;
+    }
+  }
+
+  async function loadFlavors() {
+    if (!isAdmin) return;
+    try {
+      flavors = await listFlavors(true);
+    } catch (requestError) {
+      // Silently fail for flavors as they're supplementary
+      console.error("Error loading flavors:", requestError);
+    }
+  }
+
+  async function loadAddons() {
+    if (!isAdmin) return;
+    try {
+      addons = await listAddons(true);
+    } catch (requestError) {
+      // Silently fail for addons as they're supplementary
+      console.error("Error loading addons:", requestError);
     }
   }
 
@@ -525,6 +566,156 @@
     }
   }
 
+  async function handleLinkProductFlavor(productId: string, flavorId: string) {
+    if (!isAdmin) return;
+    busy.productos = true;
+    clearModuleError("productos");
+    try {
+      await linkProductFlavor(productId, flavorId);
+      setNotice("Sabor añadido al producto");
+      await loadProducts();
+    } catch (requestError) {
+      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo añadir sabor");
+    } finally {
+      busy.productos = false;
+    }
+  }
+
+  async function handleUnlinkProductFlavor(productId: string, flavorId: string) {
+    if (!isAdmin) return;
+    busy.productos = true;
+    clearModuleError("productos");
+    try {
+      await unlinkProductFlavor(productId, flavorId);
+      setNotice("Sabor removido del producto");
+      await loadProducts();
+    } catch (requestError) {
+      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo remover sabor");
+    } finally {
+      busy.productos = false;
+    }
+  }
+
+  async function handleLinkProductAddon(productId: string, addonId: string) {
+    if (!isAdmin) return;
+    busy.productos = true;
+    clearModuleError("productos");
+    try {
+      await linkProductAddon(productId, addonId);
+      setNotice("Adicional añadido al producto");
+      await loadProducts();
+    } catch (requestError) {
+      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo añadir adicional");
+    } finally {
+      busy.productos = false;
+    }
+  }
+
+  async function handleUnlinkProductAddon(productId: string, addonId: string) {
+    if (!isAdmin) return;
+    busy.productos = true;
+    clearModuleError("productos");
+    try {
+      await unlinkProductAddon(productId, addonId);
+      setNotice("Adicional removido del producto");
+      await loadProducts();
+    } catch (requestError) {
+      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo remover adicional");
+    } finally {
+      busy.productos = false;
+    }
+  }
+
+  async function handleCreateFlavor(payload: Parameters<typeof createFlavor>[0]) {
+    if (!isAdmin) return;
+    busy.sabores = true;
+    clearModuleError("sabores");
+    try {
+      await createFlavor(payload);
+      setNotice("Sabor creado");
+      await loadFlavors();
+    } catch (requestError) {
+      setModuleError("sabores", requestError instanceof Error ? requestError.message : "No se pudo crear sabor");
+    } finally {
+      busy.sabores = false;
+    }
+  }
+
+  async function handleUpdateFlavor(id: string, payload: Parameters<typeof updateFlavor>[1]) {
+    if (!isAdmin) return;
+    busy.sabores = true;
+    clearModuleError("sabores");
+    try {
+      await updateFlavor(id, payload);
+      setNotice("Sabor actualizado");
+      await loadFlavors();
+    } catch (requestError) {
+      setModuleError("sabores", requestError instanceof Error ? requestError.message : "No se pudo actualizar sabor");
+    } finally {
+      busy.sabores = false;
+    }
+  }
+
+  async function handleDeleteFlavor(id: string) {
+    if (!isAdmin) return;
+    busy.sabores = true;
+    clearModuleError("sabores");
+    try {
+      await deleteFlavor(id);
+      setNotice("Sabor eliminado");
+      await loadFlavors();
+    } catch (requestError) {
+      setModuleError("sabores", requestError instanceof Error ? requestError.message : "No se pudo eliminar sabor");
+    } finally {
+      busy.sabores = false;
+    }
+  }
+
+  async function handleCreateAddon(payload: Parameters<typeof createAddon>[0]) {
+    if (!isAdmin) return;
+    busy.complementos = true;
+    clearModuleError("complementos");
+    try {
+      await createAddon(payload);
+      setNotice("Complemento creado");
+      await loadAddons();
+    } catch (requestError) {
+      setModuleError("complementos", requestError instanceof Error ? requestError.message : "No se pudo crear complemento");
+    } finally {
+      busy.complementos = false;
+    }
+  }
+
+  async function handleUpdateAddon(id: string, payload: Parameters<typeof updateAddon>[1]) {
+    if (!isAdmin) return;
+    busy.complementos = true;
+    clearModuleError("complementos");
+    try {
+      await updateAddon(id, payload);
+      setNotice("Complemento actualizado");
+      await loadAddons();
+    } catch (requestError) {
+      setModuleError("complementos", requestError instanceof Error ? requestError.message : "No se pudo actualizar complemento");
+    } finally {
+      busy.complementos = false;
+    }
+  }
+
+  async function handleDeleteAddon(id: string) {
+    if (!isAdmin) return;
+    busy.complementos = true;
+    clearModuleError("complementos");
+    try {
+      await deleteAddon(id);
+      setNotice("Complemento eliminado");
+      await loadAddons();
+    } catch (requestError) {
+      setModuleError("complementos", requestError instanceof Error ? requestError.message : "No se pudo eliminar complemento");
+    } finally {
+      busy.complementos = false;
+    }
+  }
+
   async function handleCreateEmployee(payload: Parameters<typeof createEmployee>[0]) {
     if (!isAdmin) return;
     busy.empleados = true;
@@ -665,6 +856,8 @@
       <ProductsTab
         categories={categories}
         products={products}
+        flavors={flavors}
+        addons={addons}
         galleryImages={productImages}
         busy={busy.productos}
         galleryBusy={productGalleryBusy}
@@ -675,6 +868,20 @@
         onReloadGallery={loadProductImages}
         onUploadGalleryImage={handleUploadProductImage}
         onDeleteGalleryImage={handleDeleteProductImage}
+        onLinkFlavor={handleLinkProductFlavor}
+        onUnlinkFlavor={handleUnlinkProductFlavor}
+        onLinkAddon={handleLinkProductAddon}
+        onUnlinkAddon={handleUnlinkProductAddon}
+        onCreateFlavor={handleCreateFlavor}
+        onUpdateFlavor={handleUpdateFlavor}
+        onDeleteFlavor={handleDeleteFlavor}
+        onCreateAddon={handleCreateAddon}
+        onUpdateAddon={handleUpdateAddon}
+        onDeleteAddon={handleDeleteAddon}
+        flavorBusy={busy.sabores}
+        addonBusy={busy.complementos}
+        flavorError={moduleErrors.sabores}
+        addonError={moduleErrors.complementos}
       />
     {/if}
 
@@ -690,14 +897,7 @@
     {/if}
 
     {#if isAdmin && activeTab === "herramientas"}
-      <section class="card bg-base-100 shadow-xl border border-base-300 rounded-2xl">
-        <div class="card-body p-8 space-y-2">
-          <h2 class="text-2xl font-semibold">Herramientas</h2>
-          <p class="text-base-content/70">
-            Proximamente aqui: analiticas, exportacion de ordenes y tareas de mantenimiento.
-          </p>
-        </div>
-      </section>
+      <ToolsTab />
     {/if}
   </div>
 {/if}
