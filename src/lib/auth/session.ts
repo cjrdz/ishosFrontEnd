@@ -1,10 +1,8 @@
 /**
  * Authentication session utilities
  * 
- * Backend sets HttpOnly cookies on login, so we no longer rely on localStorage.
- * The cookie is sent automatically with every request.
- * 
- * This module handles session state on the frontend (optional fallback).
+ * Backend sets HttpOnly cookies on login. This module only caches
+ * session data in the browser runtime for UI state.
  */
 
 import type { Session } from '../../types/auth';
@@ -14,13 +12,14 @@ import type { Session } from '../../types/auth';
  * This is used only as a cache of the current session for UI purposes.
  */
 let cachedSession: Session | null = null;
-let cachedToken: string | null = null;
-const tokenKey = "ishos_admin_token";
 
 /**
  * Get cached session from memory
  */
 export function getCachedSession(): Session | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
   return cachedSession;
 }
 
@@ -28,6 +27,9 @@ export function getCachedSession(): Session | null {
  * Set cached session in memory
  */
 export function setCachedSession(session: Session | null): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
   cachedSession = session;
 }
 
@@ -35,34 +37,10 @@ export function setCachedSession(session: Session | null): void {
  * Clear cached session
  */
 export function clearCachedSession(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
   cachedSession = null;
-}
-
-// Backward-compatible token helpers used by existing admin dashboard flows.
-// The backend uses HttpOnly cookies, so these are DEPRECATED.
-// New code should NOT use these functions - tokens are now handled via HttpOnly cookies automatically.
-export function getToken(): string | null {
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem(tokenKey);
-    if (stored) {
-      cachedToken = stored;
-    }
-  }
-  return cachedToken;
-}
-
-export function setToken(token: string): void {
-  cachedToken = token;
-  if (typeof window !== "undefined") {
-    localStorage.setItem(tokenKey, token);
-  }
-}
-
-export function clearToken(): void {
-  cachedToken = null;
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(tokenKey);
-  }
 }
 
 /**
@@ -70,33 +48,34 @@ export function clearToken(): void {
  * This just checks if we have session data cached
  */
 export function hasSession(): boolean {
-  return cachedSession !== null;
+  return getCachedSession() !== null;
 }
 
 /**
  * Get session email
  */
 export function getSessionEmail(): string | null {
-  return cachedSession?.email || null;
+  return getCachedSession()?.email || null;
 }
 
 /**
  * Get session role
  */
 export function getSessionRole(): string | null {
-  return cachedSession?.role || null;
+  return getCachedSession()?.role || null;
 }
 
 /**
  * Check if user is admin
  */
 export function isAdmin(): boolean {
-  return cachedSession?.role === 'admin';
+  return getCachedSession()?.role === 'admin';
 }
 
 /**
  * Check if user is manager or admin
  */
 export function isManagerial(): boolean {
-  return cachedSession?.role === 'admin' || cachedSession?.role === 'manager';
+  const role = getCachedSession()?.role;
+  return role === 'admin' || role === 'manager';
 }

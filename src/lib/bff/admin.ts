@@ -373,9 +373,13 @@ export async function getAnalyticsOrdersOverTime(
   });
 }
 
-export async function getAnalyticsTopProducts(limit = 10) {
+export async function getAnalyticsTopProducts(limit = 10, start?: string, end?: string) {
+  const query: Record<string, string | number> = { limit };
+  if (start) query.start = start;
+  if (end) query.end = end;
+
   return bffRequest<AnalyticsTopProduct[]>('/api/admin/analytics/top-products', {
-    query: { limit },
+    query,
   });
 }
 

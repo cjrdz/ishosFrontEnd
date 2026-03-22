@@ -11,7 +11,6 @@
 import type { APIRoute } from 'astro';
 import { login } from '../../../lib/api/auth';
 import { LoginSchema } from '../../../lib/validators/admin';
-import { setCachedSession } from '../../../lib/auth/session';
 
 export const prerender = false;
 
@@ -30,13 +29,8 @@ export const POST: APIRoute = async (context) => {
       httpOnly: true,
       sameSite: 'lax',
       secure: context.url.protocol === 'https:',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24,
     });
-
-    // Cache session in memory for UI
-    if (response.employee) {
-      setCachedSession(response.employee);
-    }
 
     // Return response (backend also set HttpOnly cookie)
     return new Response(JSON.stringify(response), {

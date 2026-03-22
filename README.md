@@ -31,8 +31,8 @@ El panel está orientado a operación interna del local:
 
 1. Astro sirve rutas (`/admin/login`, `/admin`) con layout base.
 2. Componentes Svelte se hidratan con `client:load`.
-3. Login llama `POST /auth/login` y guarda JWT en `localStorage`.
-4. Dashboard consulta sesión y datos por módulo según rol.
+3. Login llama `POST /auth/login` y establece `auth_token` en cookie `HttpOnly`.
+4. Middleware de Astro valida sesión del cookie contra `/api/admin/session` antes de permitir rutas protegidas.
 5. Cada acción de UI llama endpoints `/api/v1/...` del backend.
 
 ### Estructura principal
@@ -55,9 +55,18 @@ src/
 			client.ts           # wrapper fetch + manejo de errores
 			auth.ts             # auth endpoints
 			admin.ts            # endpoints del panel
-		auth/session.ts       # token storage
+		auth/session.ts       # caché de sesión en memoria (solo navegador)
 		config.ts             # PUBLIC_API_BASE_URL
 ```
+
+---
+
+## Seguridad de Sesión (estado actual)
+
+- Cookie `auth_token` es `HttpOnly`, `SameSite=Lax`, con `Cache-Control: no-store` en respuestas de auth.
+- El frontend **no** usa `localStorage` para tokens de autenticación.
+- El middleware del panel no se limita a verificar existencia de cookie: valida sesión activa vía BFF (`/api/admin/session`).
+- El backend aplica revocación server-side en logout, por lo que un token revocado queda inválido antes de expiración.
 
 ---
 

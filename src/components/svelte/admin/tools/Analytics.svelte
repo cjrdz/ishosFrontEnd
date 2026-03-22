@@ -227,7 +227,7 @@
       const [overviewResult, timelineResult, topProductsResult] = await Promise.all([
         getAnalyticsOverview(period),
         getAnalyticsOrdersOverTime(start, end, groupBy),
-        getAnalyticsTopProducts(10),
+        getAnalyticsTopProducts(10, start, end),
       ]);
 
       overview = overviewResult;

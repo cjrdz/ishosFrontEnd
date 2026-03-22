@@ -14,6 +14,8 @@ export const prerender = false;
 
 export const POST: APIRoute = async (context) => {
   try {
+    const token = context.cookies.get('auth_token')?.value;
+
     // Clear cached session immediately
     clearCachedSession();
 
@@ -23,7 +25,7 @@ export const POST: APIRoute = async (context) => {
     });
 
     // Call backend logout
-    const response = await logout();
+    const response = await logout(token);
 
     return new Response(JSON.stringify(response), {
       status: 200,

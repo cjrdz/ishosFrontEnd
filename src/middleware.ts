@@ -15,7 +15,7 @@ const protectedRoutes = ['/admin'];
 // Routes that don't require authentication
 const publicRoutes = ['/admin/login'];
 
-export const onRequest = defineMiddleware((context, next) => {
+export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
 
   // Check if this is a protected route
@@ -42,8 +42,50 @@ export const onRequest = defineMiddleware((context, next) => {
       return context.redirect('/admin/login');
     }
 
-    // Session exists - continue
-    return next();
+    // Session cookie exists - verify token validity through BFF session endpoint.
+    try {
+      const sessionResp = await fetch(`${context.url.origin}/api/admin/session`, {
+      method: 'GET',
+      headers: {
+        cookie: `auth_token=${authCookie}`,
+        'cache-control': 'no-store',
+      },
+      });
+
+      if (sessionResp.ok) {
+        return next();
+      }
+
+      context.cookies.delete('auth_token', { path: '/' });
+      if (pathname.startsWith('/api/')) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', code: 'UNAUTHORIZED' }),
+          {
+            status: 401,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store',
+            },
+          }
+        );
+      }
+      return context.redirect('/admin/login');
+    } catch {
+      context.cookies.delete('auth_token', { path: '/' });
+      if (pathname.startsWith('/api/')) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', code: 'UNAUTHORIZED' }),
+          {
+            status: 401,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store',
+            },
+          }
+        );
+      }
+      return context.redirect('/admin/login');
+    }
   }
 
   // Not a protected route - continue

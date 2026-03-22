@@ -8,7 +8,6 @@
 
 import type { APIRoute } from 'astro';
 import { getSession } from '../../../lib/api/auth';
-import { setCachedSession } from '../../../lib/auth/session';
 
 export const prerender = false;
 
@@ -18,8 +17,6 @@ export const GET: APIRoute = async (context) => {
     const token = context.cookies.get('auth_token')?.value;
 
     const session = await getSession(token);
-
-    setCachedSession(session);
 
     return new Response(JSON.stringify(session), {
       status: 200,
