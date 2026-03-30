@@ -102,6 +102,8 @@
   }: Props = $props();
   let productEditorDialog: HTMLDialogElement | null = null;
   let imageGalleryDialog: HTMLDialogElement | null = null;
+  let globalFlavorsDialog: HTMLDialogElement | null = null;
+  let globalAddonsDialog: HTMLDialogElement | null = null;
   let flavorAssignmentDialog: HTMLDialogElement | null = null;
   let addonAssignmentDialog: HTMLDialogElement | null = null;
   let confirmDialog: HTMLDialogElement | null = null;
@@ -118,10 +120,6 @@
   let currentProductForFlavorAddonId = $state<string | null>(null);
   let editingFlavorId = $state<string | null>(null);
   let editingAddonId = $state<string | null>(null);
-  let draggingFlavorId = $state<string | null>(null);
-  let draggingFlavorFromAssigned = $state(false);
-  let draggingAddonId = $state<string | null>(null);
-  let draggingAddonFromAssigned = $state(false);
   let selectedAvailableFlavorIds = $state<string[]>([]);
   let selectedAssignedFlavorIds = $state<string[]>([]);
   let selectedAvailableAddonIds = $state<string[]>([]);
@@ -361,6 +359,22 @@
     productEditorDialog?.showModal();
   }
 
+  function openGlobalFlavorsModal() {
+    globalFlavorsDialog?.showModal();
+  }
+
+  function closeGlobalFlavorsModal() {
+    globalFlavorsDialog?.close();
+  }
+
+  function openGlobalAddonsModal() {
+    globalAddonsDialog?.showModal();
+  }
+
+  function closeGlobalAddonsModal() {
+    globalAddonsDialog?.close();
+  }
+
   function closeProductEditor() {
     productEditorDialog?.close();
     resetForm();
@@ -434,6 +448,13 @@
     flavorAssignmentDialog?.showModal();
   }
 
+  function openFlavorAssignmentForEditingProduct() {
+    if (!editingProductId) return;
+    const product = products.find((item) => item.id === editingProductId);
+    if (!product) return;
+    openFlavorAssignmentDialog(product);
+  }
+
   function closeFlavorAssignmentDialog() {
     flavorAssignmentDialog?.close();
     selectedAvailableFlavorIds = [];
@@ -450,6 +471,13 @@
     addonAssignmentDialog?.showModal();
   }
 
+  function openAddonAssignmentForEditingProduct() {
+    if (!editingProductId) return;
+    const product = products.find((item) => item.id === editingProductId);
+    if (!product) return;
+    openAddonAssignmentDialog(product);
+  }
+
   function closeAddonAssignmentDialog() {
     addonAssignmentDialog?.close();
     selectedAvailableAddonIds = [];
@@ -457,50 +485,6 @@
     if (!flavorAssignmentDialog?.open) {
       currentProductForFlavorAddonId = null;
     }
-  }
-
-  async function addFlavorToProduct(flavorId: string) {
-    if (!currentProductForFlavorAddon) return;
-    flavorAddonBusy = true;
-    try {
-      await onLinkFlavor(currentProductForFlavorAddon.id, flavorId);
-    } finally {
-      flavorAddonBusy = false;
-    }
-  }
-
-  async function removeFlavorFromProduct(flavorId: string) {
-    if (!currentProductForFlavorAddon) return;
-    flavorAddonBusy = true;
-    try {
-      await onUnlinkFlavor(currentProductForFlavorAddon.id, flavorId);
-    } finally {
-      flavorAddonBusy = false;
-    }
-  }
-
-  async function addAddonToProduct(addonId: string) {
-    if (!currentProductForFlavorAddon) return;
-    flavorAddonBusy = true;
-    try {
-      await onLinkAddon(currentProductForFlavorAddon.id, addonId);
-    } finally {
-      flavorAddonBusy = false;
-    }
-  }
-
-  async function removeAddonFromProduct(addonId: string) {
-    if (!currentProductForFlavorAddon) return;
-    flavorAddonBusy = true;
-    try {
-      await onUnlinkAddon(currentProductForFlavorAddon.id, addonId);
-    } finally {
-      flavorAddonBusy = false;
-    }
-  }
-
-  function allowDrop(event: DragEvent) {
-    event.preventDefault();
   }
 
   function toggleSelection(list: string[], id: string): string[] {
@@ -549,40 +533,6 @@
     } finally {
       flavorAddonBusy = false;
     }
-  }
-
-  function handleFlavorDragStart(flavorId: string, fromAssigned: boolean) {
-    draggingFlavorId = flavorId;
-    draggingFlavorFromAssigned = fromAssigned;
-  }
-
-  async function dropFlavorToAssigned() {
-    if (!draggingFlavorId || draggingFlavorFromAssigned) return;
-    await addFlavorToProduct(draggingFlavorId);
-    draggingFlavorId = null;
-  }
-
-  async function dropFlavorToAvailable() {
-    if (!draggingFlavorId || !draggingFlavorFromAssigned) return;
-    await removeFlavorFromProduct(draggingFlavorId);
-    draggingFlavorId = null;
-  }
-
-  function handleAddonDragStart(addonId: string, fromAssigned: boolean) {
-    draggingAddonId = addonId;
-    draggingAddonFromAssigned = fromAssigned;
-  }
-
-  async function dropAddonToAssigned() {
-    if (!draggingAddonId || draggingAddonFromAssigned) return;
-    await addAddonToProduct(draggingAddonId);
-    draggingAddonId = null;
-  }
-
-  async function dropAddonToAvailable() {
-    if (!draggingAddonId || !draggingAddonFromAssigned) return;
-    await removeAddonFromProduct(draggingAddonId);
-    draggingAddonId = null;
   }
 
   function toggleProductAvailability(product: Product, checked: boolean) {
@@ -743,6 +693,12 @@
           <p class="text-sm text-base-content/70">Administra productos, precios y disponibilidad de forma ordenada.</p>
         </div>
         <div class="flex flex-wrap items-end gap-2">
+          <button class="btn btn-outline" type="button" onclick={openGlobalFlavorsModal}>
+            Sabores globales
+          </button>
+          <button class="btn btn-outline" type="button" onclick={openGlobalAddonsModal}>
+            Complementos globales
+          </button>
           <button class="btn btn-primary" type="button" onclick={openCreateProductModal} disabled={busy}>
             Crear producto
           </button>
@@ -810,121 +766,9 @@
                    <td class="text-center align-middle">
                      <div class="flex w-full flex-wrap items-center justify-center gap-2">
                        <button class="btn btn-sm btn-soft btn-accent" onclick={() => editProduct(product)}>Editar</button>
-                       <button class="btn btn-sm btn-soft btn-info" onclick={() => openFlavorAssignmentDialog(product)}>Sabores</button>
-                       <button class="btn btn-sm btn-soft btn-secondary" onclick={() => openAddonAssignmentDialog(product)}>Complementos</button>
                        <button class="btn btn-sm btn-soft btn-error" onclick={() => requestDeleteProduct(product)}>Eliminar</button>
                      </div>
                    </td>
-                </tr>
-              {/each}
-            {/if}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <div class="card bg-base-100 shadow">
-    <div class="card-body">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h4 class="card-title text-base">Sabores globales</h4>
-          <p class="text-sm text-base-content/70">Gestiona sabores disponibles para enlazar a productos.</p>
-        </div>
-        <button class="btn btn-primary btn-sm" type="button" onclick={openCreateFlavorModal} disabled={flavorBusy}>Crear sabor</button>
-      </div>
-
-      {#if flavorError}
-        <div class="alert alert-warning mt-3"><span>{flavorError}</span></div>
-      {/if}
-
-      <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 mt-4">
-        <table class="table table-sm">
-          <thead class="bg-base-200/60 text-base-content">
-            <tr>
-              <th class="font-bold">Nombre</th>
-              <th class="text-center font-bold">Orden</th>
-              <th class="text-center font-bold">Temporada</th>
-              <th class="text-center font-bold">Estado</th>
-              <th class="text-center font-bold">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#if sortedFlavors.length === 0}
-              <tr><td colspan="5" class="text-center">No hay sabores</td></tr>
-            {:else}
-              {#each sortedFlavors as flavor}
-                <tr>
-                  <td>{flavor.name}</td>
-                  <td class="text-center">{flavor.display_order}</td>
-                  <td class="text-center">
-                    {#if flavor.is_seasonal}
-                      <span class="badge badge-warning badge-sm">Temporada</span>
-                    {:else}
-                      <span class="badge badge-ghost badge-sm">Regular</span>
-                    {/if}
-                  </td>
-                  <td class="text-center">
-                    <span class={`badge badge-sm ${flavor.is_active ? "badge-success" : "badge-ghost"}`}>{flavor.is_active ? "Activo" : "Inactivo"}</span>
-                  </td>
-                  <td class="text-center">
-                    <div class="flex justify-center gap-2">
-                      <button class="btn btn-xs btn-soft btn-accent" type="button" onclick={() => editFlavor(flavor)}>Editar</button>
-                      <button class="btn btn-xs btn-soft btn-error" type="button" onclick={() => requestDeleteFlavor(flavor)}>Eliminar</button>
-                    </div>
-                  </td>
-                </tr>
-              {/each}
-            {/if}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <div class="card bg-base-100 shadow">
-    <div class="card-body">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h4 class="card-title text-base">Complementos globales</h4>
-          <p class="text-sm text-base-content/70">Gestiona toppings, jalea y extras disponibles para productos.</p>
-        </div>
-        <button class="btn btn-primary btn-sm" type="button" onclick={openCreateAddonModal} disabled={addonBusy}>Crear complemento</button>
-      </div>
-
-      {#if addonError}
-        <div class="alert alert-warning mt-3"><span>{addonError}</span></div>
-      {/if}
-
-      <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 mt-4">
-        <table class="table table-sm">
-          <thead class="bg-base-200/60 text-base-content">
-            <tr>
-              <th class="font-bold">Nombre</th>
-              <th class="text-center font-bold">Grupo</th>
-              <th class="text-center font-bold">Precio</th>
-              <th class="text-center font-bold">Estado</th>
-              <th class="text-center font-bold">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#if sortedAddons.length === 0}
-              <tr><td colspan="5" class="text-center">No hay complementos</td></tr>
-            {:else}
-              {#each sortedAddons as addon}
-                <tr>
-                  <td>{addon.name}</td>
-                  <td class="text-center">{addonGroupLabel(addon.group_name)}</td>
-                  <td class="text-center">{formatCurrency(addon.price)}</td>
-                  <td class="text-center">
-                    <span class={`badge badge-sm ${addon.is_active ? "badge-success" : "badge-ghost"}`}>{addon.is_active ? "Activo" : "Inactivo"}</span>
-                  </td>
-                  <td class="text-center">
-                    <div class="flex justify-center gap-2">
-                      <button class="btn btn-xs btn-soft btn-accent" type="button" onclick={() => editAddon(addon)}>Editar</button>
-                      <button class="btn btn-xs btn-soft btn-error" type="button" onclick={() => requestDeleteAddon(addon)}>Eliminar</button>
-                    </div>
-                  </td>
                 </tr>
               {/each}
             {/if}
@@ -939,6 +783,16 @@
   <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="font-bold text-lg">{isEditing ? "Editar producto" : "Crear producto"}</h3>
+      {#if isEditing}
+        <div class="flex flex-wrap items-center gap-2">
+          <button class="btn btn-sm btn-soft btn-info" type="button" onclick={openFlavorAssignmentForEditingProduct}>
+            Editar sabores
+          </button>
+          <button class="btn btn-sm btn-soft btn-secondary" type="button" onclick={openAddonAssignmentForEditingProduct}>
+            Editar complementos
+          </button>
+        </div>
+      {/if}
     </div>
 
     <form class="mt-5 grid items-start gap-6 md:grid-cols-[1.15fr_0.85fr]" onsubmit={submit}>
@@ -1042,6 +896,124 @@
   </form>
 </dialog>
 
+<dialog class="modal" bind:this={globalFlavorsDialog}>
+  <div class="modal-box w-11/12 max-w-6xl max-h-[90vh] overflow-y-auto">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h3 class="font-bold text-lg">Sabores globales</h3>
+        <p class="text-sm text-base-content/70">Gestiona sabores disponibles para enlazar a productos.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn btn-primary btn-sm" type="button" onclick={openCreateFlavorModal} disabled={flavorBusy}>Crear sabor</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick={closeGlobalFlavorsModal}>Cerrar</button>
+      </div>
+    </div>
+
+    {#if flavorError}
+      <div class="alert alert-warning mt-3"><span>{flavorError}</span></div>
+    {/if}
+
+    <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 mt-4">
+      <table class="table table-sm">
+        <thead class="bg-base-200/60 text-base-content">
+          <tr>
+            <th class="font-bold">Nombre</th>
+            <th class="text-center font-bold">Orden</th>
+            <th class="text-center font-bold">Temporada</th>
+            <th class="text-center font-bold">Estado</th>
+            <th class="text-center font-bold">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#if sortedFlavors.length === 0}
+            <tr><td colspan="5" class="text-center">No hay sabores</td></tr>
+          {:else}
+            {#each sortedFlavors as flavor}
+              <tr>
+                <td>{flavor.name}</td>
+                <td class="text-center">{flavor.display_order}</td>
+                <td class="text-center">
+                  {#if flavor.is_seasonal}
+                    <span class="badge badge-warning badge-sm">Temporada</span>
+                  {:else}
+                    <span class="badge badge-ghost badge-sm">Regular</span>
+                  {/if}
+                </td>
+                <td class="text-center">
+                  <span class={`badge badge-sm ${flavor.is_active ? "badge-success" : "badge-ghost"}`}>{flavor.is_active ? "Activo" : "Inactivo"}</span>
+                </td>
+                <td class="text-center">
+                  <div class="flex justify-center gap-2">
+                    <button class="btn btn-xs btn-soft btn-accent" type="button" onclick={() => editFlavor(flavor)}>Editar</button>
+                    <button class="btn btn-xs btn-soft btn-error" type="button" onclick={() => requestDeleteFlavor(flavor)}>Eliminar</button>
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          {/if}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button type="button" onclick={closeGlobalFlavorsModal}>close</button></form>
+</dialog>
+
+<dialog class="modal" bind:this={globalAddonsDialog}>
+  <div class="modal-box w-11/12 max-w-6xl max-h-[90vh] overflow-y-auto">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h3 class="font-bold text-lg">Complementos globales</h3>
+        <p class="text-sm text-base-content/70">Gestiona toppings, jalea y extras disponibles para productos.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn btn-primary btn-sm" type="button" onclick={openCreateAddonModal} disabled={addonBusy}>Crear complemento</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick={closeGlobalAddonsModal}>Cerrar</button>
+      </div>
+    </div>
+
+    {#if addonError}
+      <div class="alert alert-warning mt-3"><span>{addonError}</span></div>
+    {/if}
+
+    <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 mt-4">
+      <table class="table table-sm">
+        <thead class="bg-base-200/60 text-base-content">
+          <tr>
+            <th class="font-bold">Nombre</th>
+            <th class="text-center font-bold">Grupo</th>
+            <th class="text-center font-bold">Precio</th>
+            <th class="text-center font-bold">Estado</th>
+            <th class="text-center font-bold">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#if sortedAddons.length === 0}
+            <tr><td colspan="5" class="text-center">No hay complementos</td></tr>
+          {:else}
+            {#each sortedAddons as addon}
+              <tr>
+                <td>{addon.name}</td>
+                <td class="text-center">{addonGroupLabel(addon.group_name)}</td>
+                <td class="text-center">{formatCurrency(addon.price)}</td>
+                <td class="text-center">
+                  <span class={`badge badge-sm ${addon.is_active ? "badge-success" : "badge-ghost"}`}>{addon.is_active ? "Activo" : "Inactivo"}</span>
+                </td>
+                <td class="text-center">
+                  <div class="flex justify-center gap-2">
+                    <button class="btn btn-xs btn-soft btn-accent" type="button" onclick={() => editAddon(addon)}>Editar</button>
+                    <button class="btn btn-xs btn-soft btn-error" type="button" onclick={() => requestDeleteAddon(addon)}>Eliminar</button>
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          {/if}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button type="button" onclick={closeGlobalAddonsModal}>close</button></form>
+</dialog>
+
 <dialog class="modal" bind:this={imageGalleryDialog}>
   <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto">
     <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1127,22 +1099,15 @@
     </div>
 
     <div class="mt-5 grid gap-4 md:grid-cols-[1fr_auto_1fr] items-start">
-      <section class="card bg-base-200/60">
-        <div class="card-body p-4">
-          <h4 class="font-semibold text-sm uppercase tracking-wide text-base-content/70">No asignados</h4>
+      <div class="space-y-2">
+        <h4 class="px-1 font-semibold text-sm uppercase tracking-wide text-base-content/70">No asignados</h4>
+        <section class="rounded-box bg-base-200/60 p-3">
           {#if availableActiveFlavors.length === 0}
-            <p class="text-sm text-base-content/70">No hay sabores disponibles</p>
+            <p class="flex min-h-[50vh] items-center justify-center text-sm text-base-content/70">No hay sabores disponibles</p>
           {:else}
-            <ul class="menu bg-base-100 rounded-box p-2 space-y-1 max-h-[50vh] overflow-y-auto" ondragover={allowDrop} ondrop={dropFlavorToAvailable}>
+            <ul class="space-y-2 max-h-[50vh] overflow-y-auto">
               {#each availableActiveFlavors as flavor}
-                <li
-                  class="flex items-center gap-2"
-                  draggable={!flavorAddonBusy}
-                  ondragstart={() => handleFlavorDragStart(flavor.id, false)}
-                  ondragend={() => {
-                    draggingFlavorId = null;
-                  }}
-                >
+                <li class="flex items-center gap-2 rounded-lg bg-base-100 px-3 py-2">
                   <input
                     type="checkbox"
                     class="checkbox checkbox-sm"
@@ -1152,7 +1117,6 @@
                     }}
                     disabled={flavorAddonBusy}
                   />
-                  <span class="cursor-move text-base-content/50">⋮⋮</span>
                   <div class="flex-1 truncate">{flavor.name}</div>
                   {#if flavor.is_seasonal}
                     <span class="badge badge-warning badge-sm">Temporada</span>
@@ -1161,10 +1125,10 @@
               {/each}
             </ul>
           {/if}
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section class="flex flex-col items-center justify-center gap-2 pt-10">
+      <section class="flex flex-col items-center justify-center gap-2 self-stretch">
         <button class="btn btn-sm btn-primary" type="button" onclick={moveSelectedFlavorsToAssigned} disabled={flavorAddonBusy || selectedAvailableFlavorIds.length === 0}>
           &gt;&gt;
         </button>
@@ -1174,22 +1138,15 @@
         </button>
       </section>
 
-      <section class="card bg-base-200/60">
-        <div class="card-body p-4">
-          <h4 class="font-semibold text-sm uppercase tracking-wide text-base-content/70">Asignados</h4>
+      <div class="space-y-2">
+        <h4 class="px-1 font-semibold text-sm uppercase tracking-wide text-base-content/70">Asignados</h4>
+        <section class="rounded-box bg-base-200/60 p-3">
           {#if currentProductFlavors.length === 0}
-            <p class="text-sm text-base-content/70">No hay sabores asignados</p>
+            <p class="flex min-h-[50vh] items-center justify-center text-sm text-base-content/70">No hay sabores asignados</p>
           {:else}
-            <ul class="menu bg-base-100 rounded-box p-2 space-y-1 max-h-[50vh] overflow-y-auto" ondragover={allowDrop} ondrop={dropFlavorToAssigned}>
+            <ul class="space-y-2 max-h-[50vh] overflow-y-auto">
               {#each currentProductFlavors as flavor}
-                <li
-                  class="flex items-center gap-2"
-                  draggable={!flavorAddonBusy}
-                  ondragstart={() => handleFlavorDragStart(flavor.id, true)}
-                  ondragend={() => {
-                    draggingFlavorId = null;
-                  }}
-                >
+                <li class="flex items-center gap-2 rounded-lg bg-base-100 px-3 py-2">
                   <input
                     type="checkbox"
                     class="checkbox checkbox-sm"
@@ -1199,7 +1156,6 @@
                     }}
                     disabled={flavorAddonBusy}
                   />
-                  <span class="cursor-move text-base-content/50">⋮⋮</span>
                   <div class="flex-1 truncate">{flavor.name}</div>
                   {#if flavor.is_seasonal}
                     <span class="badge badge-warning badge-sm">Temporada</span>
@@ -1208,8 +1164,8 @@
               {/each}
             </ul>
           {/if}
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
 
     <div class="modal-action mt-5">
@@ -1225,22 +1181,15 @@
     </div>
 
     <div class="mt-5 grid gap-4 md:grid-cols-[1fr_auto_1fr] items-start">
-      <section class="card bg-base-200/60">
-        <div class="card-body p-4">
-          <h4 class="font-semibold text-sm uppercase tracking-wide text-base-content/70">No asignados</h4>
+      <div class="space-y-2">
+        <h4 class="px-1 font-semibold text-sm uppercase tracking-wide text-base-content/70">No asignados</h4>
+        <section class="rounded-box bg-base-200/60 p-3">
           {#if availableActiveAddons.length === 0}
-            <p class="text-sm text-base-content/70">No hay complementos disponibles</p>
+            <p class="flex min-h-[50vh] items-center justify-center text-sm text-base-content/70">No hay complementos disponibles</p>
           {:else}
-            <ul class="menu bg-base-100 rounded-box p-2 space-y-1 max-h-[50vh] overflow-y-auto" ondragover={allowDrop} ondrop={dropAddonToAvailable}>
+            <ul class="space-y-2 max-h-[50vh] overflow-y-auto">
               {#each availableActiveAddons as addon}
-                <li
-                  class="flex items-center gap-2"
-                  draggable={!flavorAddonBusy}
-                  ondragstart={() => handleAddonDragStart(addon.id, false)}
-                  ondragend={() => {
-                    draggingAddonId = null;
-                  }}
-                >
+                <li class="flex items-center gap-2 rounded-lg bg-base-100 px-3 py-2">
                   <input
                     type="checkbox"
                     class="checkbox checkbox-sm"
@@ -1250,20 +1199,19 @@
                     }}
                     disabled={flavorAddonBusy}
                   />
-                  <span class="cursor-move text-base-content/50">⋮⋮</span>
                   <div class="flex-1 truncate">
                     {addon.name}
-                    <span class="text-xs text-base-content/70 ml-2">S/. {addon.price.toFixed(2)}</span>
+                    <span class="text-xs text-base-content/70 ml-2">{formatCurrency(addon.price)}</span>
                   </div>
                   <span class="badge badge-outline badge-sm">{addonGroupLabel(addon.group_name)}</span>
                 </li>
               {/each}
             </ul>
           {/if}
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section class="flex flex-col items-center justify-center gap-2 pt-10">
+      <section class="flex flex-col items-center justify-center gap-2 self-stretch">
         <button class="btn btn-sm btn-primary" type="button" onclick={moveSelectedAddonsToAssigned} disabled={flavorAddonBusy || selectedAvailableAddonIds.length === 0}>
           &gt;&gt;
         </button>
@@ -1273,22 +1221,15 @@
         </button>
       </section>
 
-      <section class="card bg-base-200/60">
-        <div class="card-body p-4">
-          <h4 class="font-semibold text-sm uppercase tracking-wide text-base-content/70">Asignados</h4>
+      <div class="space-y-2">
+        <h4 class="px-1 font-semibold text-sm uppercase tracking-wide text-base-content/70">Asignados</h4>
+        <section class="rounded-box bg-base-200/60 p-3">
           {#if currentProductAddons.length === 0}
-            <p class="text-sm text-base-content/70">No hay complementos asignados</p>
+            <p class="flex min-h-[50vh] items-center justify-center text-sm text-base-content/70">No hay complementos asignados</p>
           {:else}
-            <ul class="menu bg-base-100 rounded-box p-2 space-y-1 max-h-[50vh] overflow-y-auto" ondragover={allowDrop} ondrop={dropAddonToAssigned}>
+            <ul class="space-y-2 max-h-[50vh] overflow-y-auto">
               {#each currentProductAddons as addon}
-                <li
-                  class="flex items-center gap-2"
-                  draggable={!flavorAddonBusy}
-                  ondragstart={() => handleAddonDragStart(addon.id, true)}
-                  ondragend={() => {
-                    draggingAddonId = null;
-                  }}
-                >
+                <li class="flex items-center gap-2 rounded-lg bg-base-100 px-3 py-2">
                   <input
                     type="checkbox"
                     class="checkbox checkbox-sm"
@@ -1298,18 +1239,17 @@
                     }}
                     disabled={flavorAddonBusy}
                   />
-                  <span class="cursor-move text-base-content/50">⋮⋮</span>
                   <div class="flex-1 truncate">
                     {addon.name}
-                    <span class="text-xs text-base-content/70 ml-2">S/. {addon.price.toFixed(2)}</span>
+                    <span class="text-xs text-base-content/70 ml-2">{formatCurrency(addon.price)}</span>
                   </div>
                   <span class="badge badge-outline badge-sm">{addonGroupLabel(addon.group_name)}</span>
                 </li>
               {/each}
             </ul>
           {/if}
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
 
     <div class="modal-action mt-5">

@@ -67,6 +67,7 @@
 
   let confirmDialog: HTMLDialogElement | null = null;
   let orderEditorDialog: HTMLDialogElement | null = null;
+  let orderNotesDialog: HTMLDialogElement | null = null;
   let confirmTitle = $state("Confirmar accion");
   let confirmMessage = $state("");
   let confirmAction = $state<null | (() => void)>(null);
@@ -100,6 +101,14 @@
   };
 
   type ProductAddon = NonNullable<Product["addons"]>[number];
+  type ProductFlavor = NonNullable<Product["flavors"]>[number];
+  type ManualOrderItemDraft = {
+    product_id: string;
+    quantity: number;
+    flavor_id?: string;
+    included_addon_ids: string[];
+    extra_addon_ids: string[];
+  };
 
   function normalizeAddonGroupName(value: string): string {
     const normalized = value.trim().toLowerCase();
@@ -162,6 +171,18 @@
         items: items.slice().sort((left, right) => left.display_order - right.display_order || left.name.localeCompare(right.name)),
       }));
   }
+
+  function arraysEqual(a: string[], b: string[]): boolean {
+    if (a.length !== b.length) return false;
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((value, index) => value === sortedB[index]);
+  }
+
+  function normalizeIdList(values: string[] | undefined): string[] {
+    return Array.from(new Set((values ?? []).filter(Boolean))).sort();
+  }
+
   let orderForm = $state({
     customer_name: "",
     customer_phone: "",
@@ -173,6 +194,7 @@
     product_id: "",
     quantity: 1,
   });
+  let manualItems = $state<ManualOrderItemDraft[]>([]);
 
   $effect(() => {
     if (!orderForm.product_id && products.length > 0) {
@@ -252,6 +274,139 @@
       return acc;
     }, {} as Record<string, string>),
   );
+  const manualOrderTotal = $derived(
+    manualItems.reduce((sum, item) => sum + manualItemSubtotal(item), 0),
+  );
+
+  function productById(productId: string): Product | undefined {
+    return products.find((product) => product.id === productId);
+  }
+
+  function activeFlavors(product: Product | null | undefined): ProductFlavor[] {
+    return (product?.flavors ?? [])
+      .filter((flavor) => flavor.is_active)
+      .slice()
+      .sort((left, right) => left.display_order - right.display_order || left.name.localeCompare(right.name));
+  }
+
+  function resolveFlavorName(productId: string, flavorId: string | undefined): string | null {
+    if (!flavorId) return null;
+    const flavor = productById(productId)?.flavors?.find((candidate) => candidate.id === flavorId);
+    return flavor?.name ?? null;
+  }
+
+  function resolveAddonNames(productId: string, addonIds: string[]): string[] {
+    if (addonIds.length === 0) return [];
+    const addons = productById(productId)?.addons ?? [];
+    return addonIds
+      .map((addonId) => addons.find((candidate) => candidate.id === addonId)?.name ?? null)
+      .filter((value): value is string => !!value);
+  }
+
+  function manualItemUnitPrice(item: ManualOrderItemDraft): number {
+    const product = productById(item.product_id);
+    const addonPrice = item.extra_addon_ids.reduce((sum, addonId) => {
+      const addon = product?.addons?.find((candidate) => candidate.id === addonId);
+      return sum + (addon?.price ?? 0);
+    }, 0);
+    return (product?.price ?? 0) + addonPrice;
+  }
+
+  function manualItemSubtotal(item: ManualOrderItemDraft): number {
+    return manualItemUnitPrice(item) * item.quantity;
+  }
+
+  function buildCustomizationsFromDraft(item: ManualOrderItemDraft): Record<string, unknown> | undefined {
+    const customizations: Record<string, unknown> = {};
+    if (item.flavor_id) {
+      customizations.flavor_id = item.flavor_id;
+    }
+    if (item.included_addon_ids.length > 0) {
+      customizations.included_addon_ids = item.included_addon_ids;
+    }
+    if (item.extra_addon_ids.length > 0) {
+      customizations.extra_addon_ids = item.extra_addon_ids;
+    }
+    return Object.keys(customizations).length > 0 ? customizations : undefined;
+  }
+
+  function buildCurrentDraftItem(): ManualOrderItemDraft | null {
+    if (!orderForm.product_id) {
+      editError = "Selecciona un producto para agregar a la orden";
+      return null;
+    }
+
+    const quantity = Number(orderForm.quantity);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      editError = "La cantidad debe ser mayor que cero";
+      return null;
+    }
+
+    if (selectedProduct && activeFlavors(selectedProduct).length > 0 && !selectedFlavorId) {
+      editError = "Selecciona un sabor para este producto";
+      return null;
+    }
+
+    return {
+      product_id: orderForm.product_id,
+      quantity,
+      flavor_id: selectedFlavorId || undefined,
+      included_addon_ids: normalizeIdList([includedToppingId, includedJaleaId].filter((value) => value)),
+      extra_addon_ids: normalizeIdList(selectedExtraAddonIds),
+    };
+  }
+
+  function addDraftItem() {
+    editError = "";
+    const nextItem = buildCurrentDraftItem();
+    if (!nextItem) {
+      return;
+    }
+
+    const existingIndex = manualItems.findIndex((item) => (
+      item.product_id === nextItem.product_id &&
+      (item.flavor_id || "") === (nextItem.flavor_id || "") &&
+      arraysEqual(item.included_addon_ids, nextItem.included_addon_ids) &&
+      arraysEqual(item.extra_addon_ids, nextItem.extra_addon_ids)
+    ));
+
+    if (existingIndex >= 0) {
+      manualItems = manualItems.map((item, index) => (
+        index === existingIndex
+          ? { ...item, quantity: item.quantity + nextItem.quantity }
+          : item
+      ));
+    } else {
+      manualItems = [...manualItems, nextItem];
+    }
+
+    orderForm.quantity = 1;
+    selectedFlavorId = "";
+    includedToppingId = "";
+    includedJaleaId = "";
+    selectedExtraAddonIds = [];
+  }
+
+  function removeDraftItem(indexToRemove: number) {
+    manualItems = manualItems.filter((_, index) => index !== indexToRemove);
+  }
+
+  function updateDraftItemQuantity(indexToUpdate: number, nextQuantity: number) {
+    const safeQuantity = Math.max(0, Math.floor(nextQuantity));
+    manualItems = manualItems
+      .map((item, index) => index === indexToUpdate ? { ...item, quantity: safeQuantity } : item)
+      .filter((item) => item.quantity > 0);
+  }
+
+  function draftItemKey(item: ManualOrderItemDraft, index: number): string {
+    return [
+      item.product_id,
+      item.flavor_id || "",
+      item.included_addon_ids.join(","),
+      item.extra_addon_ids.join(","),
+      String(index),
+    ].join("|");
+  }
 
   $effect(() => {
     const currentProductId = selectedProduct?.id ?? "";
@@ -390,6 +545,7 @@
     includedToppingId = "";
     includedJaleaId = "";
     selectedExtraAddonIds = [];
+    manualItems = [];
     orderForm = {
       customer_name: "",
       customer_phone: "",
@@ -438,8 +594,17 @@
   }
 
   function closeOrderEditor() {
+    orderNotesDialog?.close();
     orderEditorDialog?.close();
     resetOrderForm();
+  }
+
+  function openNotesDialog() {
+    orderNotesDialog?.showModal();
+  }
+
+  function closeNotesDialog() {
+    orderNotesDialog?.close();
   }
 
   async function handleSubmit(event: SubmitEvent) {
@@ -469,16 +634,16 @@
       return;
     }
 
-    const customizations: Record<string, unknown> = {};
-    if (selectedFlavorId) {
-      customizations.flavor_id = selectedFlavorId;
-    }
-    const includedAddonIDs = [includedToppingId, includedJaleaId].filter((value) => value);
-    if (includedAddonIDs.length > 0) {
-      customizations.included_addon_ids = includedAddonIDs;
-    }
-    if (selectedExtraAddonIds.length > 0) {
-      customizations.extra_addon_ids = selectedExtraAddonIds;
+    const fallbackItem = manualItems.length === 0 ? buildCurrentDraftItem() : null;
+    const itemsToCreate = manualItems.length > 0
+      ? manualItems
+      : fallbackItem
+        ? [fallbackItem]
+        : [];
+
+    if (itemsToCreate.length === 0) {
+      editError = "Agrega al menos un producto a la orden";
+      return;
     }
 
     const created = await onCreate({
@@ -491,13 +656,11 @@
         ? Number(orderForm.table_number)
         : undefined,
       notes: orderForm.notes.trim() || undefined,
-      items: [
-        {
-          product_id: orderForm.product_id,
-          quantity: Number(orderForm.quantity),
-          customizations: Object.keys(customizations).length > 0 ? customizations : undefined,
-        },
-      ],
+      items: itemsToCreate.map((item) => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        customizations: buildCustomizationsFromDraft(item),
+      })),
     });
 
     if (created) {
@@ -1007,7 +1170,7 @@
         <span class="text-xs text-base-content/60">{selectedOrder.order_number}</span>
       {/if}
     </div>
-    <form class="grid md:grid-cols-[1.15fr_0.85fr] gap-6 mt-5" onsubmit={handleSubmit}>
+    <form class="mt-5" onsubmit={handleSubmit}>
       <div class="grid gap-5">
         <div class="grid md:grid-cols-2 gap-5">
           <div class="form-control">
@@ -1052,147 +1215,249 @@
               aria-labelledby="order-table-number-label"
             />
           </div>
-          <div class="form-control">
-            <span id="order-product-label" class="label-text mb-1">Producto</span>
-            <select id="order-product" class="select select-bordered" bind:value={orderForm.product_id} required disabled={isEditing} aria-labelledby="order-product-label">
-              {#if products.length === 0}
-                <option value="" disabled>Sin productos</option>
-              {:else}
-                {#each products as product}
-                  <option value={product.id}>{product.name}</option>
-                {/each}
-              {/if}
-            </select>
-          </div>
-          <div class="form-control">
-            <span id="order-quantity-label" class="label-text mb-1">Cantidad</span>
-            <input id="order-quantity" class="input input-bordered" type="number" min="1" bind:value={orderForm.quantity} required disabled={isEditing} aria-labelledby="order-quantity-label" />
-          </div>
         </div>
-        {#if !isEditing && hasCustomizationOptions}
-          <section class="rounded-2xl border border-base-300 bg-base-200/60 p-4 space-y-4">
-            <div class="flex flex-wrap gap-2">
-              <span class="badge badge-outline">Sabores: {customizationDebugSummary.flavors}</span>
-              <span class="badge badge-outline">Toppings: {customizationDebugSummary.toppings}</span>
-              <span class="badge badge-outline">Jaleas: {customizationDebugSummary.jaleas}</span>
-              <span class="badge badge-outline">Extras: {customizationDebugSummary.extras}</span>
+        {#if !isEditing}
+          <section class="rounded-2xl border border-base-300 bg-base-200/50 p-4 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h4 class="font-semibold">Productos de la orden</h4>
+                <p class="text-sm text-base-content/70">Agrega una o varias configuraciones del mismo producto o de productos distintos antes de crear la orden.</p>
+              </div>
+              <div class="text-sm text-base-content/70">{manualItems.length} item(s) agregados</div>
             </div>
 
-            {#if selectedProductFlavors.length > 0}
+            <div class="grid md:grid-cols-[minmax(0,1fr)_140px] gap-4">
               <div class="form-control">
-                <span id="order-flavor-label" class="label-text mb-1">Sabor opcional</span>
-                <select id="order-flavor" class="select select-bordered" bind:value={selectedFlavorId} aria-labelledby="order-flavor-label">
-                  <option value="">Sin sabor seleccionado</option>
-                  {#each selectedProductFlavors as flavor}
-                    <option value={flavor.id}>{flavor.name}</option>
-                  {/each}
+                <span id="order-product-label" class="label-text mb-1">Producto</span>
+                <select id="order-product" class="select select-bordered" bind:value={orderForm.product_id} required aria-labelledby="order-product-label">
+                  {#if products.length === 0}
+                    <option value="" disabled>Sin productos</option>
+                  {:else}
+                    {#each products as product}
+                      <option value={product.id}>{product.name}</option>
+                    {/each}
+                  {/if}
                 </select>
               </div>
-            {/if}
-            {#if toppingAddons.length > 0}
               <div class="form-control">
-                <span id="order-included-topping-label" class="label-text mb-1">Topping opcional</span>
-                <select id="order-included-topping" class="select select-bordered" bind:value={includedToppingId} onchange={(event) => changeIncludedTopping((event.currentTarget as HTMLSelectElement).value)} aria-labelledby="order-included-topping-label">
-                  <option value="">Sin topping</option>
-                  {#each toppingAddons as addon}
-                    <option value={addon.id}>{addon.name}</option>
-                  {/each}
-                </select>
+                <span id="order-quantity-label" class="label-text mb-1">Cantidad</span>
+                <input id="order-quantity" class="input input-bordered" type="number" min="1" bind:value={orderForm.quantity} required aria-labelledby="order-quantity-label" />
               </div>
-            {/if}
-            {#if jaleaAddons.length > 0}
-              <div class="form-control">
-                <span id="order-included-jalea-label" class="label-text mb-1">Jalea opcional</span>
-                <select id="order-included-jalea" class="select select-bordered" bind:value={includedJaleaId} onchange={(event) => changeIncludedJalea((event.currentTarget as HTMLSelectElement).value)} aria-labelledby="order-included-jalea-label">
-                  <option value="">Sin jalea</option>
-                  {#each jaleaAddons as addon}
-                    <option value={addon.id}>{addon.name}</option>
+            </div>
+
+            {#if hasCustomizationOptions}
+              <section class="rounded-2xl border border-base-300 bg-base-100 p-4 space-y-4">
+                <div class="flex flex-wrap gap-2">
+                  <span class="badge badge-outline">Sabores: {customizationDebugSummary.flavors}</span>
+                  <span class="badge badge-outline">Toppings: {customizationDebugSummary.toppings}</span>
+                  <span class="badge badge-outline">Jaleas: {customizationDebugSummary.jaleas}</span>
+                  <span class="badge badge-outline">Extras: {customizationDebugSummary.extras}</span>
+                </div>
+
+                {#if selectedProductFlavors.length > 0}
+                  <div class="form-control">
+                    <span id="order-flavor-label" class="label-text mb-1">Sabor</span>
+                    <select id="order-flavor" class="select select-bordered" bind:value={selectedFlavorId} aria-labelledby="order-flavor-label">
+                      <option value="">Selecciona un sabor</option>
+                      {#each selectedProductFlavors as flavor}
+                        <option value={flavor.id}>{flavor.name}</option>
+                      {/each}
+                    </select>
+                  </div>
+                {/if}
+                {#if toppingAddons.length > 0}
+                  <div class="form-control">
+                    <span id="order-included-topping-label" class="label-text mb-1">Topping opcional</span>
+                    <select id="order-included-topping" class="select select-bordered" bind:value={includedToppingId} onchange={(event) => changeIncludedTopping((event.currentTarget as HTMLSelectElement).value)} aria-labelledby="order-included-topping-label">
+                      <option value="">Sin topping</option>
+                      {#each toppingAddons as addon}
+                        <option value={addon.id}>{addon.name}</option>
+                      {/each}
+                    </select>
+                  </div>
+                {/if}
+                {#if jaleaAddons.length > 0}
+                  <div class="form-control">
+                    <span id="order-included-jalea-label" class="label-text mb-1">Jalea opcional</span>
+                    <select id="order-included-jalea" class="select select-bordered" bind:value={includedJaleaId} onchange={(event) => changeIncludedJalea((event.currentTarget as HTMLSelectElement).value)} aria-labelledby="order-included-jalea-label">
+                      <option value="">Sin jalea</option>
+                      {#each jaleaAddons as addon}
+                        <option value={addon.id}>{addon.name}</option>
+                      {/each}
+                    </select>
+                  </div>
+                {/if}
+                {#if selectedProductAddons.length > 0}
+                  <div class="form-control">
+                    <span class="label-text mb-2">Extras con costo</span>
+                    <p class="text-xs text-base-content/60 mb-1">Usa estos toggles para agregar toppings, jaleas u otros extras adicionales que sí deben cobrarse.</p>
+                    <div class="space-y-3">
+                  {#if toppingAddons.length > 0}
+                    <div class="space-y-2">
+                      <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Toppings extra</p>
+                      <div class="grid gap-2 md:grid-cols-2">
+                        {#each toppingAddons as addon}
+                          <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
+                            <input
+                              type="checkbox"
+                              class="checkbox checkbox-sm"
+                              checked={selectedExtraAddonIds.includes(addon.id)}
+                              disabled={addon.id === includedToppingId}
+                              onchange={(event) => toggleExtraAddonSelection(addon.id, (event.currentTarget as HTMLInputElement).checked)}
+                            />
+                            <span class="label-text flex-1">{addon.name}</span>
+                            <span class="text-xs font-medium text-base-content/70">+{formatCurrency(addon.price)}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+
+                  {#if jaleaAddons.length > 0}
+                    <div class="space-y-2">
+                      <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Jalea extra</p>
+                      <div class="grid gap-2 md:grid-cols-2">
+                        {#each jaleaAddons as addon}
+                          <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
+                            <input
+                              type="checkbox"
+                              class="checkbox checkbox-sm"
+                              checked={selectedExtraAddonIds.includes(addon.id)}
+                              disabled={addon.id === includedJaleaId}
+                              onchange={(event) => toggleExtraAddonSelection(addon.id, (event.currentTarget as HTMLInputElement).checked)}
+                            />
+                            <span class="label-text flex-1">{addon.name}</span>
+                            <span class="text-xs font-medium text-base-content/70">+{formatCurrency(addon.price)}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </div>
+                  {/if}
+
+                  {#each paidAddonGroups as group}
+                    <div class="space-y-2">
+                      <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">{group.label}</p>
+                      <div class="grid gap-2 md:grid-cols-2">
+                        {#each group.items as addon}
+                          <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
+                            <input
+                              type="checkbox"
+                              class="checkbox checkbox-sm"
+                              checked={selectedExtraAddonIds.includes(addon.id)}
+                              onchange={(event) => toggleExtraAddonSelection(addon.id, (event.currentTarget as HTMLInputElement).checked)}
+                            />
+                            <span class="label-text flex-1">{addon.name}</span>
+                            <span class="text-xs font-medium text-base-content/70">+{formatCurrency(addon.price)}</span>
+                          </label>
+                        {/each}
+                      </div>
+                    </div>
                   {/each}
-                </select>
-              </div>
+                    </div>
+                  </div>
+                {/if}
+              </section>
             {/if}
-            {#if selectedProductAddons.length > 0}
-              <div class="form-control">
-                <span class="label-text mb-2">Extras con costo</span>
-                <p class="text-xs text-base-content/60 mb-1">Usa estos toggles para agregar toppings, jaleas u otros extras adicionales que sí deben cobrarse.</p>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-base-300 bg-base-100 px-4 py-3">
+              <div class="text-sm text-base-content/70 space-y-1">
+                <p>Subtotal de esta configuracion: <strong>{formatCurrency(totalPreview)}</strong></p>
+                <p>Total acumulado en la orden: <strong>{formatCurrency(manualOrderTotal)}</strong></p>
+              </div>
+              <div class="space-y-1 text-right">
+                <button class="btn btn-outline btn-primary" type="button" onclick={addDraftItem} disabled={busy || products.length === 0}>
+                  Agregar producto
+                </button>
+                <p class="text-xs text-base-content/60">La configuracion actual se agrega a la orden solo cuando presionas este boton.</p>
+              </div>
+            </div>
+
+            <section class="space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <h5 class="font-semibold">Items agregados</h5>
+                <span class="text-xs text-base-content/60">Puedes repetir el mismo producto con diferentes sabores o extras.</span>
+              </div>
+              {#if manualItems.length === 0}
+                <div class="rounded-xl border border-base-300 bg-base-100 px-4 py-5 text-sm text-base-content/70">
+                  No has agregado productos todavia.
+                </div>
+              {:else}
                 <div class="space-y-3">
-              {#if toppingAddons.length > 0}
-                <div class="space-y-2">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Toppings extra</p>
-                  <div class="grid gap-2 md:grid-cols-2">
-                    {#each toppingAddons as addon}
-                      <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          checked={selectedExtraAddonIds.includes(addon.id)}
-                          disabled={addon.id === includedToppingId}
-                          onchange={(event) => toggleExtraAddonSelection(addon.id, (event.currentTarget as HTMLInputElement).checked)}
-                        />
-                        <span class="label-text flex-1">{addon.name}</span>
-                        <span class="text-xs font-medium text-base-content/70">+{formatCurrency(addon.price)}</span>
-                      </label>
-                    {/each}
-                  </div>
+                  {#each manualItems as item, index (draftItemKey(item, index))}
+                    <div class="rounded-xl border border-base-300 bg-base-100 p-4 space-y-3">
+                      <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="space-y-1">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <h6 class="font-medium">{productById(item.product_id)?.name ?? "Producto"}</h6>
+                            {#if resolveFlavorName(item.product_id, item.flavor_id)}
+                              <span class="badge badge-outline">Sabor: {resolveFlavorName(item.product_id, item.flavor_id)}</span>
+                            {/if}
+                          </div>
+                          {#if resolveAddonNames(item.product_id, item.included_addon_ids).length > 0}
+                            <p class="text-xs text-base-content/60">Incluidos: {resolveAddonNames(item.product_id, item.included_addon_ids).join(", ")}</p>
+                          {/if}
+                          {#if resolveAddonNames(item.product_id, item.extra_addon_ids).length > 0}
+                            <p class="text-xs text-base-content/60">Extras: {resolveAddonNames(item.product_id, item.extra_addon_ids).join(", ")}</p>
+                          {/if}
+                        </div>
+                        <div class="text-sm font-semibold whitespace-nowrap">{formatCurrency(manualItemSubtotal(item))}</div>
+                      </div>
+                      <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="join">
+                          <button class="btn btn-sm join-item" type="button" onclick={() => updateDraftItemQuantity(index, item.quantity - 1)}>-</button>
+                          <span class="btn btn-sm join-item no-animation min-w-14 text-sm">{item.quantity}</span>
+                          <button class="btn btn-sm join-item" type="button" onclick={() => updateDraftItemQuantity(index, item.quantity + 1)}>+</button>
+                        </div>
+                        <button class="btn btn-sm btn-error btn-outline" type="button" onclick={() => removeDraftItem(index)}>
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  {/each}
                 </div>
               {/if}
-
-              {#if jaleaAddons.length > 0}
-                <div class="space-y-2">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Jalea extra</p>
-                  <div class="grid gap-2 md:grid-cols-2">
-                    {#each jaleaAddons as addon}
-                      <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          checked={selectedExtraAddonIds.includes(addon.id)}
-                          disabled={addon.id === includedJaleaId}
-                          onchange={(event) => toggleExtraAddonSelection(addon.id, (event.currentTarget as HTMLInputElement).checked)}
-                        />
-                        <span class="label-text flex-1">{addon.name}</span>
-                        <span class="text-xs font-medium text-base-content/70">+{formatCurrency(addon.price)}</span>
-                      </label>
-                    {/each}
-                  </div>
-                </div>
-              {/if}
-
-              {#each paidAddonGroups as group}
-                <div class="space-y-2">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">{group.label}</p>
-                  <div class="grid gap-2 md:grid-cols-2">
-                    {#each group.items as addon}
-                      <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          checked={selectedExtraAddonIds.includes(addon.id)}
-                          onchange={(event) => toggleExtraAddonSelection(addon.id, (event.currentTarget as HTMLInputElement).checked)}
-                        />
-                        <span class="label-text flex-1">{addon.name}</span>
-                        <span class="text-xs font-medium text-base-content/70">+{formatCurrency(addon.price)}</span>
-                      </label>
-                    {/each}
-                  </div>
-                </div>
-              {/each}
-                </div>
-              </div>
-            {/if}
+            </section>
           </section>
+        {:else}
+          <div class="grid md:grid-cols-2 gap-5">
+            <div class="form-control">
+              <span id="order-product-label" class="label-text mb-1">Producto</span>
+              <select id="order-product" class="select select-bordered" bind:value={orderForm.product_id} required disabled aria-labelledby="order-product-label">
+                {#if products.length === 0}
+                  <option value="" disabled>Sin productos</option>
+                {:else}
+                  {#each products as product}
+                    <option value={product.id}>{product.name}</option>
+                  {/each}
+                {/if}
+              </select>
+            </div>
+            <div class="form-control">
+              <span id="order-quantity-label" class="label-text mb-1">Cantidad</span>
+              <input id="order-quantity" class="input input-bordered" type="number" min="1" bind:value={orderForm.quantity} required disabled aria-labelledby="order-quantity-label" />
+            </div>
+          </div>
         {/if}
+        <div class="rounded-xl border border-base-300 bg-base-100 px-4 py-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="space-y-1">
+              <p class="font-medium">Nota de la orden</p>
+              <p class="text-sm text-base-content/70">
+                {orderForm.notes.trim() ? orderForm.notes : "Sin nota agregada"}
+              </p>
+            </div>
+            <button class="btn btn-outline btn-sm" type="button" onclick={openNotesDialog}>
+              {orderForm.notes.trim() ? "Editar nota" : "Agregar nota"}
+            </button>
+          </div>
+        </div>
         <div class="text-sm text-base-content/70">
           {#if isEditing}
             {#if selectedOrder && selectedOrder.id === editOrderId}
               <p>Total actual: <strong>{formatCurrency(selectedOrder.total_amount)}</strong></p>
             {/if}
           {:else}
-            <p>Precio unitario: <strong>{formatCurrency(pricePreview)}</strong></p>
-            {#if selectedExtraAddonIds.length > 0}
-              <p>Extras: <strong>{formatCurrency(addonsPreviewTotal)}</strong></p>
-            {/if}
-            <p>Total estimado: <strong>{formatCurrency(totalPreview)}</strong></p>
+            <p>Total estimado de la orden: <strong>{formatCurrency(manualItems.length > 0 ? manualOrderTotal : totalPreview)}</strong></p>
           {/if}
         </div>
         {#if editError}
@@ -1212,13 +1477,37 @@
           </button>
         </div>
       </div>
-      <div class="form-control self-start pt-6">
-        <textarea id="order-notes" class="textarea w-full min-h-55" rows="10" placeholder="Notas" bind:value={orderForm.notes} aria-label="Notas"></textarea>
-      </div>
     </form>
   </div>
   <form method="dialog" class="modal-backdrop">
     <button type="button" onclick={closeOrderEditor}>close</button>
+  </form>
+</dialog>
+
+<dialog class="modal" bind:this={orderNotesDialog}>
+  <div class="modal-box max-w-xl">
+    <div class="flex items-center justify-between gap-3">
+      <h3 class="font-bold text-lg">Nota de la orden</h3>
+      {#if orderForm.notes.trim()}
+        <button class="btn btn-ghost btn-xs" type="button" onclick={() => (orderForm.notes = "")}>Limpiar</button>
+      {/if}
+    </div>
+    <p class="mt-2 text-sm text-base-content/70">Agrega una observacion general para esta orden.</p>
+    <textarea
+      id="order-notes"
+      class="textarea textarea-bordered w-full mt-4 min-h-40"
+      rows="6"
+      placeholder="Notas"
+      bind:value={orderForm.notes}
+      aria-label="Notas"
+    ></textarea>
+    <div class="modal-action">
+      <button class="btn btn-ghost" type="button" onclick={closeNotesDialog}>Cerrar</button>
+      <button class="btn btn-primary" type="button" onclick={closeNotesDialog}>Guardar nota</button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button type="button" onclick={closeNotesDialog}>close</button>
   </form>
 </dialog>
 

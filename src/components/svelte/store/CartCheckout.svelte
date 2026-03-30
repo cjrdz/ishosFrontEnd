@@ -240,6 +240,15 @@
     return resolveItemAddonNames(item).extras;
   }
 
+  function itemFlavorSummary(item: StoreCartItem): string | null {
+    const flavorName = resolveFlavorName(item);
+    if (flavorName) {
+      return flavorName;
+    }
+
+    return requiresFlavorSelection(item) ? "Pendiente" : null;
+  }
+
   function cartItemKey(item: StoreCartItem): string {
     return [
       item.product_id,
@@ -465,61 +474,50 @@
         {@const jaleaOptions = addonsForGroup(product, "jalea")}
         {@const extraGroups = paidAddonGroups(product)}
         {@const flavorIsRequired = flavorOptions.length > 0 && !item.flavor_id}
+        {@const flavorSummary = itemFlavorSummary(item)}
         <div class="border border-base-300 rounded-lg p-4 space-y-4 bg-base-100">
-                <div class="flex items-center justify-between gap-2">
-                  <div>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="flex flex-wrap items-center gap-2">
                     <h4 class="font-medium">{item.name}</h4>
-                    <p class="text-xs text-base-content/60">Precio actual: {formatCurrency(itemEffectivePrice(item))} c/u</p>
+                    {#if flavorSummary}
+                      <span class={`badge ${flavorIsRequired ? "badge-warning" : "badge-outline"}`}>
+                        Sabor: {flavorSummary}
+                      </span>
+                    {/if}
+                    <span class="badge badge-outline">Cantidad: {item.quantity}</span>
                   </div>
-                  <span class="text-sm font-semibold">{formatCurrency(itemEffectivePrice(item) * item.quantity)}</span>
+                  <div class="ml-auto flex items-center gap-3">
+                    <div class="join">
+                      <button
+                        class="btn btn-sm join-item"
+                        type="button"
+                        onclick={() => updateQty(item, item.quantity - 1)}
+                        aria-label="Reducir cantidad"
+                      >
+                        -
+                      </button>
+                      <span class="btn btn-sm join-item no-animation min-w-14 text-sm">{item.quantity}</span>
+                      <button
+                        class="btn btn-sm join-item"
+                        type="button"
+                        onclick={() => updateQty(item, item.quantity + 1)}
+                        aria-label="Aumentar cantidad"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span class="text-sm font-semibold whitespace-nowrap">{formatCurrency(itemEffectivePrice(item) * item.quantity)}</span>
+                  </div>
                 </div>
 
-                <div role="tablist" class="tabs tabs-bordered tabs-sm sm:tabs-md w-full">
-                  <input type="radio" name={`cart-item-tabs-${itemIndex}`} class="tab" aria-label="Informacion" checked />
-                  <div class="tab-content border-base-300 bg-base-100 p-3 sm:p-4 rounded-box space-y-4">
-                    {#if flavorIsRequired}
-                      <div class="alert alert-warning text-sm">
-                        <span>Selecciona un sabor primero para continuar.</span>
-                      </div>
-                    {/if}
-                    {#if item.flavor_id}
-                      {@const flavorName = resolveFlavorName(item)}
-                      {#if flavorName}
-                        <p class="text-sm text-base-content/80">Sabor: {flavorName}</p>
-                      {/if}
-                    {/if}
-                    {#if resolveIncludedAddonNames(item).length > 0}
-                      <p class="text-sm text-base-content/80">Incluidos: {resolveIncludedAddonNames(item).join(", ")}</p>
-                    {/if}
-                    {#if resolveExtraAddonNames(item).length > 0}
-                      <p class="text-sm text-base-content/80">Extras: {resolveExtraAddonNames(item).join(", ")}</p>
-                    {/if}
-
-                    <div class="form-control">
-                      <span class="label-text font-medium mb-2">Cantidad</span>
-                      <div class="join w-full max-w-xs">
-                        <button
-                          class="btn btn-md join-item"
-                          type="button"
-                          onclick={() => updateQty(item, item.quantity - 1)}
-                          aria-label="Reducir cantidad"
-                        >
-                          -
-                        </button>
-                        <span class="btn btn-md join-item no-animation flex-1 text-base">{item.quantity}</span>
-                        <button
-                          class="btn btn-md join-item"
-                          type="button"
-                          onclick={() => updateQty(item, item.quantity + 1)}
-                          aria-label="Aumentar cantidad"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
+                {#if flavorIsRequired}
+                  <div class="alert alert-warning text-sm">
+                    <span>Selecciona un sabor primero para continuar.</span>
                   </div>
+                {/if}
 
-                  <input type="radio" name={`cart-item-tabs-${itemIndex}`} class="tab" aria-label="Opcionales" />
+                <div role="tablist" class="tabs tabs-bordered tabs-sm sm:tabs-md w-full">
+                  <input type="radio" name={`cart-item-tabs-${itemIndex}`} class="tab" aria-label="Opcionales" checked />
                   <div class="tab-content border-base-300 bg-base-100 p-3 sm:p-4 rounded-box space-y-3">
                     {#if hasEditableCustomizations(product) && (flavorOptions.length > 0 || toppingOptions.length > 0 || jaleaOptions.length > 0)}
                       {#if flavorOptions.length > 0}
