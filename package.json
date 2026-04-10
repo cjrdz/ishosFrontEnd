@@ -27,6 +27,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.8"
+    "@astrojs/check": "^0.9.8",
+    "wrangler": "^4.81.1"
   }
 }
