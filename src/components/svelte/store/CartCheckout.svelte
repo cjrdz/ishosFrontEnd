@@ -432,10 +432,10 @@
         })),
       });
 
-      saveTracking(created.order_number, form.customer_phone.trim());
+      saveTracking(created.order_number, created.tracking_token);
       clearCartItems();
       items = [];
-      message = `${created.message} N° ${created.order_number}`;
+      message = `${created.message} N° ${created.order_number}. Guarda tu token para seguimiento seguro.`;
     } catch (requestError: unknown) {
       if (requestError instanceof ApiError && requestError.status === 429) {
         error = "Has alcanzado el límite de pedidos. Intenta más tarde.";

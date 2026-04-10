@@ -12,18 +12,27 @@
  */
 
 import type { APIRoute } from 'astro';
+import { requireAction, requireUuidParam } from '../../../../lib/bff/params';
 import { proxyToBackend } from '../../../../lib/bff/proxy';
 
 export const prerender = false;
 
 export const GET: APIRoute = async (context) => {
-  const { id } = context.params;
+  const id = requireUuidParam(context, 'id');
+  if (id instanceof Response) return id;
   return proxyToBackend(context, `/orders/${id}`);
 };
 
 export const PATCH: APIRoute = async (context) => {
-  const { id } = context.params;
-  const action = context.url.searchParams.get('action');
+  const id = requireUuidParam(context, 'id');
+  if (id instanceof Response) return id;
+  const action = context.url.searchParams.get('action')?.trim() ?? '';
+  if (action && action !== 'status' && action !== 'notes') {
+    return new Response(
+      JSON.stringify({ error: 'Invalid action query parameter', code: 'VALIDATION_ERROR' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
   try {
     const body = await context.request.json();
     const targetPath =
@@ -46,20 +55,16 @@ export const PATCH: APIRoute = async (context) => {
 };
 
 export const DELETE: APIRoute = async (context) => {
-  const { id } = context.params;
+  const id = requireUuidParam(context, 'id');
+  if (id instanceof Response) return id;
   return proxyToBackend(context, `/orders/${id}`, { method: 'DELETE' });
 };
 
 export const POST: APIRoute = async (context) => {
-  const { id } = context.params;
-  const action = context.url.searchParams.get('action');
-
-  if (!action) {
-    return new Response(
-      JSON.stringify({ error: 'Missing action query parameter', code: 'VALIDATION_ERROR' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
+  const id = requireUuidParam(context, 'id');
+  if (id instanceof Response) return id;
+  const action = requireAction(context.url.searchParams.get('action'), ['approve', 'reject']);
+  if (action instanceof Response) return action;
 
   try {
     const body = await context.request.json().catch(() => ({}));

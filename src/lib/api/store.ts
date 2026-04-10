@@ -68,6 +68,8 @@ export interface PublicOrderCreateResponse {
   order_number: string;
   status: PublicOrderStatus;
   total: number;
+  tracking_token: string;
+  tracking_expires_at: string;
   message: string;
 }
 
@@ -103,24 +105,12 @@ export async function createPublicOrder(
 
 export async function trackPublicOrder(
   orderNumber: string,
-  customerPhone: string,
+  trackingToken: string,
 ): Promise<PublicOrderTrackingResponse> {
   const query = new URLSearchParams({
     order_number: orderNumber,
-    customer_phone: customerPhone,
+    tracking_token: trackingToken,
   });
 
   return apiRequest<PublicOrderTrackingResponse>(`/orders/track?${query.toString()}`);
-}
-
-export async function trackPublicOrdersByPhone(
-  customerPhone: string,
-  limit = 20,
-): Promise<PublicOrderTrackingHistoryResponse> {
-  const query = new URLSearchParams({
-    customer_phone: customerPhone,
-    limit: String(limit),
-  });
-
-  return apiRequest<PublicOrderTrackingHistoryResponse>(`/orders/track/history?${query.toString()}`);
 }

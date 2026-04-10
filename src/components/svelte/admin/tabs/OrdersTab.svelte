@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from "@iconify/svelte";
   import type { Employee, Order, Product } from "../../../../lib/api/admin";
   import { formatCurrency } from "../../../../lib/utils/formatters";
 
@@ -17,7 +18,7 @@
     }>;
   }
 
-  interface Props {
+  interface OrdersTabProps {
     isAdmin: boolean;
     orders: Order[];
     products: Product[];
@@ -43,6 +44,13 @@
     }) => Promise<Order | null>;
     onDelete: (id: string) => void;
     onCreate: (payload: CreateOrderPayload) => Promise<boolean>;
+    saveUserFromOrder: (payload: {
+      name: string;
+      user_type: "user" | "company";
+      phone: string;
+      email?: string;
+      status: "active" | "inactive";
+    }) => Promise<boolean>;
   }
 
   let {
@@ -63,11 +71,33 @@
     onUpdateOrder,
     onDelete,
     onCreate,
-  }: Props = $props();
+    saveUserFromOrder,
+  }: OrdersTabProps = $props();
 
   let confirmDialog: HTMLDialogElement | null = null;
   let orderEditorDialog: HTMLDialogElement | null = null;
   let orderNotesDialog: HTMLDialogElement | null = null;
+  let saveUserDialog: HTMLDialogElement | null = null;
+  let tokenVisible = $state(false);
+  let tokenCopied = $state<"" | "token" | "both" | "link">("");
+
+  $effect(() => {
+    // reset reveal state whenever a different order is opened
+    if (selectedOrder) {
+      tokenVisible = false;
+      tokenCopied = "";
+    }
+  });
+
+  async function copyToClipboard(text: string, kind: "token" | "both" | "link") {
+    try {
+      await navigator.clipboard.writeText(text);
+      tokenCopied = kind;
+      setTimeout(() => { tokenCopied = ""; }, 2000);
+    } catch {
+      // clipboard not available (e.g. insecure context) — silently ignore
+    }
+  }
   let confirmTitle = $state("Confirmar accion");
   let confirmMessage = $state("");
   let confirmAction = $state<null | (() => void)>(null);
@@ -86,12 +116,21 @@
   let editOrderId = $state<string | null>(null);
   let editError = $state("");
   let editNotice = $state("");
+  let addItemError = $state("");
+  let saveUserError = $state("");
   let orderSearch = $state("");
   let selectedFlavorId = $state("");
   let includedToppingId = $state("");
   let includedJaleaId = $state("");
   let selectedExtraAddonIds = $state<string[]>([]);
   let lastSelectedProductId = $state("");
+  let saveUserForm = $state({
+    name: "",
+    user_type: "user" as "user" | "company",
+    phone: "",
+    email: "",
+    status: "active" as "active" | "inactive",
+  });
 
   const DEFAULT_ADDON_GROUP_NAME = "extras";
   const ADDON_GROUP_LABELS: Record<string, string> = {
@@ -358,10 +397,14 @@
 
   function addDraftItem() {
     editError = "";
+    addItemError = "";
     const nextItem = buildCurrentDraftItem();
     if (!nextItem) {
+      addItemError = editError;
+      editError = "";
       return;
     }
+    addItemError = "";
 
     const existingIndex = manualItems.findIndex((item) => (
       item.product_id === nextItem.product_id &&
@@ -471,12 +514,20 @@
     cancelada: "badge-error",
   };
 
-  const statusStepIcons: Record<(typeof linearStatuses)[number], string> = {
-    pendiente_revision: "🧾",
-    recibida: "✅",
-    en_proceso: "👨‍🍳",
-    lista: "🔔",
-    entregada: "📦",
+  const statusStepIconsActive: Record<(typeof linearStatuses)[number], string> = {
+    pendiente_revision: "line-md:watch-loop",
+    recibida:           "line-md:confirm-circle",
+    en_proceso:         "line-md:loading-twotone-loop",
+    lista:              "line-md:bell-loop",
+    entregada:          "line-md:check-all",
+  };
+
+  const statusStepIconsStatic: Record<(typeof linearStatuses)[number], string> = {
+    pendiente_revision: "lucide:clock",
+    recibida:           "lucide:check-circle",
+    en_proceso:         "lucide:loader",
+    lista:              "lucide:bell",
+    entregada:          "lucide:check-check",
   };
 
   const canceledFlow: Array<"pendiente_revision" | "cancelada"> = [
@@ -489,9 +540,14 @@
     cancelada: "denegada",
   };
 
-  const canceledStepIcons: Record<(typeof canceledFlow)[number], string> = {
-    pendiente_revision: "🧾",
-    cancelada: "⛔",
+  const canceledStepIconsActive: Record<(typeof canceledFlow)[number], string> = {
+    pendiente_revision: "line-md:watch-loop",
+    cancelada:          "line-md:close-circle",
+  };
+
+  const canceledStepIconsStatic: Record<(typeof canceledFlow)[number], string> = {
+    pendiente_revision: "lucide:clock",
+    cancelada:          "lucide:x-circle",
   };
 
   const orderStatusFilterLabel = $derived(
@@ -533,8 +589,10 @@
   }
 
   function createdByLabel(order: Order) {
-    if (!order.created_by_user_id) return "Cliente";
-    return employeeById[order.created_by_user_id] || "Empleado";
+    const explicitName = order.created_by_name?.trim();
+    if (explicitName) return explicitName;
+    if (!order.created_by_user_id) return order.customer_name;
+    return employeeById[order.created_by_user_id] || "Personal";
   }
 
   function resetOrderForm() {
@@ -595,6 +653,7 @@
 
   function closeOrderEditor() {
     orderNotesDialog?.close();
+    saveUserDialog?.close();
     orderEditorDialog?.close();
     resetOrderForm();
   }
@@ -605,6 +664,55 @@
 
   function closeNotesDialog() {
     orderNotesDialog?.close();
+  }
+
+  function openSaveUserDialog() {
+    saveUserError = "";
+    saveUserForm = {
+      name: orderForm.customer_name.trim(),
+      user_type: "user",
+      phone: orderForm.customer_phone.trim(),
+      email: orderForm.customer_email.trim(),
+      status: "active",
+    };
+    saveUserDialog?.showModal();
+  }
+
+  function openSaveUserDialogFromOrder(order: Order) {
+    saveUserError = "";
+    saveUserForm = {
+      name: order.customer_name.trim(),
+      user_type: "user",
+      phone: order.customer_phone.trim(),
+      email: (order.customer_email ?? "").trim(),
+      status: "active",
+    };
+    saveUserDialog?.showModal();
+  }
+
+  function closeSaveUserDialog() {
+    saveUserDialog?.close();
+    saveUserError = "";
+  }
+
+  async function submitSaveUser(event: SubmitEvent) {
+    event.preventDefault();
+    saveUserError = "";
+
+    const saved = await saveUserFromOrder({
+      name: saveUserForm.name.trim(),
+      user_type: saveUserForm.user_type,
+      phone: saveUserForm.phone.trim(),
+      email: saveUserForm.email.trim() || undefined,
+      status: saveUserForm.status,
+    });
+
+    if (!saved) {
+      saveUserError = "No se pudo guardar el usuario";
+      return;
+    }
+
+    closeSaveUserDialog();
   }
 
   async function handleSubmit(event: SubmitEvent) {
@@ -642,7 +750,9 @@
         : [];
 
     if (itemsToCreate.length === 0) {
-      editError = "Agrega al menos un producto a la orden";
+      if (!editError) {
+        editError = "Agrega al menos un producto a la orden";
+      }
       return;
     }
 
@@ -1030,7 +1140,18 @@
   {#if selectedOrder}
     <div class="card bg-base-100 shadow">
       <div class="card-body">
-        <h3 class="card-title">Detalle de orden: {selectedOrder.order_number}</h3>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="card-title">Detalle de orden: {selectedOrder.order_number}</h3>
+          {#if isAdmin}
+            <button
+              class="btn btn-sm btn-soft btn-secondary"
+              type="button"
+              onclick={() => openSaveUserDialogFromOrder(selectedOrder)}
+            >
+              Guardar como usuario
+            </button>
+          {/if}
+        </div>
         <div class="grid gap-3 md:grid-cols-[1fr_1fr_0.9fr] text-sm">
           <div class="space-y-2">
             <p><strong>Cliente:</strong> {selectedOrder.customer_name}</p>
@@ -1048,6 +1169,60 @@
               {selectedOrder.notes?.trim() ? selectedOrder.notes : "Sin notas"}
             </div>
           </div>
+          {#if selectedOrder.tracking_token}
+            <div class="md:col-span-3 rounded-lg border border-warning/40 bg-warning/5 p-3 space-y-2">
+              <p class="text-xs font-semibold text-warning/80 uppercase tracking-wide">Token de seguimiento del cliente</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <code class="flex-1 min-w-0 truncate rounded bg-base-300/60 px-2 py-1 text-xs font-mono select-all">
+                  {tokenVisible ? selectedOrder.tracking_token : "\u2022".repeat(24)}
+                </code>
+                <button
+                  class="btn btn-xs btn-ghost"
+                  type="button"
+                  title={tokenVisible ? "Ocultar token" : "Revelar token"}
+                  onclick={() => { tokenVisible = !tokenVisible; }}
+                  aria-label={tokenVisible ? "Ocultar token" : "Revelar token"}
+                >
+                  <Icon icon={tokenVisible ? "lucide:eye-off" : "lucide:eye"} width="14" height="14" />
+                </button>
+                <button
+                  class="btn btn-xs btn-ghost"
+                  type="button"
+                  title="Copiar token"
+                  onclick={() => copyToClipboard(selectedOrder.tracking_token!, "token")}
+                  aria-label="Copiar token"
+                >
+                  <Icon icon={tokenCopied === "token" ? "lucide:check" : "lucide:copy"} width="14" height="14" />
+                  {tokenCopied === "token" ? "¡Copiado!" : "Token"}
+                </button>
+                <button
+                  class="btn btn-xs btn-outline btn-warning"
+                  type="button"
+                  title="Copiar Número de orden y token juntos para enviar al cliente"
+                  onclick={() => copyToClipboard(`Número de orden: ${selectedOrder.order_number}\nToken: ${selectedOrder.tracking_token}`, "both")}
+                  aria-label="Copiar ORD y token"
+                >
+                  <Icon icon={tokenCopied === "both" ? "lucide:check" : "lucide:clipboard-copy"} width="14" height="14" />
+                  {tokenCopied === "both" ? "¡Copiado!" : "Copiar ORD + Token"}
+                </button>
+                {#if selectedOrder.tracking_url}
+                  <button
+                    class="btn btn-xs btn-warning"
+                    type="button"
+                    title="Copiar enlace seguro de seguimiento"
+                    onclick={() => copyToClipboard(selectedOrder.tracking_url!, "link")}
+                    aria-label="Copiar enlace de seguimiento"
+                  >
+                    <Icon icon={tokenCopied === "link" ? "lucide:check" : "lucide:link"} width="14" height="14" />
+                    {tokenCopied === "link" ? "¡Copiado!" : "Copiar enlace"}
+                  </button>
+                {/if}
+              </div>
+              {#if selectedOrder.tracking_token_expires_at}
+                <p class="text-xs text-base-content/50">Expira: {new Date(selectedOrder.tracking_token_expires_at).toLocaleDateString("es-SV", { dateStyle: "medium" })}</p>
+              {/if}
+            </div>
+          {/if}
           <div class="md:col-span-3">
             {#if selectedOrder.status === "cancelada"}
               <div class="flex flex-col gap-1">
@@ -1069,7 +1244,7 @@
                 <ul class="steps steps-sm w-full max-w-2xl mt-2">
                   {#each canceledFlow as stepStatus}
                     <li class="step step-primary text-center">
-                      <span class="step-icon">{canceledStepIcons[stepStatus]}</span>
+                      <span class="step-icon"><Icon icon={stepStatus === selectedOrder.status ? canceledStepIconsActive[stepStatus] : canceledStepIconsStatic[stepStatus]} width="16" height="16" /></span>
                       <span>{canceledStepLabels[stepStatus]}</span>
                     </li>
                   {/each}
@@ -1084,7 +1259,7 @@
                   <ul class="steps steps-sm w-full max-w-3xl mx-auto">
                     {#each linearStatuses as stepStatus}
                       <li class={`step ${isStepReached(selectedOrder.status, stepStatus) ? "step-primary" : ""} text-center`}>
-                        <span class="step-icon">{statusStepIcons[stepStatus]}</span>
+                        <span class="step-icon"><Icon icon={stepStatus === selectedOrder.status ? statusStepIconsActive[stepStatus] : statusStepIconsStatic[stepStatus]} width="16" height="16" /></span>
                         <button
                           class="cursor-pointer bg-transparent border-0 p-0 m-0 text-inherit disabled:cursor-default"
                           type="button"
@@ -1181,7 +1356,7 @@
             <span id="order-customer-phone-label" class="label-text mb-1">Telefono</span>
             <input id="order-customer-phone" class="input input-bordered" bind:value={orderForm.customer_phone} required aria-labelledby="order-customer-phone-label" />
           </div>
-          <div class="form-control">
+          <div class="form-control md:col-span-2">
             <span id="order-customer-email-label" class="label-text mb-1">Correo (opcional)</span>
             <input id="order-customer-email" class="input input-bordered" type="email" bind:value={orderForm.customer_email} aria-labelledby="order-customer-email-label" />
           </div>
@@ -1247,13 +1422,6 @@
 
             {#if hasCustomizationOptions}
               <section class="rounded-2xl border border-base-300 bg-base-100 p-4 space-y-4">
-                <div class="flex flex-wrap gap-2">
-                  <span class="badge badge-outline">Sabores: {customizationDebugSummary.flavors}</span>
-                  <span class="badge badge-outline">Toppings: {customizationDebugSummary.toppings}</span>
-                  <span class="badge badge-outline">Jaleas: {customizationDebugSummary.jaleas}</span>
-                  <span class="badge badge-outline">Extras: {customizationDebugSummary.extras}</span>
-                </div>
-
                 {#if selectedProductFlavors.length > 0}
                   <div class="form-control">
                     <span id="order-flavor-label" class="label-text mb-1">Sabor</span>
@@ -1368,7 +1536,11 @@
                 <button class="btn btn-outline btn-primary" type="button" onclick={addDraftItem} disabled={busy || products.length === 0}>
                   Agregar producto
                 </button>
-                <p class="text-xs text-base-content/60">La configuracion actual se agrega a la orden solo cuando presionas este boton.</p>
+                {#if addItemError}
+                  <p class="text-xs text-error">{addItemError}</p>
+                {:else}
+                  <p class="text-xs text-base-content/60">La configuracion actual se agrega a la orden solo cuando presionas este boton.</p>
+                {/if}
               </div>
             </div>
 
@@ -1508,6 +1680,63 @@
   </div>
   <form method="dialog" class="modal-backdrop">
     <button type="button" onclick={closeNotesDialog}>close</button>
+  </form>
+</dialog>
+
+<dialog class="modal" bind:this={saveUserDialog}>
+  <div class="modal-box max-w-2xl">
+    <h3 class="font-bold text-lg">Guardar usuario desde orden</h3>
+    <p class="mt-2 text-sm text-base-content/70">Puedes ajustar tipo y estado antes de guardar el registro.</p>
+
+    <form class="mt-4 space-y-4" onsubmit={submitSaveUser}>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="form-control">
+          <span id="save-user-name-label" class="label-text mb-1">Nombre</span>
+          <input id="save-user-name" class="input input-bordered" bind:value={saveUserForm.name} required aria-labelledby="save-user-name-label" />
+        </div>
+        <div class="form-control">
+          <span id="save-user-type-label" class="label-text mb-1">Tipo de usuario</span>
+          <select id="save-user-type" class="select select-bordered" bind:value={saveUserForm.user_type} aria-labelledby="save-user-type-label">
+            <option value="user">usuario</option>
+            <option value="company">empresa</option>
+          </select>
+        </div>
+        <div class="form-control">
+          <span id="save-user-phone-label" class="label-text mb-1">Telefono</span>
+          <input id="save-user-phone" class="input input-bordered" bind:value={saveUserForm.phone} required aria-labelledby="save-user-phone-label" />
+        </div>
+        <div class="form-control">
+          <span id="save-user-email-label" class="label-text mb-1">Correo (opcional)</span>
+          <input id="save-user-email" class="input input-bordered" type="email" bind:value={saveUserForm.email} aria-labelledby="save-user-email-label" />
+        </div>
+      </div>
+
+      <div class="form-control">
+        <span class="label-text mb-1">Estado</span>
+        <label class="label h-12 w-full cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-3">
+          <input
+            class="toggle toggle-sm"
+            type="checkbox"
+            checked={saveUserForm.status === "active"}
+            onchange={(event) => (saveUserForm.status = (event.currentTarget as HTMLInputElement).checked ? "active" : "inactive")}
+            aria-label="Estado de usuario"
+          />
+          <span class="label-text">{saveUserForm.status === "active" ? "Activo" : "Inactivo"}</span>
+        </label>
+      </div>
+
+      {#if saveUserError}
+        <div class="text-sm text-error">{saveUserError}</div>
+      {/if}
+
+      <div class="modal-action">
+        <button class="btn btn-ghost" type="button" onclick={closeSaveUserDialog}>Cancelar</button>
+        <button class="btn btn-primary" type="submit" disabled={busy}>Guardar usuario</button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button type="button" onclick={closeSaveUserDialog}>close</button>
   </form>
 </dialog>
 

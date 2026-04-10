@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from "@iconify/svelte";
   import {
     exportOrders,
     purgeOrdersByStatuses,
@@ -11,93 +12,88 @@
   let deleting = $state(false);
   let error = $state("");
   let notice = $state("");
-  let purgeConfirmDialog: HTMLDialogElement | null = null;
+  let isCollapsed = $state(false);
   let lastExportedStartDate = $state("");
   let lastExportedEndDate = $state("");
+  let lastExportFormat = $state<"csv" | "json" | null>(null);
   let selectedPurgeStatuses = $state<OrderStatus[]>(["entregada", "cancelada"]);
+  let purgeConfirmDialog: HTMLDialogElement | null = null;
 
-  const purgeStatusOptions: Array<{ value: OrderStatus; label: string }> = [
-    { value: "pendiente_revision", label: "Pendiente revision" },
-    { value: "recibida", label: "Recibida" },
-    { value: "en_proceso", label: "En proceso" },
-    { value: "lista", label: "Lista" },
-    { value: "entregada", label: "Entregada" },
-    { value: "cancelada", label: "Cancelada" },
+  const purgeStatusOptions: Array<{ value: OrderStatus; label: string; icon: string }> = [
+    { value: "pendiente_revision", label: "Pendiente revisión", icon: "lucide:clock"         },
+    { value: "recibida",           label: "Recibida",           icon: "lucide:circle-check"  },
+    { value: "en_proceso",         label: "En proceso",         icon: "lucide:refresh-cw"    },
+    { value: "lista",              label: "Lista",              icon: "lucide:bell"           },
+    { value: "entregada",          label: "Entregada",          icon: "lucide:package"        },
+    { value: "cancelada",          label: "Cancelada",          icon: "lucide:x-circle"       },
   ];
 
-  function toISODate(date: Date): string {
-    return date.toISOString().slice(0, 10);
+  function toISODate(d: Date) { return d.toISOString().slice(0, 10); }
+
+  function formatDateDisplay(s: string) {
+    if (!s) return "";
+    return new Date(`${s}T00:00:00`).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
   }
 
-  function applyRangePreset(days: 7 | 30 | 90) {
+  function getDaysDiff() {
+    if (!startDate || !endDate) return 0;
+    return Math.ceil((new Date(`${endDate}T00:00:00`).getTime() - new Date(`${startDate}T00:00:00`).getTime()) / 86400000) + 1;
+  }
+
+  function applyPreset(days: 7 | 30 | 90) {
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - days);
     startDate = toISODate(start);
     endDate = toISODate(end);
     error = "";
-  }
-
-  function download(content: string, mimeType: string, filename: string) {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function buildFilename(prefix: string, extension: string): string {
-    const now = new Date();
-    const stamp = now.toISOString().slice(0, 10);
-    return `${prefix}_${stamp}.${extension}`;
+    notice = "";
   }
 
   function ensureDates(): boolean {
     if (!startDate || !endDate) {
-      error = "Debes seleccionar fecha inicio y fecha fin";
-      notice = "";
+      error = "Selecciona fecha inicio y fecha fin";
       return false;
     }
-
     if (new Date(endDate) < new Date(startDate)) {
       error = "La fecha fin debe ser mayor o igual a la fecha inicio";
-      notice = "";
       return false;
     }
-
     error = "";
     return true;
   }
 
-  function hasExportForCurrentRange(): boolean {
-    return (
-      Boolean(startDate) &&
-      Boolean(endDate) &&
+  function hasExportForCurrentRange() {
+    return Boolean(startDate) && Boolean(endDate) &&
       startDate === lastExportedStartDate &&
-      endDate === lastExportedEndDate
-    );
+      endDate === lastExportedEndDate;
+  }
+
+  function download(content: string, mime: string, filename: string) {
+    const a = Object.assign(document.createElement("a"), {
+      href: URL.createObjectURL(new Blob([content], { type: mime })),
+      download: filename,
+    });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
   }
 
   async function handleExport(format: "csv" | "json") {
     if (!ensureDates()) return;
-
     exporting = true;
     notice = "";
-
     try {
       const blob = await exportOrders(startDate, endDate, format);
-      const content = await blob.text();
-      const mimeType = format === "csv" ? "text/csv;charset=utf-8" : "application/json;charset=utf-8";
-      download(content, mimeType, buildFilename(`ordenes_${startDate}_a_${endDate}`, format));
+      const mime = format === "csv" ? "text/csv;charset=utf-8" : "application/json;charset=utf-8";
+      download(await blob.text(), mime, `ordenes_${startDate}_a_${endDate}_${new Date().toISOString().slice(0,10)}.${format}`);
       lastExportedStartDate = startDate;
       lastExportedEndDate = endDate;
-      notice = `Exportacion ${format.toUpperCase()} completada`;
-    } catch (requestError) {
-      error = requestError instanceof Error ? requestError.message : "No se pudo exportar ordenes";
+      lastExportFormat = format;
+      notice = `Exportación ${format.toUpperCase()} completada. Ya puedes eliminar las órdenes si lo necesitas.`;
+    } catch (err) {
+      error = err instanceof Error ? err.message : "No se pudo exportar";
     } finally {
       exporting = false;
     }
@@ -105,192 +101,224 @@
 
   function openPurgeModal() {
     if (!ensureDates()) return;
-
-    if (selectedPurgeStatuses.length === 0) {
-      error = "Selecciona al menos un estado para eliminar";
-      notice = "";
-      return;
-    }
-
-    if (!hasExportForCurrentRange()) {
-      error = "Primero debes exportar CSV o JSON para este mismo rango de fechas";
-      notice = "";
-      return;
-    }
-
+    if (selectedPurgeStatuses.length === 0) { error = "Selecciona al menos un estado"; return; }
+    if (!hasExportForCurrentRange()) { error = "Primero exporta CSV o JSON para este rango de fechas"; return; }
     purgeConfirmDialog?.showModal();
   }
 
-  function closePurgeModal() {
+  async function confirmPurge() {
     purgeConfirmDialog?.close();
-  }
-
-  async function confirmPurgeExportedOrders() {
-    purgeConfirmDialog?.close();
-
     if (!ensureDates()) return;
-
     deleting = true;
     notice = "";
     try {
       const result = await purgeOrdersByStatuses(startDate, endDate, selectedPurgeStatuses);
-      const deletedCount = result.deleted_count ?? result.archived_count ?? 0;
-      notice = `${deletedCount} ordenes eliminadas correctamente (${selectedPurgeStatuses.join(", ")})`;
-    } catch (requestError) {
-      error = requestError instanceof Error ? requestError.message : "No se pudieron eliminar ordenes";
+      const count = result.deleted_count ?? result.archived_count ?? 0;
+      notice = `${count} órdenes eliminadas correctamente (${selectedPurgeStatuses.join(", ")})`;
+      lastExportedStartDate = "";
+      lastExportedEndDate = "";
+    } catch (err) {
+      error = err instanceof Error ? err.message : "No se pudieron eliminar órdenes";
     } finally {
       deleting = false;
     }
   }
 
-  function togglePurgeStatus(status: OrderStatus, checked: boolean) {
-    if (checked) {
-      if (!selectedPurgeStatuses.includes(status)) {
-        selectedPurgeStatuses = [...selectedPurgeStatuses, status];
-      }
-      return;
-    }
-
-    selectedPurgeStatuses = selectedPurgeStatuses.filter((current) => current !== status);
+  function toggleStatus(status: OrderStatus, checked: boolean) {
+    selectedPurgeStatuses = checked
+      ? [...new Set([...selectedPurgeStatuses, status])]
+      : selectedPurgeStatuses.filter((s) => s !== status);
   }
 </script>
 
 <section class="space-y-4">
-  <div class="card bg-base-100 shadow">
-    <div class="card-body">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 class="card-title">Exportacion y mantenimiento</h2>
-          <p class="text-sm text-base-content/70">
-            Exporta por rango de fechas y elimina por estados para mantener la base de datos ligera.
-          </p>
-        </div>
+  <!-- Header — collapsible -->
+  <div class="card bg-base-100 shadow border border-base-300/60">
+    <div class="card-body py-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          class="flex items-center gap-3 text-left hover:opacity-75 transition-opacity"
+          onclick={() => isCollapsed = !isCollapsed}
+          aria-expanded={!isCollapsed}
+        >
+          <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+            <Icon icon="lucide:upload" class="h-5 w-5 text-warning" />
+          </div>
+          <div>
+            <h2 class="card-title text-base leading-tight">Exportación y mantenimiento</h2>
+            <p class="text-xs text-base-content/55">Exporta datos y libera espacio en la BD</p>
+          </div>
+          <span class="h-4 w-4 text-base-content/40 transition-transform duration-200 ml-1 flex items-center" class:rotate-180={!isCollapsed}>
+            <Icon icon="lucide:chevron-down" />
+          </span>
+        </button>
+
         <div class="join">
-          <button class="btn btn-sm btn-outline join-item" type="button" onclick={() => applyRangePreset(7)}>7 dias</button>
-          <button class="btn btn-sm btn-outline join-item" type="button" onclick={() => applyRangePreset(30)}>30 dias</button>
-          <button class="btn btn-sm btn-outline join-item" type="button" onclick={() => applyRangePreset(90)}>90 dias</button>
+          {#each [[7,"7d"],[30,"30d"],[90,"90d"]] as [days, lbl]}
+            <button
+              type="button"
+              class="btn btn-sm join-item"
+              class:btn-neutral={startDate && endDate && getDaysDiff() === days}
+              class:btn-ghost={!startDate || !endDate || getDaysDiff() !== days}
+              onclick={() => applyPreset(days as 7|30|90)}
+            >{lbl}</button>
+          {/each}
         </div>
       </div>
     </div>
   </div>
 
-  <div class="card bg-base-100 shadow">
-    <div class="card-body space-y-5">
-    {#if error}
-      <div class="alert alert-error"><span>{error}</span></div>
-    {/if}
-    {#if notice}
-      <div class="alert alert-success"><span>{notice}</span></div>
-    {/if}
+  <!-- Collapsible body -->
+  {#if !isCollapsed}
+    <div class="card bg-base-100 shadow border border-base-300/60 animate-fadeIn">
+      <div class="card-body space-y-5">
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <label class="form-control gap-2 xl:col-span-2">
-        <span id="export-start-date-label" class="label-text">Fecha inicio</span>
-        <input
-          id="export-start-date"
-          type="date"
-          class="input input-bordered h-11 w-full"
-          bind:value={startDate}
-          aria-labelledby="export-start-date-label"
-        />
-      </label>
+        {#if error}
+          <div class="alert alert-error">
+            <span>{error}</span>
+            <button type="button" class="btn btn-ghost btn-xs ml-auto" onclick={() => error = ""}>✕</button>
+          </div>
+        {/if}
 
-      <label class="form-control gap-2 xl:col-span-2">
-        <span id="export-end-date-label" class="label-text">Fecha fin</span>
-        <input
-          id="export-end-date"
-          type="date"
-          class="input input-bordered h-11 w-full"
-          bind:value={endDate}
-          aria-labelledby="export-end-date-label"
-        />
-      </label>
-    </div>
+        {#if notice}
+          <div class="alert alert-success"><span>{notice}</span></div>
+        {/if}
 
-    <div class="rounded-box border border-base-300/70 bg-base-200/35 p-3 md:p-4">
-      <div class="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-end">
-      <button
-        class="btn btn-primary w-full md:w-auto"
-        class:loading={exporting}
-        disabled={exporting || deleting}
-        onclick={() => handleExport("csv")}
-      >
-        Exportar CSV
-      </button>
+        <!-- Step indicator -->
+        <ul class="steps steps-horizontal w-full text-xs">
+          <li class="step" class:step-primary={Boolean(startDate && endDate)}>Seleccionar fechas</li>
+          <li class="step" class:step-primary={hasExportForCurrentRange()}>Exportar</li>
+          <li class="step">Eliminar (opcional)</li>
+        </ul>
 
-      <button
-        class="btn btn-outline w-full md:w-auto"
-        class:loading={exporting}
-        disabled={exporting || deleting}
-        onclick={() => handleExport("json")}
-      >
-        Exportar JSON
-      </button>
+        <!-- Date pickers -->
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <label class="flex items-center gap-3">
+            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60">Fecha inicio</span>
+            <input id="export-start-date" type="date" class="input input-bordered h-11 w-full" bind:value={startDate} />
+          </label>
+          <label class="flex items-center gap-3">
+            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60">Fecha fin</span>
+            <input id="export-end-date" type="date" class="input input-bordered h-11 w-full" bind:value={endDate} />
+          </label>
+        </div>
 
-      <button
-        class="btn btn-soft btn-error w-full md:w-auto"
-        class:loading={deleting}
-        disabled={deleting || exporting || !hasExportForCurrentRange()}
-        onclick={openPurgeModal}
-      >
-        Eliminar exportadas
-      </button>
+        <!-- Range summary chip -->
+        {#if startDate && endDate}
+          <div class="flex items-center gap-2 text-sm text-base-content/60">
+            <Icon icon="lucide:calendar" class="h-4 w-4 shrink-0" />
+            <span>{formatDateDisplay(startDate)} – {formatDateDisplay(endDate)}</span>
+            <span class="badge badge-ghost badge-sm">{getDaysDiff()} días</span>
+          </div>
+        {/if}
+
+        <!-- Actions -->
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:flex-wrap">
+          <button
+            class="btn btn-primary gap-2 w-full sm:w-auto"
+            disabled={exporting || deleting || !startDate || !endDate}
+            onclick={() => handleExport("csv")}
+          >
+            {#if exporting}<span class="loading loading-spinner loading-sm"></span>{:else}
+              <Icon icon="lucide:file-down" class="h-4 w-4" />
+            {/if}
+            Exportar CSV
+          </button>
+
+          <button
+            class="btn btn-outline gap-2 w-full sm:w-auto"
+            disabled={exporting || deleting || !startDate || !endDate}
+            onclick={() => handleExport("json")}
+          >
+            {#if exporting}<span class="loading loading-spinner loading-sm"></span>{:else}
+              <Icon icon="lucide:file-code" class="h-4 w-4" />
+            {/if}
+            Exportar JSON
+          </button>
+
+          <div class="divider divider-horizontal hidden sm:flex my-0 h-9"></div>
+
+          <div class="flex flex-col items-end gap-1 w-full sm:w-auto">
+            <button
+              class="btn btn-error btn-outline gap-2 w-full sm:w-auto"
+              disabled={deleting || exporting || !hasExportForCurrentRange()}
+              onclick={openPurgeModal}
+            >
+              {#if deleting}<span class="loading loading-spinner loading-sm"></span>{:else}
+                <Icon icon="lucide:trash-2" class="h-4 w-4" />
+              {/if}
+              Eliminar exportadas
+            </button>
+            {#if !hasExportForCurrentRange() && startDate && endDate}
+              <span class="text-xs text-base-content/40">Exporta primero este rango</span>
+            {/if}
+          </div>
+        </div>
+
       </div>
     </div>
-
-    <div class="alert alert-info py-3">
-      <span>Por defecto se eliminan entregadas y canceladas. Puedes elegir otros estados en el modal antes de proceder.</span>
-    </div>
-
-    <p class="text-xs text-base-content/70">
-      Al hacer click en "Eliminar exportadas", se abrira una confirmacion explicando el impacto. Solo estara disponible si ya exportaste CSV o JSON del rango seleccionado.
-    </p>
-  </div>
-  </div>
+  {/if}
 </section>
 
-<dialog class="modal" bind:this={purgeConfirmDialog}>
+<!-- Purge modal -->
+<dialog class="modal modal-bottom sm:modal-middle" bind:this={purgeConfirmDialog}>
   <div class="modal-box max-w-lg">
-    <h3 class="font-bold text-lg">Confirmar eliminacion de ordenes</h3>
-    <p class="py-3 text-sm text-base-content/80">
-      Se eliminaran permanentemente las ordenes entregadas entre <strong>{startDate}</strong> y <strong>{endDate}</strong>.
-      Esta accion libera espacio real en base de datos para ayudarte con los limites de Neon.
-    </p>
-    <div class="mt-4 rounded-box border border-base-300/70 bg-base-200/35 p-3">
-      <p class="text-sm font-medium">Estados a eliminar</p>
-      <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {#each purgeStatusOptions as option}
-          <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
-            <input
-              type="checkbox"
-              class="checkbox checkbox-sm"
-              checked={selectedPurgeStatuses.includes(option.value)}
-              onchange={(event) => togglePurgeStatus(option.value, (event.currentTarget as HTMLInputElement).checked)}
-            />
-            <span class="label-text">{option.label}</span>
-          </label>
-        {/each}
+    <div class="flex items-center gap-3 mb-5">
+      <div class="w-11 h-11 rounded-full bg-error/10 flex items-center justify-center shrink-0">
+        <Icon icon="lucide:triangle-alert" class="h-6 w-6 text-error" />
+      </div>
+      <div>
+        <h3 class="font-bold text-base">Confirmar eliminación</h3>
+        <p class="text-xs text-base-content/55">{formatDateDisplay(startDate)} – {formatDateDisplay(endDate)} · Esta acción no se puede deshacer</p>
       </div>
     </div>
 
-    <p class="mt-3 text-sm text-base-content/80">
-      Ya realizaste una exportacion para este rango, por lo que conservas respaldo en CSV o JSON antes de proceder.
-    </p>
+    <p class="text-sm font-medium mb-3">Estados a eliminar:</p>
+    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 mb-5">
+      {#each purgeStatusOptions as opt}
+        <label
+          class={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${selectedPurgeStatuses.includes(opt.value) ? "border-error bg-error/5" : "border-base-300"}`}
+        >
+          <input
+            type="checkbox"
+            class="checkbox checkbox-sm checkbox-error"
+            checked={selectedPurgeStatuses.includes(opt.value)}
+            onchange={(e) => toggleStatus(opt.value, (e.currentTarget as HTMLInputElement).checked)}
+          />
+            <Icon icon={opt.icon} class="h-4 w-4 text-base-content/40 shrink-0" />
+          <span class="text-sm">{opt.label}</span>
+        </label>
+      {/each}
+    </div>
+
+    {#if lastExportFormat}
+      <div class="alert bg-success/10 border-success/25 mb-4 py-2.5">
+        <Icon icon="lucide:circle-check" class="text-success h-4 w-4 shrink-0" />
+        <span class="text-sm">Tienes respaldo {lastExportFormat.toUpperCase()} de este rango.</span>
+      </div>
+    {/if}
 
     <div class="modal-action">
-      <button class="btn btn-outline" type="button" onclick={closePurgeModal}>Cancelar</button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick={() => purgeConfirmDialog?.close()}>Cancelar</button>
       <button
-        class="btn btn-error"
+        class="btn btn-error btn-sm gap-2"
         type="button"
-        class:loading={deleting}
-        disabled={deleting || exporting || selectedPurgeStatuses.length === 0}
-        onclick={confirmPurgeExportedOrders}
+        disabled={deleting || selectedPurgeStatuses.length === 0}
+        onclick={confirmPurge}
       >
-        Proceder y eliminar
+        {#if deleting}<span class="loading loading-spinner loading-xs"></span>{/if}
+        Eliminar órdenes
       </button>
     </div>
   </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="submit">close</button>
-  </form>
+  <form method="dialog" class="modal-backdrop"><button type="submit">close</button></form>
 </dialog>
+
+<style>
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fadeIn { animation: fadeIn 0.18s ease-out; }
+</style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import Icon from "@iconify/svelte";
   import { formatCurrency } from "../../../lib/utils/formatters";
   import { listPublicCategories, listPublicProducts, type PublicCategory, type PublicProduct } from "../../../lib/api/store";
   import { addCartItem } from "../../../lib/store/cart";
@@ -304,11 +305,7 @@
           <div class="grid grid-cols-2 gap-2 pt-1">
             <button type="button" class="btn btn-primary" onclick={() => addSelectedToCart(false)}>Agregar</button>
             <button type="button" class="btn btn-outline gap-2" onclick={() => addSelectedToCart(true)}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="size-4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="8" cy="21" r="1"></circle>
-                <circle cx="19" cy="21" r="1"></circle>
-                <path d="M2.5 3H5l2.4 11.3a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L21 7H7"></path>
-              </svg>
+              <Icon icon="lucide:shopping-cart" class="size-4" aria-hidden="true" />
               Pagar
             </button>
           </div>

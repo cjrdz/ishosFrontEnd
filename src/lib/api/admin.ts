@@ -77,9 +77,14 @@ export interface Order {
   notes?: string | null;
   rejection_reason?: string | null;
   created_by_user_id?: string | null;
+  created_by_name?: string | null;
+  created_by_role?: "customer" | UserRole | null;
   created_at?: string;
   updated_at?: string;
   items?: OrderItem[];
+  tracking_token?: string | null;
+  tracking_token_expires_at?: string | null;
+  tracking_url?: string | null;
 }
 
 export interface OrderItem {
@@ -98,6 +103,31 @@ export interface Employee {
   phone?: string;
   role: UserRole;
   state?: "active" | "inactive";
+}
+
+export interface User {
+  id: string;
+  name: string;
+  user_type: "user" | "company";
+  phone: string;
+  email?: string | null;
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserOrderHistoryItem {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  customer_phone: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
+}
+
+export interface AdminTabsSettings {
+  tab_order: string[];
 }
 
 export interface OrdersPaginatedResponse {
@@ -364,6 +394,84 @@ export async function deleteEmployee(token: string, id: string): Promise<{ messa
   return apiRequest<{ message: string }>(`/employees/${id}`, {
     method: "DELETE",
     token,
+  });
+}
+
+export async function listUsers(token: string, options?: { status?: string; search?: string }): Promise<User[]> {
+  const params = new URLSearchParams();
+  if (options?.status) {
+    params.set("status", options.status);
+  }
+  if (options?.search) {
+    params.set("search", options.search);
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<User[]>(`/users${suffix}`, { token });
+}
+
+export async function getUser(token: string, id: string): Promise<User> {
+  return apiRequest<User>(`/users/${id}`, { token });
+}
+
+export async function createUser(
+  token: string,
+  payload: {
+    name: string;
+    user_type: "user" | "company";
+    phone: string;
+    email?: string;
+    status: "active" | "inactive";
+  },
+): Promise<User> {
+  return apiRequest<User>("/users", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function updateUser(
+  token: string,
+  id: string,
+  payload: Partial<{
+    name: string;
+    user_type: "user" | "company";
+    phone: string;
+    email: string;
+    status: "active" | "inactive";
+  }>,
+): Promise<User> {
+  return apiRequest<User>(`/users/${id}`, {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
+export async function deleteUser(token: string, id: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/users/${id}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export async function listUserOrders(token: string, id: string, limit = 50): Promise<{ orders: UserOrderHistoryItem[] }> {
+  return apiRequest<{ orders: UserOrderHistoryItem[] }>(`/users/${id}/orders?limit=${limit}`, { token });
+}
+
+export async function getAdminTabsSettings(token: string): Promise<AdminTabsSettings> {
+  return apiRequest<AdminTabsSettings>("/settings/tabs", { token });
+}
+
+export async function updateAdminTabsSettings(
+  token: string,
+  payload: { tab_order: string[] },
+): Promise<AdminTabsSettings> {
+  return apiRequest<AdminTabsSettings>("/settings/tabs", {
+    method: "PATCH",
+    token,
+    body: payload,
   });
 }
 

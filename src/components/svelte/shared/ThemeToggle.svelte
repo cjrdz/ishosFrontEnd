@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import Icon from "@iconify/svelte";
   import { COLOR_THEME, DARK_THEME, type ThemeMode } from "../../../lib/theme/constants";
 
   // Initialize theme from localStorage or system preference immediately
@@ -37,13 +38,8 @@
 
 <button class="btn btn-ghost btn-circle" type="button" onclick={toggleTheme} aria-label="Cambiar tema">
   {#if theme === COLOR_THEME}
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-base-content" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-    </svg>
+    <Icon icon="lucide:sun" class="h-6 w-6 text-base-content" />
   {:else}
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-base-content" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M20.354 15.354A9 9 0 0 1 8.646 3.646a1 1 0 0 0-1.273-1.273A11 11 0 1 0 21.627 16.627a1 1 0 0 0-1.273-1.273Z"/>
-    </svg>
+    <Icon icon="lucide:moon" class="h-6 w-6 text-base-content" />
   {/if}
 </button>

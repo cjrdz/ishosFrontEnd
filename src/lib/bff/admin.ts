@@ -234,7 +234,7 @@ export async function listAdminImages() {
   return response;
 }
 
-export async function uploadAdminImage(file: File, folder = 'menu'): Promise<{ path: string; message: string }> {
+export async function uploadAdminImage(file: File, folder = ''): Promise<{ path: string; message: string }> {
   const formData = new FormData();
   formData.append('image', file);
   if (folder.trim()) {
@@ -301,6 +301,58 @@ export async function deactivateEmployee(id: string) {
   return bffRequest<any>(`/api/admin/employees/${id}`, {
     method: 'DELETE',
     query: { action: 'deactivate' },
+  });
+}
+
+// Users (customer directory)
+export async function listUsers(status?: string, search?: string) {
+  const query: Record<string, string> = {};
+  if (status) query.status = status;
+  if (search) query.search = search;
+  return bffRequest<any>('/api/admin/users', {
+    query: Object.keys(query).length > 0 ? query : undefined,
+  });
+}
+
+export async function getUser(id: string) {
+  return bffRequest<any>(`/api/admin/users/${id}`);
+}
+
+export async function createUser(payload: any) {
+  return bffRequest<any>('/api/admin/users', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function updateUser(id: string, payload: any) {
+  return bffRequest<any>(`/api/admin/users/${id}`, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
+
+export async function deleteUser(id: string) {
+  return bffRequest<any>(`/api/admin/users/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function listUserOrders(id: string, limit = 50) {
+  return bffRequest<{ orders: any[] }>(`/api/admin/users/${id}/orders`, {
+    query: { limit },
+  });
+}
+
+// Admin settings
+export async function getAdminTabsSettings() {
+  return bffRequest<{ tab_order: string[] }>('/api/admin/settings/tabs');
+}
+
+export async function updateAdminTabsSettings(tabOrder: string[]) {
+  return bffRequest<{ tab_order: string[] }>('/api/admin/settings/tabs', {
+    method: 'PATCH',
+    body: { tab_order: tabOrder },
   });
 }
 

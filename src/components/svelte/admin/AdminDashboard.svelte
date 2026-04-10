@@ -4,27 +4,34 @@
     approveOrder,
     createCategory,
     createEmployee,
+    createUser,
     createOrder,
     createProduct,
     deleteAdminImage,
     deleteEmployee,
+    deleteUser,
     deleteCategory,
     deleteOrder,
     deleteProduct,
+    getAdminTabsSettings,
     getOrder,
     listAdminImages,
     listCategories,
     listEmployees,
+    listUserOrders,
+    listUsers,
     listOrders,
     listProducts,
     rejectOrder,
     uploadAdminImage,
+    updateAdminTabsSettings,
     updateCategory,
     updateEmployee,
     updateOrder,
     updateOrderNotes,
     updateOrderStatus,
     updateProduct,
+    updateUser,
     linkProductFlavor,
     unlinkProductFlavor,
     linkProductAddon,
@@ -47,12 +54,16 @@
     Flavor,
     Order,
     Product,
+    User,
+    UserOrderHistoryItem,
   } from "../../../lib/api/admin";
   import AdminHeader, { type TabKey } from "./AdminHeader.svelte";
   import OrdersTab from "./tabs/OrdersTab.svelte";
   import CategoriesTab from "./tabs/CategoriesTab.svelte";
   import ProductsTab from "./tabs/ProductsTab.svelte";
   import EmployeesTab from "./tabs/EmployeesTab.svelte";
+  import UsersTab from "./tabs/UsersTab.svelte";
+  import SettingsTab from "./tabs/SettingsTab.svelte";
   import ToolsTab from "./tabs/ToolsTab.svelte";
 
   type Session = {
@@ -76,6 +87,9 @@
   let productImages = $state<AdminImage[]>([]);
   let orders = $state<Order[]>([]);
   let employees = $state<Employee[]>([]);
+  let users = $state<User[]>([]);
+  let selectedUserOrders = $state<UserOrderHistoryItem[]>([]);
+  let usersHistoryBusy = $state(false);
   let flavors = $state<Flavor[]>([]);
   let addons = $state<Addon[]>([]);
   let selectedOrder = $state<Order | null>(null);
@@ -86,6 +100,9 @@
   let newOrdersToast = $state<{ count: number; orderNumber?: string } | null>(null);
   let newOrdersToastTimer: ReturnType<typeof setTimeout> | null = null;
   let ordersPollingTimer: ReturnType<typeof setInterval> | null = null;
+  let settingsDialog = $state<HTMLDialogElement | null>(null);
+  const DEFAULT_TAB_ORDER: TabKey[] = ["ordenes", "categorias", "productos", "empleados", "usuarios", "herramientas"];
+  let tabOrder = $state<TabKey[]>([...DEFAULT_TAB_ORDER]);
 
   let moduleErrors = $state({
     ordenes: "",
@@ -94,6 +111,8 @@
     sabores: "",
     complementos: "",
     empleados: "",
+    usuarios: "",
+    configuracion: "",
   });
 
   let busy = $state({
@@ -103,6 +122,8 @@
     complementos: false,
     ordenes: false,
     empleados: false,
+    usuarios: false,
+    configuracion: false,
   });
 
   const isAdmin = $derived(session?.role === "admin");
@@ -188,7 +209,15 @@
         loadProducts(),
       ]);
       if (session?.role === "admin") {
-        await Promise.allSettled([loadCategories(), loadEmployees(), loadProductImages(), loadFlavors(), loadAddons()]);
+        await Promise.allSettled([
+          loadCategories(),
+          loadEmployees(),
+          loadUsers(),
+          loadTabsSettings(),
+          loadProductImages(),
+          loadFlavors(),
+          loadAddons(),
+        ]);
       }
       startOrdersPolling();
     })();
@@ -283,6 +312,50 @@
       setModuleError("empleados", requestError instanceof Error ? requestError.message : "No se pudieron cargar empleados");
     } finally {
       busy.empleados = false;
+    }
+  }
+
+  async function loadUsers() {
+    if (!isAdmin) return;
+    busy.usuarios = true;
+    clearModuleError("usuarios");
+    try {
+      users = await listUsers();
+    } catch (requestError) {
+      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudieron cargar usuarios");
+    } finally {
+      busy.usuarios = false;
+    }
+  }
+
+  async function loadUserOrders(userId: string) {
+    if (!isAdmin) return;
+    usersHistoryBusy = true;
+    clearModuleError("usuarios");
+    try {
+      const response = await listUserOrders(userId, 50);
+      selectedUserOrders = response.orders ?? [];
+    } catch (requestError) {
+      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo cargar historial del usuario");
+      selectedUserOrders = [];
+    } finally {
+      usersHistoryBusy = false;
+    }
+  }
+
+  async function loadTabsSettings() {
+    if (!isAdmin) return;
+    busy.configuracion = true;
+    clearModuleError("configuracion");
+    try {
+      const settings = await getAdminTabsSettings();
+      const incoming = (settings.tab_order ?? []).filter((item): item is TabKey => DEFAULT_TAB_ORDER.includes(item as TabKey));
+      tabOrder = incoming.length > 0 ? incoming : [...DEFAULT_TAB_ORDER];
+    } catch (requestError) {
+      setModuleError("configuracion", requestError instanceof Error ? requestError.message : "No se pudo cargar configuracion");
+      tabOrder = [...DEFAULT_TAB_ORDER];
+    } finally {
+      busy.configuracion = false;
     }
   }
 
@@ -537,7 +610,7 @@
     productGalleryBusy = true;
     clearModuleError("productos");
     try {
-      const uploaded = await uploadAdminImage(file, "menu");
+      const uploaded = await uploadAdminImage(file);
       setNotice("Imagen subida al bucket");
       await loadProductImages();
       return uploaded.path;
@@ -761,9 +834,104 @@
     }
   }
 
+  async function handleCreateUser(payload: Parameters<typeof createUser>[0]) {
+    if (!isAdmin) return;
+    busy.usuarios = true;
+    clearModuleError("usuarios");
+    try {
+      await createUser(payload);
+      setNotice("Usuario creado");
+      await loadUsers();
+    } catch (requestError) {
+      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo crear usuario");
+    } finally {
+      busy.usuarios = false;
+    }
+  }
+
+  async function handleUpdateUser(id: string, payload: Parameters<typeof updateUser>[1]) {
+    if (!isAdmin) return;
+    busy.usuarios = true;
+    clearModuleError("usuarios");
+    try {
+      await updateUser(id, payload);
+      setNotice("Usuario actualizado");
+      await loadUsers();
+    } catch (requestError) {
+      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo actualizar usuario");
+    } finally {
+      busy.usuarios = false;
+    }
+  }
+
+  async function handleDeleteUser(id: string) {
+    if (!isAdmin) return;
+    busy.usuarios = true;
+    clearModuleError("usuarios");
+    try {
+      await deleteUser(id);
+      setNotice("Usuario eliminado");
+      await loadUsers();
+    } catch (requestError) {
+      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo eliminar usuario");
+    } finally {
+      busy.usuarios = false;
+    }
+  }
+
+  async function handleSaveUserFromOrder(payload: Parameters<typeof createUser>[0]) {
+    if (!isAdmin) return false;
+    busy.usuarios = true;
+    clearModuleError("usuarios");
+    try {
+      await createUser(payload);
+      setNotice("Usuario guardado desde la orden");
+      await loadUsers();
+      return true;
+    } catch (requestError) {
+      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo guardar usuario desde la orden");
+      return false;
+    } finally {
+      busy.usuarios = false;
+    }
+  }
+
+  async function handleSaveTabOrder(nextTabOrder: string[]) {
+    if (!isAdmin) return;
+    busy.configuracion = true;
+    clearModuleError("configuracion");
+    try {
+      const response = await updateAdminTabsSettings(nextTabOrder as TabKey[]);
+      const incoming = (response.tab_order ?? []).filter((item): item is TabKey => DEFAULT_TAB_ORDER.includes(item as TabKey));
+      tabOrder = incoming.length > 0 ? incoming : [...DEFAULT_TAB_ORDER];
+      setNotice("Configuracion guardada");
+    } catch (requestError) {
+      setModuleError("configuracion", requestError instanceof Error ? requestError.message : "No se pudo guardar configuracion");
+    } finally {
+      busy.configuracion = false;
+    }
+  }
+
   function handleFilterChange(status: string) {
     orderStatusFilter = status;
     loadOrders();
+  }
+
+  function handleTabChange(tab: TabKey) {
+    if (!isAdmin && tab !== "ordenes") {
+      activeTab = "ordenes";
+      return;
+    }
+    activeTab = tab;
+  }
+
+  function openSettingsModal() {
+    if (!isAdmin) return;
+    settingsDialog?.showModal();
+  }
+
+  function closeSettingsModal() {
+    settingsDialog?.close();
   }
 
   onMount(() => {
@@ -780,9 +948,11 @@
 </script>
 
 {#if loading}
-  <div class="flex items-center gap-3">
-    <span class="loading loading-spinner loading-md"></span>
-    <span>Cargando sesion...</span>
+  <div class="flex min-h-[45vh] w-full items-center justify-center">
+    <div class="flex items-center gap-3">
+      <span class="loading loading-spinner loading-md"></span>
+      <span>Cargando sesion...</span>
+    </div>
   </div>
 {:else if sessionError}
   <div class="space-y-4">
@@ -797,8 +967,10 @@
       role={session.role}
       activeTab={activeTab}
       isAdmin={isAdmin}
+      tabOrder={tabOrder}
       onLogout={handleLogout}
-      onTabChange={(tab) => (activeTab = tab)}
+      onTabChange={handleTabChange}
+      onOpenSettings={openSettingsModal}
     />
 
     {#if newOrdersToast}
@@ -817,6 +989,51 @@
 
     {#if notice}
       <div class="alert alert-success"><span>{notice}</span></div>
+    {/if}
+
+    {#if isAdmin}
+      <dialog class="modal" bind:this={settingsDialog}>
+        <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto space-y-6">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h3 class="text-xl font-bold">Personalizacion del panel</h3>
+              <p class="text-sm text-base-content/70">Ajusta el panel administrativo desde un solo lugar.</p>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="button" onclick={closeSettingsModal}>Cerrar</button>
+          </div>
+
+          <SettingsTab
+            tabOrder={tabOrder}
+            busy={busy.configuracion}
+            moduleError={moduleErrors.configuracion}
+            onSave={handleSaveTabOrder}
+          />
+
+          <section class="space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <h4 class="text-base font-semibold">Proximas personalizaciones</h4>
+              <span class="badge badge-outline">Muy pronto</span>
+            </div>
+            <div class="grid gap-3 md:grid-cols-3">
+              <article class="rounded-xl border border-base-300 bg-base-100 p-4">
+                <h5 class="font-semibold">Branding del panel</h5>
+                <p class="mt-1 text-sm text-base-content/70">Logo, colores administrativos y nombre visible en cabecera.</p>
+              </article>
+              <article class="rounded-xl border border-base-300 bg-base-100 p-4">
+                <h5 class="font-semibold">Widgets de inicio</h5>
+                <p class="mt-1 text-sm text-base-content/70">Define que resumenes se muestran primero al entrar.</p>
+              </article>
+              <article class="rounded-xl border border-base-300 bg-base-100 p-4">
+                <h5 class="font-semibold">Atajos de operacion</h5>
+                <p class="mt-1 text-sm text-base-content/70">Configura accesos rapidos para tareas frecuentes del equipo.</p>
+              </article>
+            </div>
+          </section>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button type="button" onclick={closeSettingsModal}>close</button>
+        </form>
+      </dialog>
     {/if}
 
     {#if activeTab === "ordenes"}
@@ -838,6 +1055,7 @@
         onUpdateOrder={handleUpdateOrder}
         onDelete={handleDeleteOrder}
         onCreate={handleCreateOrder}
+        saveUserFromOrder={handleSaveUserFromOrder}
       />
     {/if}
 
@@ -896,8 +1114,23 @@
       />
     {/if}
 
+    {#if isAdmin && activeTab === "usuarios"}
+      <UsersTab
+        users={users}
+        busy={busy.usuarios}
+        moduleError={moduleErrors.usuarios}
+        historyBusy={usersHistoryBusy}
+        selectedUserOrders={selectedUserOrders}
+        onCreate={handleCreateUser}
+        onUpdate={handleUpdateUser}
+        onDelete={handleDeleteUser}
+        onLoadOrders={loadUserOrders}
+      />
+    {/if}
+
     {#if isAdmin && activeTab === "herramientas"}
       <ToolsTab />
     {/if}
+
   </div>
 {/if}
