@@ -11,6 +11,7 @@
     "audit:fix": "pnpm audit --fix"
   },
   "dependencies": {
+    "@astrojs/cloudflare": "^13.1.8",
     "@astrojs/svelte": "^8.0.4",
     "@iconify/svelte": "^5.2.1",
     "@tailwindcss/vite": "^4.1.18",
