@@ -1,7 +1,7 @@
 {
   "name": "ishos-factory",
   "compatibility_date": "2026-04-10",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat"]
 
   // Astro SSR generates the dist folder with server entrypoints
   // The Cloudflare adapter handles the build output automatically
