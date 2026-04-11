@@ -1,4 +1,22 @@
-import { apiRequest } from "./client";
+import { ApiError } from "./client";
+
+async function bffRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(path, options);
+  } catch {
+    throw new ApiError('Network request failed', 0, 'NETWORK_ERROR');
+  }
+  if (!response.ok) {
+    let message = 'Request failed';
+    try {
+      const data = await response.json() as Record<string, unknown>;
+      if (typeof data?.error === 'string') message = data.error;
+    } catch { /* ignore */ }
+    throw new ApiError(message, response.status, 'API_ERROR');
+  }
+  return response.json() as Promise<T>;
+}
 
 export interface PublicCategory {
   id: string;
@@ -87,19 +105,20 @@ export interface PublicOrderTrackingHistoryResponse {
 }
 
 export async function listPublicCategories(): Promise<PublicCategory[]> {
-  return apiRequest<PublicCategory[]>("/categories");
+  return bffRequest<PublicCategory[]>('/api/store/categories');
 }
 
 export async function listPublicProducts(): Promise<PublicProduct[]> {
-  return apiRequest<PublicProduct[]>("/products");
+  return bffRequest<PublicProduct[]>('/api/store/products');
 }
 
 export async function createPublicOrder(
   payload: PublicOrderCreatePayload,
 ): Promise<PublicOrderCreateResponse> {
-  return apiRequest<PublicOrderCreateResponse>("/orders", {
-    method: "POST",
-    body: payload,
+  return bffRequest<PublicOrderCreateResponse>('/api/store/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   });
 }
 
@@ -107,10 +126,7 @@ export async function trackPublicOrder(
   orderNumber: string,
   trackingToken: string,
 ): Promise<PublicOrderTrackingResponse> {
-  const query = new URLSearchParams({
-    order_number: orderNumber,
-    tracking_token: trackingToken,
-  });
-
-  return apiRequest<PublicOrderTrackingResponse>(`/orders/track?${query.toString()}`);
+  return bffRequest<PublicOrderTrackingResponse>(
+    `/api/store/tracking/${encodeURIComponent(orderNumber)}?tracking_token=${encodeURIComponent(trackingToken)}`,
+  );
 }
