@@ -14,6 +14,22 @@ import { LoginSchema } from '../../../lib/validators/admin';
 
 export const prerender = false;
 
+function buildAuthCookie(token: string, isSecure: boolean): string {
+  const parts = [
+    `auth_token=${encodeURIComponent(token)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${60 * 60 * 24}`,
+  ];
+
+  if (isSecure) {
+    parts.push('Secure');
+  }
+
+  return parts.join('; ');
+}
+
 export const POST: APIRoute = async (context) => {
   try {
     // Parse and validate request body
@@ -23,16 +39,19 @@ export const POST: APIRoute = async (context) => {
     // Call backend login
     const response = await login(validated.email, validated.password);
 
+    const forwardedProto = context.request.headers.get('x-forwarded-proto');
+    const isSecure = (forwardedProto ?? context.url.protocol.replace(':', '')) === 'https';
+
     // Set same-origin HttpOnly cookie so Astro middleware can validate /admin routes.
     context.cookies.set('auth_token', response.token, {
       path: '/',
       httpOnly: true,
       sameSite: 'lax',
-      secure: context.url.protocol === 'https:',
+      secure: isSecure,
       maxAge: 60 * 60 * 24,
     });
 
-    // Return response (backend also set HttpOnly cookie)
+    // Return response with explicit Set-Cookie for edge/runtime consistency.
     return new Response(JSON.stringify(response), {
       status: 200,
       headers: {
@@ -40,6 +59,7 @@ export const POST: APIRoute = async (context) => {
         'Cache-Control': 'no-store, no-cache, must-revalidate, private',
         'Pragma': 'no-cache',
         'Expires': '0',
+        'Set-Cookie': buildAuthCookie(response.token, isSecure),
       },
     });
   } catch (error) {

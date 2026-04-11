@@ -12,9 +12,29 @@ import { clearCachedSession } from '../../../lib/auth/session';
 
 export const prerender = false;
 
+function buildLogoutCookie(isSecure: boolean): string {
+  const parts = [
+    'auth_token=',
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    'Max-Age=0',
+    'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+  ];
+
+  if (isSecure) {
+    parts.push('Secure');
+  }
+
+  return parts.join('; ');
+}
+
 export const POST: APIRoute = async (context) => {
   try {
     const token = context.cookies.get('auth_token')?.value;
+
+    const forwardedProto = context.request.headers.get('x-forwarded-proto');
+    const isSecure = (forwardedProto ?? context.url.protocol.replace(':', '')) === 'https';
 
     // Clear cached session immediately
     clearCachedSession();
@@ -32,6 +52,7 @@ export const POST: APIRoute = async (context) => {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store',
+        'Set-Cookie': buildLogoutCookie(isSecure),
       },
     });
   } catch (error) {
@@ -46,7 +67,13 @@ export const POST: APIRoute = async (context) => {
       JSON.stringify({
         message: 'Logged out',
       }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Set-Cookie': buildLogoutCookie(true),
+        },
+      }
     );
   }
 };
