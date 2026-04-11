@@ -14,13 +14,37 @@ import { LoginSchema } from '../../../lib/validators/admin';
 
 export const prerender = false;
 
-function buildAuthCookie(token: string, isSecure: boolean): string {
+const defaultCookieTTLSeconds = 60 * 60 * 24;
+
+function resolveCookieTTLSeconds(token: string): number {
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    return defaultCookieTTLSeconds;
+  }
+
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const payload = JSON.parse(atob(padded)) as { exp?: number };
+    if (!payload.exp || !Number.isFinite(payload.exp)) {
+      return defaultCookieTTLSeconds;
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const remaining = Math.floor(payload.exp - nowSeconds);
+    return remaining > 0 ? remaining : defaultCookieTTLSeconds;
+  } catch {
+    return defaultCookieTTLSeconds;
+  }
+}
+
+function buildAuthCookie(token: string, isSecure: boolean, ttlSeconds: number): string {
   const parts = [
     `auth_token=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
-    `Max-Age=${60 * 60 * 24}`,
+    `Max-Age=${ttlSeconds}`,
   ];
 
   if (isSecure) {
@@ -38,6 +62,7 @@ export const POST: APIRoute = async (context) => {
 
     // Call backend login
     const response = await login(validated.email, validated.password);
+    const ttlSeconds = resolveCookieTTLSeconds(response.token);
 
     const forwardedProto = context.request.headers.get('x-forwarded-proto');
     const isSecure = (forwardedProto ?? context.url.protocol.replace(':', '')) === 'https';
@@ -48,7 +73,7 @@ export const POST: APIRoute = async (context) => {
       httpOnly: true,
       sameSite: 'lax',
       secure: isSecure,
-      maxAge: 60 * 60 * 24,
+      maxAge: ttlSeconds,
     });
 
     // Return response with explicit Set-Cookie for edge/runtime consistency.
@@ -59,7 +84,7 @@ export const POST: APIRoute = async (context) => {
         'Cache-Control': 'no-store, no-cache, must-revalidate, private',
         'Pragma': 'no-cache',
         'Expires': '0',
-        'Set-Cookie': buildAuthCookie(response.token, isSecure),
+        'Set-Cookie': buildAuthCookie(response.token, isSecure, ttlSeconds),
       },
     });
   } catch (error) {

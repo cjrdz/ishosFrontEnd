@@ -356,6 +356,23 @@ export async function updateAdminTabsSettings(tabOrder: string[]) {
   });
 }
 
+export type AdminPanelConfig = {
+  auth_cookie_ttl_hours: number;
+  auth_token_ttl_hours: number;
+  tracking_token_ttl_hours: number;
+};
+
+export async function getAdminPanelConfig() {
+  return bffRequest<AdminPanelConfig>('/api/admin/settings/panel-config');
+}
+
+export async function updateAdminPanelConfig(payload: AdminPanelConfig) {
+  return bffRequest<AdminPanelConfig>('/api/admin/settings/panel-config', {
+    method: 'PATCH',
+    body: payload,
+  });
+}
+
 // Flavors
 export async function listFlavors(includeAll = false) {
   const query = includeAll ? { all: true } : undefined;

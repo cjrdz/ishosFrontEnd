@@ -14,6 +14,7 @@
     deleteOrder,
     deleteProduct,
     getAdminTabsSettings,
+    getAdminPanelConfig,
     getOrder,
     listAdminImages,
     listCategories,
@@ -25,6 +26,7 @@
     rejectOrder,
     uploadAdminImage,
     updateAdminTabsSettings,
+    updateAdminPanelConfig,
     updateCategory,
     updateEmployee,
     updateOrder,
@@ -64,6 +66,7 @@
   import EmployeesTab from "./tabs/EmployeesTab.svelte";
   import UsersTab from "./tabs/UsersTab.svelte";
   import SettingsTab from "./tabs/SettingsTab.svelte";
+  import type { PanelConfigValues } from "./tabs/SettingsTab.svelte";
   import ToolsTab from "./tabs/ToolsTab.svelte";
 
   type Session = {
@@ -103,6 +106,12 @@
   let settingsDialog = $state<HTMLDialogElement | null>(null);
   const DEFAULT_TAB_ORDER: TabKey[] = ["ordenes", "categorias", "productos", "empleados", "usuarios", "herramientas"];
   let tabOrder = $state<TabKey[]>([...DEFAULT_TAB_ORDER]);
+  const DEFAULT_PANEL_CONFIG: PanelConfigValues = {
+    auth_cookie_ttl_hours: 24,
+    auth_token_ttl_hours: 168,
+    tracking_token_ttl_hours: 720,
+  };
+  let panelConfig = $state<PanelConfigValues>({ ...DEFAULT_PANEL_CONFIG });
 
   let moduleErrors = $state({
     ordenes: "",
@@ -214,6 +223,7 @@
           loadEmployees(),
           loadUsers(),
           loadTabsSettings(),
+          loadPanelConfig(),
           loadProductImages(),
           loadFlavors(),
           loadAddons(),
@@ -354,6 +364,25 @@
     } catch (requestError) {
       setModuleError("configuracion", requestError instanceof Error ? requestError.message : "No se pudo cargar configuracion");
       tabOrder = [...DEFAULT_TAB_ORDER];
+    } finally {
+      busy.configuracion = false;
+    }
+  }
+
+  async function loadPanelConfig() {
+    if (!isAdmin) return;
+    busy.configuracion = true;
+    clearModuleError("configuracion");
+    try {
+      const config = await getAdminPanelConfig();
+      panelConfig = {
+        auth_cookie_ttl_hours: config.auth_cookie_ttl_hours,
+        auth_token_ttl_hours: config.auth_token_ttl_hours,
+        tracking_token_ttl_hours: config.tracking_token_ttl_hours,
+      };
+    } catch (requestError) {
+      setModuleError("configuracion", requestError instanceof Error ? requestError.message : "No se pudo cargar configuracion");
+      panelConfig = { ...DEFAULT_PANEL_CONFIG };
     } finally {
       busy.configuracion = false;
     }
@@ -912,6 +941,25 @@
     }
   }
 
+  async function handleSavePanelConfig(nextPanelConfig: PanelConfigValues) {
+    if (!isAdmin) return;
+    busy.configuracion = true;
+    clearModuleError("configuracion");
+    try {
+      const response = await updateAdminPanelConfig(nextPanelConfig);
+      panelConfig = {
+        auth_cookie_ttl_hours: response.auth_cookie_ttl_hours,
+        auth_token_ttl_hours: response.auth_token_ttl_hours,
+        tracking_token_ttl_hours: response.tracking_token_ttl_hours,
+      };
+      setNotice("Expiraciones actualizadas");
+    } catch (requestError) {
+      setModuleError("configuracion", requestError instanceof Error ? requestError.message : "No se pudo guardar configuracion");
+    } finally {
+      busy.configuracion = false;
+    }
+  }
+
   function handleFilterChange(status: string) {
     orderStatusFilter = status;
     loadOrders();
@@ -996,7 +1044,7 @@
         <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto space-y-6">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <h3 class="text-xl font-bold">Personalizacion del panel</h3>
+              <h3 class="text-xl font-bold">Panel de configuracion</h3>
               <p class="text-sm text-base-content/70">Ajusta el panel administrativo desde un solo lugar.</p>
             </div>
             <button class="btn btn-ghost btn-sm" type="button" onclick={closeSettingsModal}>Cerrar</button>
@@ -1004,9 +1052,11 @@
 
           <SettingsTab
             tabOrder={tabOrder}
+            panelConfig={panelConfig}
             busy={busy.configuracion}
             moduleError={moduleErrors.configuracion}
             onSave={handleSaveTabOrder}
+            onSavePanelConfig={handleSavePanelConfig}
           />
 
           <section class="space-y-3">
