@@ -1,9 +1,17 @@
 <script lang="ts">
+  export interface PanelConfigValues {
+    auth_cookie_ttl_hours: number;
+    auth_token_ttl_hours: number;
+    tracking_token_ttl_hours: number;
+  }
+
   interface Props {
     tabOrder: string[];
+    panelConfig: PanelConfigValues;
     busy: boolean;
     moduleError: string;
     onSave: (tabOrder: string[]) => void;
+    onSavePanelConfig: (config: PanelConfigValues) => void;
   }
 
   const TAB_LABELS: Record<string, string> = {
@@ -15,11 +23,24 @@
     herramientas: "Herramientas",
   };
 
-  let { tabOrder, busy, moduleError, onSave }: Props = $props();
+  let { tabOrder, panelConfig, busy, moduleError, onSave, onSavePanelConfig }: Props = $props();
   let localOrder = $state<string[]>([]);
+  let localPanelConfig = $state<PanelConfigValues>({
+    auth_cookie_ttl_hours: 24,
+    auth_token_ttl_hours: 168,
+    tracking_token_ttl_hours: 720,
+  });
 
   $effect(() => {
     localOrder = [...tabOrder];
+  });
+
+  $effect(() => {
+    localPanelConfig = {
+      auth_cookie_ttl_hours: panelConfig.auth_cookie_ttl_hours,
+      auth_token_ttl_hours: panelConfig.auth_token_ttl_hours,
+      tracking_token_ttl_hours: panelConfig.tracking_token_ttl_hours,
+    };
   });
 
   function moveUp(index: number) {
@@ -43,6 +64,22 @@
   function handleSave() {
     onSave(localOrder);
   }
+
+  function handleSavePanelConfig() {
+    onSavePanelConfig({
+      auth_cookie_ttl_hours: normalizeHours(localPanelConfig.auth_cookie_ttl_hours, panelConfig.auth_cookie_ttl_hours),
+      auth_token_ttl_hours: normalizeHours(localPanelConfig.auth_token_ttl_hours, panelConfig.auth_token_ttl_hours),
+      tracking_token_ttl_hours: normalizeHours(localPanelConfig.tracking_token_ttl_hours, panelConfig.tracking_token_ttl_hours),
+    });
+  }
+
+  function normalizeHours(value: number, fallback: number): number {
+    if (!Number.isFinite(value) || value <= 0) {
+      return fallback;
+    }
+
+    return Math.round(value);
+  }
 </script>
 
 <section class="space-y-4">
@@ -53,7 +90,7 @@
   <div class="card bg-base-100 shadow">
     <div class="card-body space-y-4">
       <div>
-        <h2 class="card-title">Configuracion del panel</h2>
+        <h2 class="card-title">Panel de configuracion</h2>
         <p class="text-sm text-base-content/70">Reordena las pestanas globales del panel administrativo.</p>
       </div>
 
@@ -71,6 +108,60 @@
 
       <div class="flex justify-end">
         <button class="btn btn-primary" type="button" onclick={handleSave} disabled={busy}>Guardar orden global</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow">
+    <div class="card-body space-y-4">
+      <div>
+        <h2 class="card-title">Expiracion de tokens</h2>
+        <p class="text-sm text-base-content/70">Configura en horas la duracion para login y seguimiento publico de ordenes.</p>
+      </div>
+
+      <div class="grid gap-3 md:grid-cols-3">
+        <label class="form-control">
+          <span class="label-text font-semibold">Cookie de sesion (horas)</span>
+          <input
+            class="input input-bordered"
+            type="number"
+            min="1"
+            step="1"
+            bind:value={localPanelConfig.auth_cookie_ttl_hours}
+            disabled={busy}
+          />
+          <span class="label-text-alt text-base-content/60">Usado por el backend para cookie HttpOnly.</span>
+        </label>
+
+        <label class="form-control">
+          <span class="label-text font-semibold">Token de login (horas)</span>
+          <input
+            class="input input-bordered"
+            type="number"
+            min="1"
+            step="1"
+            bind:value={localPanelConfig.auth_token_ttl_hours}
+            disabled={busy}
+          />
+          <span class="label-text-alt text-base-content/60">JWT de empleados para iniciar sesion.</span>
+        </label>
+
+        <label class="form-control">
+          <span class="label-text font-semibold">Token de seguimiento (horas)</span>
+          <input
+            class="input input-bordered"
+            type="number"
+            min="1"
+            step="1"
+            bind:value={localPanelConfig.tracking_token_ttl_hours}
+            disabled={busy}
+          />
+          <span class="label-text-alt text-base-content/60">Token publico para rastreo de ordenes.</span>
+        </label>
+      </div>
+
+      <div class="flex justify-end">
+        <button class="btn btn-primary" type="button" onclick={handleSavePanelConfig} disabled={busy}>Guardar expiraciones</button>
       </div>
     </div>
   </div>

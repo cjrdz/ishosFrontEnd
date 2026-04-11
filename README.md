@@ -75,6 +75,7 @@ src/
 Base URL configurada por:
 
 - `PUBLIC_API_BASE_URL`
+- `PUBLIC_AUTH_COOKIE_TTL_HOURS` (cookie `auth_token` emitida por el BFF)
 - Default local: `http://localhost:8080/api/v1`
 
 ### Endpoints usados actualmente por el panel
@@ -177,6 +178,7 @@ Crea `.env` (opcional) con:
 
 ```env
 PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
+PUBLIC_AUTH_COOKIE_TTL_HOURS=24
 ```
 
 ### Comandos
