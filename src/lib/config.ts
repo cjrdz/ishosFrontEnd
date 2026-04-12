@@ -1,5 +1,5 @@
 const defaultApiBaseUrl = "http://localhost:8080/api/v1";
-const productionApiBaseUrl = "https://ishosbackend.onrender.com/api/v1";
+const productionApiBaseUrl = "https://ishosbackend-production.up.railway.app/api/v1";
 const defaultAuthCookieTTLHours = 24;
 
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
