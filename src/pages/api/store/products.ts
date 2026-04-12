@@ -22,9 +22,11 @@ export const GET: APIRoute = async (context) => {
 
     const response = await fetch(url.toString());
     return forwardUpstreamJson(response);
-  } catch (error) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[store/products] upstream fetch failed:', message);
     return new Response(
-      JSON.stringify({ error: 'Failed to fetch products' }),
+      JSON.stringify({ error: 'Failed to fetch products', detail: message }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
