@@ -1,3 +1,5 @@
+import { arraysEqualUnordered } from "../utils/collections";
+
 export type StoreCartItem = {
   product_id: string;
   name: string;
@@ -19,17 +21,10 @@ function itemsMatch(a: StoreCartItem, b: StoreCartItem): boolean {
     a.product_id === b.product_id &&
     (a.flavor_id || null) === (b.flavor_id || null) &&
     (a.notes || "") === (b.notes || "") &&
-    arraysEqual(a.addons || [], b.addons || []) &&
-    arraysEqual(a.included_addon_ids || [], b.included_addon_ids || []) &&
-    arraysEqual(a.extra_addon_ids || [], b.extra_addon_ids || [])
+    arraysEqualUnordered(a.addons || [], b.addons || []) &&
+    arraysEqualUnordered(a.included_addon_ids || [], b.included_addon_ids || []) &&
+    arraysEqualUnordered(a.extra_addon_ids || [], b.extra_addon_ids || [])
   );
-}
-
-function arraysEqual(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const sortedA = [...a].sort();
-  const sortedB = [...b].sort();
-  return sortedA.every((v, i) => v === sortedB[i]);
 }
 
 function syncCartCount(items: StoreCartItem[]) {
@@ -91,9 +86,9 @@ export function updateCartItemQuantity(
         item.product_id === productId &&
         (item.flavor_id || null) === (flavorId || null) &&
         (item.notes || "") === (notes || "") &&
-        arraysEqual(item.addons || [], addons || []) &&
-        arraysEqual(item.included_addon_ids || [], includedAddonIds || []) &&
-        arraysEqual(item.extra_addon_ids || [], extraAddonIds || [])
+        arraysEqualUnordered(item.addons || [], addons || []) &&
+        arraysEqualUnordered(item.included_addon_ids || [], includedAddonIds || []) &&
+        arraysEqualUnordered(item.extra_addon_ids || [], extraAddonIds || [])
       ) {
         return { ...item, quantity };
       }
@@ -118,9 +113,9 @@ export function removeCartItem(
         item.product_id === productId &&
         (item.flavor_id || null) === (flavorId || null) &&
         (item.notes || "") === (notes || "") &&
-        arraysEqual(item.addons || [], addons || []) &&
-        arraysEqual(item.included_addon_ids || [], includedAddonIds || []) &&
-        arraysEqual(item.extra_addon_ids || [], extraAddonIds || [])
+        arraysEqualUnordered(item.addons || [], addons || []) &&
+        arraysEqualUnordered(item.included_addon_ids || [], includedAddonIds || []) &&
+        arraysEqualUnordered(item.extra_addon_ids || [], extraAddonIds || [])
       ),
   );
   setCartItems(items);

@@ -132,7 +132,7 @@
           type="radio"
           name={tabsGroupName}
           class="tab tab-lg"
-          aria-label="Todo"
+          aria-label="Todos"
           checked={activeCategory === "all"}
           onchange={() => {
             activeCategory = "all";
@@ -175,7 +175,7 @@
     {:else if loadingError}
       <div class="alert alert-error">{loadingError}</div>
     {:else if visibleProducts.length === 0}
-      <div class="alert">No hay productos disponibles en esta categoría.</div>
+      <div class="alert mx-auto max-w-fit">No hay productos disponibles en esta categoría.</div>
     {:else}
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 items-start">
         {#each visibleProducts as product (product.id)}

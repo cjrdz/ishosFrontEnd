@@ -1,84 +1,147 @@
-# Ishos Frontend — Panel Administrativo
+# IshosFactory Frontend
 
-Frontend administrativo de **IshosFactory** construido con Astro + Svelte.
+Full-stack frontend for **IshosFactory** gelato shop, built with Astro + Svelte and deployed on Cloudflare Workers.
 
-Este panel opera sobre la API en Go (`ishosBackend`) para autenticación, gestión de órdenes, catálogo, empleados y media library.
+The application includes two surfaces:
+- **Admin Panel** — internal operations: orders, catalog, employees, analytics, settings.
+- **Storefront** — public-facing menu, cart checkout, and order tracking.
 
----
-
-## 1) Objetivo del Panel
-
-El panel está orientado a operación interna del local:
-
-- Login de personal (`admin` / `employee`)
-- Gestión de órdenes (crear, editar, aprobar/rechazar, cambiar estado, eliminar)
-- Gestión de categorías (CRUD)
-- Gestión de productos (CRUD + galería de imágenes)
-- Gestión de empleados (crear, editar estado, eliminar)
+Both communicate with the Go backend (`ishosBackEnd`) through an Astro BFF (Backend-for-Frontend) layer.
 
 ---
 
-## 2) Arquitectura actual
+## Stack
 
-### Stack
+| Layer | Technology |
+| --- | --- |
+| Framework | Astro 5 (SSR, Cloudflare Workers adapter) |
+| UI components | Svelte 5 |
+| Styling | Tailwind CSS + DaisyUI |
+| HTTP client | Fetch API (via typed BFF wrappers) |
+| Deployment | Cloudflare Workers (`wrangler`) |
 
-- **Astro 5**: shell de páginas y layout
-- **Svelte 5**: UI interactiva del panel (client-side)
-- **Tailwind + DaisyUI**: estilos del panel
-- **Fetch API**: cliente HTTP hacia backend Go
+---
 
-### Flujo de ejecución
+## Architecture
 
-1. Astro sirve rutas (`/admin/login`, `/admin`) con layout base.
-2. Componentes Svelte se hidratan con `client:load`.
-3. Login llama `POST /auth/login` y establece `auth_token` en cookie `HttpOnly`.
-4. Middleware de Astro valida sesión del cookie contra `/api/admin/session` antes de permitir rutas protegidas.
-5. Cada acción de UI llama endpoints `/api/v1/...` del backend.
+### Request flow
 
-### Estructura principal
+1. Browser requests an Astro page; the middleware validates the session cookie before rendering protected routes.
+2. Astro server renders the shell (layout + initial data).
+3. Svelte components hydrate client-side with `client:load`.
+4. UI actions call Astro API routes under `/api/admin/...` or `/api/store/...` (the BFF).
+5. BFF routes proxy to the Go backend at `PUBLIC_API_BASE_URL`, forwarding the `Authorization` header derived from the cookie.
+
+### BFF design
+
+All backend requests from the client go through Astro API routes, not directly to the Go API. This keeps:
+- The backend URL and auth token server-side only.
+- Non-JSON backend errors surfaced correctly (BFF parses response by `Content-Type`, no unconditional `.json()`).
+
+### Session security
+
+- `auth_token` cookie is `HttpOnly`, `SameSite=Lax`, with `Cache-Control: no-store` on auth responses.
+- The middleware validates an active session via the BFF (`/api/admin/session`) before allowing protected routes — it does not only check cookie presence.
+- Logout triggers server-side token revocation on the backend, so a revoked token is invalid before JWT expiry.
+- `localStorage` is NOT used for authentication tokens.
+
+---
+
+## Pages
+
+| Route | Description |
+| --- | --- |
+| `/` | Storefront home with featured products |
+| `/menu` | Full catalog with category filter |
+| `/order/cart` | Cart checkout (order submission) |
+| `/order/tracking` | Public order status tracking (via secure link) |
+| `/admin/login` | Staff login |
+| `/admin` | Admin dashboard (tabbed panel) |
+| `/admin/analytics` | Sales analytics and KPI charts |
+| `/admin/settings` | Admin panel configuration |
+
+### Admin dashboard tabs
+
+| Tab | Functionality |
+| --- | --- |
+| Orders | View, update, approve/reject, advance status, delete |
+| Categories | CRUD + image management |
+| Products | CRUD + image upload + flavor/addon assignment |
+| Flavors | CRUD for available gelato flavors |
+| Addons | CRUD for available toppings/add-ons |
+| Employees | Create, deactivate, delete staff accounts |
+| Users | Customer directory (admin) |
+| Tools | Export orders (CSV), purge old orders |
+| Settings | Panel tab order + token TTL configuration |
+
+---
+
+## Project Structure
 
 ```text
 src/
-	pages/
-		admin/login.astro     # pantalla login
-		admin/index.astro     # dashboard admin
-	components/svelte/
-		AdminLoginForm.svelte
-		AdminDashboard.svelte
-		admin/
-			OrdersTab.svelte
-			CategoriesTab.svelte
-			ProductsTab.svelte
-			EmployeesTab.svelte
-	lib/
-		api/
-			client.ts           # wrapper fetch + manejo de errores
-			auth.ts             # auth endpoints
-			admin.ts            # endpoints del panel
-		auth/session.ts       # caché de sesión en memoria (solo navegador)
-		config.ts             # PUBLIC_API_BASE_URL
+├── middleware.ts                   # Session validation for protected routes
+├── layouts/
+│   ├── AdminLayout.astro
+│   └── StoreLayout.astro
+├── pages/
+│   ├── index.astro                 # Storefront home
+│   ├── menu.astro                  # Public product catalog
+│   ├── order/
+│   │   ├── cart.astro              # Cart / checkout
+│   │   └── tracking.astro          # Order tracking
+│   ├── admin/
+│   │   ├── login.astro
+│   │   ├── index.astro             # Dashboard shell
+│   │   ├── analytics.astro
+│   │   └── settings.astro
+│   └── api/
+│       ├── admin/                  # BFF routes (proxy to Go backend)
+│       │   ├── login.ts, logout.ts, session.ts
+│       │   ├── orders/, categories/, products/
+│       │   ├── flavors/, addons/, employees/, users/
+│       │   ├── images/, settings/
+│       │   ├── analytics/, export/
+│       └── store/                  # Storefront BFF routes
+├── components/
+│   ├── astro/store/                # Server-rendered store shell components
+│   └── svelte/
+│       ├── admin/
+│       │   ├── AdminDashboard.svelte
+│       │   ├── AdminHeader.svelte
+│       │   ├── AdminLoginForm.svelte
+│       │   ├── AdminTabPanels.svelte
+│       │   └── tabs/
+│       │       ├── OrdersTab.svelte
+│       │       ├── CategoriesTab.svelte
+│       │       ├── ProductsTab.svelte
+│       │       ├── FlavorsTab.svelte
+│       │       ├── AddonsTab.svelte
+│       │       ├── EmployeesTab.svelte
+│       │       ├── UsersTab.svelte
+│       │       ├── ToolsTab.svelte
+│       │       └── SettingsTab.svelte
+│       └── store/
+│           ├── MenuCatalog.svelte
+│           ├── CartCheckout.svelte
+│           └── OrderTracking.svelte
+└── lib/
+    ├── config.ts                   # Environment config
+    ├── api/                        # Typed HTTP client wrappers
+    ├── bff/                        # BFF proxy helpers
+    ├── auth/                       # Session cache
+    ├── store/                      # Cart state + order tracking
+    ├── stores/                     # Svelte writable stores (admin)
+    └── validators/                 # Request validation
 ```
 
 ---
 
-## Seguridad de Sesión (estado actual)
+## Integration with `ishosBackEnd`
 
-- Cookie `auth_token` es `HttpOnly`, `SameSite=Lax`, con `Cache-Control: no-store` en respuestas de auth.
-- El frontend **no** usa `localStorage` para tokens de autenticación.
-- El middleware del panel no se limita a verificar existencia de cookie: valida sesión activa vía BFF (`/api/admin/session`).
-- El backend aplica revocación server-side en logout, por lo que un token revocado queda inválido antes de expiración.
+BFF routes under `/api/admin/...` map to Go backend endpoints at `PUBLIC_API_BASE_URL`.
 
----
-
-## 3) Integración con `ishosBackend` API
-
-Base URL configurada por:
-
-- `PUBLIC_API_BASE_URL`
-- `PUBLIC_AUTH_COOKIE_TTL_HOURS` (cookie `auth_token` emitida por el BFF)
-- Default local: `http://localhost:8080/api/v1`
-
-### Endpoints usados actualmente por el panel
+### Backend endpoints consumed by the admin panel
 
 #### Auth
 - `POST /auth/login`
@@ -86,119 +149,123 @@ Base URL configurada por:
 - `POST /auth/logout`
 
 #### Orders
-- `GET /orders`
+- `GET /orders` (with `status`, `page`, `limit` filters)
 - `GET /orders/{id}`
-- `POST /orders`
 - `PATCH /orders/{id}`
 - `POST /orders/{id}/approve`
 - `POST /orders/{id}/reject`
 - `PATCH /orders/{id}/status`
-- `DELETE /orders/{id}` (solo admin)
+- `PATCH /orders/{id}/notes`
+- `DELETE /orders/{id}` (admin only)
+- `GET /export/orders` (CSV export, admin only)
+- `DELETE /export/orders` (purge, admin only)
 
 #### Categories
-- `GET /categories` (con `?all=true` para admin)
+- `GET /categories`
 - `POST /categories`
-- `PATCH /categories/{id}`
-- `DELETE /categories/{id}`
+- `PATCH /categories/{slug}`
+- `DELETE /categories/{slug}`
 
 #### Products
 - `GET /products?all=true`
 - `POST /products`
 - `PATCH /products/{id}`
+- `PATCH /products/{id}/availability`
 - `DELETE /products/{id}`
+- `POST /products/{id}/flavors/{flavorId}`
+- `DELETE /products/{id}/flavors/{flavorId}`
+- `POST /products/{id}/addons/{addonId}`
+- `DELETE /products/{id}/addons/{addonId}`
+
+#### Flavors
+- `GET /flavors`
+- `POST /flavors`
+- `PATCH /flavors/{id}`
+- `DELETE /flavors/{id}`
+
+#### Addons
+- `GET /addons`
+- `POST /addons`
+- `PATCH /addons/{id}`
+- `DELETE /addons/{id}`
 
 #### Employees
 - `GET /employees`
 - `POST /employees`
 - `PATCH /employees/{id}`
+- `PATCH /employees/{id}/deactivate`
 - `DELETE /employees/{id}`
+
+#### Users (customer directory)
+- `GET /users`
+- `GET /users/{id}`
+- `GET /users/{id}/orders`
+- `POST /users`
+- `PATCH /users/{id}`
+- `DELETE /users/{id}`
+
+#### Analytics
+- `GET /analytics/overview`
+- `GET /analytics/orders-over-time`
+- `GET /analytics/top-products`
+
+#### Settings
+- `GET /settings/tabs`
+- `PATCH /settings/tabs`
+- `GET /settings/panel-config`
+- `PATCH /settings/panel-config`
 
 #### Upload / Media Library
 - `GET /upload/images`
 - `POST /upload/image` (`multipart/form-data`)
 - `DELETE /upload/image`
 
----
+### Backend endpoints consumed by the storefront
 
-## 4) ¿Está usando todas las features del backend?
-
-**No al 100%.** El panel usa la mayor parte del API administrativo, pero no todas las rutas disponibles.
-
-### Funcionalidad backend disponible pero no usada en UI actual
-
-1. `PATCH /products/{id}/availability`
-	 - El panel cambia disponibilidad vía `PATCH /products/{id}` con `is_available`.
-	 - No usa la ruta dedicada de toggle.
-
-2. `PATCH /orders/{id}/notes`
-	 - Existe endpoint dedicado para notas.
-	 - UI actualmente edita notas dentro de `PATCH /orders/{id}`.
-
-3. `POST /employees/{id}/deactivate`
-	 - Existe endpoint de desactivación explícita.
-	 - UI gestiona estado por `PATCH /employees/{id}` y también permite `DELETE`.
-
-4. Endpoints públicos/no administrativos no consumidos por este panel
-	 - `GET /products/{id}`
-	 - `GET /categories/{slug}`
-	 - `GET /health`
-	 - (esperable, porque son para storefront, integración externa o monitoreo)
+- `GET /products` (public catalog)
+- `GET /categories` (public list)
+- `GET /flavors` (public list)
+- `GET /addons` (public list)
+- `POST /orders` (checkout, rate-limited)
+- `GET /orders/track?order_number=...&tracking_token=...` (public tracking)
 
 ---
 
-## 5) ¿Qué features faltan desde la perspectiva del Panel vs API?
+## Local Development
 
-Para el alcance actual del panel, **no hay bloqueos críticos de API**: las operaciones principales sí tienen soporte backend.
-
-Pendientes recomendados (si se quiere cobertura total):
-
-- Integrar ruta dedicada de toggle de disponibilidad (`/products/{id}/availability`).
-- Integrar flujo explícito de desactivación de empleado (`/employees/{id}/deactivate`) separado de edición.
-- Integrar endpoint dedicado de notas (`/orders/{id}/notes`) para edición liviana.
-
----
-
-## 6) Notas de consistencia
-
-Hay diferencias entre documentación histórica y rutas activas del servidor en algunos casos (sobre todo empleados/órdenes). La referencia confiable es el enrutado actual en `ishosBackend/internal/server/server.go`.
-
----
-
-## 7) Desarrollo local
-
-### Requisitos
+### Prerequisites
 
 - Node.js 20+
 - pnpm
-- Backend `ishosBackend` corriendo
+- `ishosBackEnd` running locally
 
-### Variables de entorno
+### Environment variables
 
-Crea `.env` (opcional) con:
+Create `.env`:
 
 ```env
 PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
 PUBLIC_AUTH_COOKIE_TTL_HOURS=24
 ```
 
-### Comandos
+### Commands
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Build producción:
+Production build:
 
 ```bash
 pnpm build
 pnpm preview
 ```
 
-Deploy a Cloudflare Workers:
+Deploy to Cloudflare Workers:
 
 ```bash
 pnpm deploy
 ```
 
-`pnpm deploy` recompila antes de publicar. Esto es importante porque `PUBLIC_API_BASE_URL` queda embebida en el bundle SSR si no se reconstruye.
+`pnpm deploy` rebuilds before publishing. This is important because `PUBLIC_API_BASE_URL` is embedded in the SSR bundle at build time — always rebuild when changing environment variables before deploying.

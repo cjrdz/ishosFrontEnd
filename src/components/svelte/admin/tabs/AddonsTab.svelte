@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { Addon } from "../../../../lib/api/admin";
+    import { normalizeAddonGroupName, addonGroupLabel } from "../../../../lib/admin/addon-groups";
+    import ConfirmDialog from "../shared/ConfirmDialog.svelte";
 
     interface Props {
         addons: Addon[];
@@ -27,7 +29,7 @@
     let { addons, busy, moduleError, onCreate, onUpdate, onDelete }: Props =
         $props();
     let addonEditorDialog: HTMLDialogElement | null = null;
-    let confirmDialog: HTMLDialogElement | null = null;
+    let confirmOpen = $state(false);
     let confirmTitle = $state("Confirmar accion");
     let confirmMessage = $state("");
     let confirmAction = $state<null | (() => void)>(null);
@@ -43,29 +45,6 @@
     });
 
     const DEFAULT_GROUP_NAME = "extras";
-    const GROUP_LABELS: Record<string, string> = {
-        toppings: "Toppings",
-        jalea: "Jalea",
-        extras: "Extras",
-    };
-
-    function normalizeGroupName(value: string): string {
-        const normalized = value.trim().toLowerCase();
-        return normalized || DEFAULT_GROUP_NAME;
-    }
-
-    function getGroupLabel(value: string): string {
-        const normalized = normalizeGroupName(value);
-        if (GROUP_LABELS[normalized]) {
-            return GROUP_LABELS[normalized];
-        }
-
-        return normalized
-            .split(/[_\s-]+/)
-            .filter(Boolean)
-            .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
-            .join(" ");
-    }
 
     let addonActivityFilter = $state<"all" | "active" | "inactive">("all");
     const filteredAddons = $derived(
@@ -79,8 +58,8 @@
         )
             .slice()
             .sort((left, right) => {
-                const leftGroup = normalizeGroupName(left.group_name);
-                const rightGroup = normalizeGroupName(right.group_name);
+                const leftGroup = normalizeAddonGroupName(left.group_name);
+                const rightGroup = normalizeAddonGroupName(right.group_name);
 
                 return (
                     leftGroup.localeCompare(rightGroup) ||
@@ -127,7 +106,7 @@
             id: addon.id,
             name: addon.name,
             price: addon.price,
-            group_name: normalizeGroupName(addon.group_name),
+            group_name: normalizeAddonGroupName(addon.group_name),
             display_order: addon.display_order,
             is_active: addon.is_active,
         };
@@ -139,7 +118,7 @@
         const payload = {
             name: form.name.trim(),
             price: Number(form.price),
-            group_name: normalizeGroupName(form.group_name),
+            group_name: normalizeAddonGroupName(form.group_name),
             display_order: Number(form.display_order),
             is_active: Boolean(form.is_active),
         };
@@ -162,19 +141,19 @@
         confirmTitle = title;
         confirmMessage = message;
         confirmAction = action;
-        confirmDialog?.showModal();
+        confirmOpen = true;
     }
 
     function confirmNow() {
         const action = confirmAction;
         confirmAction = null;
-        confirmDialog?.close();
+        confirmOpen = false;
         if (action) action();
     }
 
     function closeConfirm() {
         confirmAction = null;
-        confirmDialog?.close();
+        confirmOpen = false;
     }
 
     function requestDeleteAddon(addon: Addon) {
@@ -307,7 +286,7 @@
                                     >
                                     <td class="text-center align-middle"
                                         ><span class="badge badge-outline"
-                                            >{getGroupLabel(addon.group_name)}</span
+                                            >{addonGroupLabel(addon.group_name)}</span
                                         ></td
                                     >
                                     <td class="text-center align-middle"
@@ -456,20 +435,12 @@
     </div>
 </dialog>
 
-<dialog class="modal" bind:this={confirmDialog}>
-    <div class="modal-box">
-        <h3 class="font-bold text-lg">{confirmTitle}</h3>
-        <p class="py-4">{confirmMessage}</p>
-        <div class="modal-action">
-            <button type="button" class="btn btn-ghost" onclick={closeConfirm}
-                >Cancelar</button
-            >
-            <button
-                type="button"
-                class="btn btn-error"
-                onclick={confirmNow}
-                disabled={busy}>Confirmar</button
-            >
-        </div>
-    </div>
-</dialog>
+<ConfirmDialog
+    open={confirmOpen}
+    title={confirmTitle}
+    message={confirmMessage}
+    busy={busy}
+    variant="error"
+    onConfirm={confirmNow}
+    onCancel={closeConfirm}
+/>

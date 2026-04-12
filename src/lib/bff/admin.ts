@@ -41,6 +41,46 @@ export type OrderStatus =
   | 'entregada'
   | 'cancelada';
 
+type ParsedResponseBody = Record<string, unknown> | string | null;
+
+async function parseResponseBody(response: Response): Promise<ParsedResponseBody> {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    try {
+      return (await response.json()) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const text = await response.text();
+    return text.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function responseErrorMessage(body: ParsedResponseBody, fallback: string): string {
+  if (!body) return fallback;
+  if (typeof body === 'string') return body;
+
+  const error = body.error;
+  if (typeof error === 'string' && error.trim()) return error;
+
+  const message = body.message;
+  if (typeof message === 'string' && message.trim()) return message;
+
+  return fallback;
+}
+
+function responseErrorCode(body: ParsedResponseBody, fallback: string): string {
+  if (body && typeof body !== 'string' && typeof body.code === 'string' && body.code.trim()) {
+    return body.code;
+  }
+  return fallback;
+}
+
 async function bffRequest<T>(
   path: string,
   options: {
@@ -72,14 +112,21 @@ async function bffRequest<T>(
       credentials: 'include',
     });
 
-    const data = (await response.json()) as BFFResponse<T> & T;
+    const body = await parseResponseBody(response);
 
     if (!response.ok) {
-      const message = (data as any)?.error || (data as any)?.message || 'Request failed';
-      throw new ApiError(message, response.status, (data as any)?.code || 'BFF_ERROR');
+      throw new ApiError(
+        responseErrorMessage(body, 'Request failed'),
+        response.status,
+        responseErrorCode(body, 'BFF_ERROR'),
+      );
     }
 
-    return data;
+    if (!body || typeof body === 'string') {
+      return {} as T;
+    }
+
+    return body as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(
@@ -248,13 +295,17 @@ export async function uploadAdminImage(file: File, folder = ''): Promise<{ path:
       credentials: 'include',
     });
 
-    const data = await response.json();
+    const body = await parseResponseBody(response);
 
     if (!response.ok) {
-      throw new ApiError(data.error || 'Upload failed', response.status);
+      throw new ApiError(responseErrorMessage(body, 'Upload failed'), response.status);
     }
 
-    return data;
+    if (!body || typeof body === 'string') {
+      throw new ApiError('Upload failed: invalid response', response.status, 'UPLOAD_ERROR');
+    }
+
+    return body as { path: string; message: string };
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(
@@ -360,6 +411,7 @@ export type AdminPanelConfig = {
   auth_cookie_ttl_hours: number;
   auth_token_ttl_hours: number;
   tracking_token_ttl_hours: number;
+  inactivity_logout_seconds: number;
 };
 
 export async function getAdminPanelConfig() {
@@ -474,11 +526,8 @@ export async function exportOrders(
 
   if (!response.ok) {
     let message = 'Export failed';
-    try {
-      const payload = await response.json();
-      message = payload?.error || payload?.message || message;
-    } catch {
-    }
+    const body = await parseResponseBody(response);
+    message = responseErrorMessage(body, message);
     throw new ApiError(message, response.status, 'EXPORT_ERROR');
   }
 

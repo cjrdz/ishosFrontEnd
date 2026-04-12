@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Employee } from "../../../../lib/api/admin";
+  import ConfirmDialog from "../shared/ConfirmDialog.svelte";
 
   interface Props {
     employees: Employee[];
@@ -27,11 +28,42 @@
   let { employees, busy, moduleError, onCreate, onUpdate, onDelete }: Props = $props();
 
   let employeeEditorDialog: HTMLDialogElement | null = null;
-  let confirmDialog: HTMLDialogElement | null = null;
+  let confirmOpen = $state(false);
   let confirmTitle = $state("Confirmar accion");
   let confirmMessage = $state("");
   let confirmAction = $state<null | (() => void)>(null);
   let editingEmployeeId = $state<string | null>(null);
+
+  let employeeStateFilter = $state<"all" | "active" | "inactive">("all");
+  const filteredEmployees = $derived(
+    employeeStateFilter === "all"
+      ? employees
+      : employees.filter((employee) =>
+          employeeStateFilter === "active" ? employee.state === "active" : employee.state === "inactive",
+        ),
+  );
+  const employeeStateFilterLabel = $derived(
+    employeeStateFilter === "all"
+      ? "Todos"
+      : employeeStateFilter === "active"
+        ? "Activos"
+        : "Inactivos",
+  );
+
+  const rowLimitOptions = [5, 10, 25, 50, 100] as const;
+  let employeeRowLimit = $state<number>(5);
+
+  const visibleEmployees = $derived(
+    employeeRowLimit <= 0 ? filteredEmployees : filteredEmployees.slice(0, employeeRowLimit),
+  );
+
+  const employeeRowLimitLabel = $derived(
+    employeeRowLimit <= 0 ? "Todos" : String(employeeRowLimit),
+  );
+
+  function setEmployeeRowLimit(limit: number) {
+    employeeRowLimit = limit;
+  }
 
   let form = $state({
     email: "",
@@ -110,19 +142,19 @@
     confirmTitle = title;
     confirmMessage = message;
     confirmAction = action;
-    confirmDialog?.showModal();
+    confirmOpen = true;
   }
 
   function confirmNow() {
     const action = confirmAction;
     confirmAction = null;
-    confirmDialog?.close();
+    confirmOpen = false;
     if (action) action();
   }
 
   function closeConfirm() {
     confirmAction = null;
-    confirmDialog?.close();
+    confirmOpen = false;
   }
 
   function toggleEmployeeState(employee: Employee, checked: boolean) {
@@ -173,14 +205,51 @@
 
   <div class="card bg-base-100 shadow">
     <div class="card-body">
-      <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <h4 class="card-title text-base">Listado de empleados</h4>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <span class="label-text text-sm whitespace-nowrap">Filtrar</span>
+            <div class="dropdown dropdown-right dropdown-center">
+              <div tabindex="0" role="button" class="btn btn-sm btn-outline min-w-32 justify-between">
+                {employeeStateFilterLabel}
+              </div>
+              <ul tabindex="-1" class="dropdown-content menu bg-base-100 rounded-box z-50 w-44 p-2 shadow-sm border border-base-300">
+                <li><button type="button" onclick={() => (employeeStateFilter = "all")}>Todos</button></li>
+                <li><button type="button" onclick={() => (employeeStateFilter = "active")}>Activos</button></li>
+                <li><button type="button" onclick={() => (employeeStateFilter = "inactive")}>Inactivos</button></li>
+              </ul>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="label-text text-sm whitespace-nowrap">Mostrar</span>
+            <div class="dropdown dropdown-right dropdown-center">
+              <div tabindex="0" role="button" class="btn btn-sm btn-outline min-w-28 justify-between">
+                {employeeRowLimitLabel}
+              </div>
+              <ul tabindex="-1" class="dropdown-content menu bg-base-100 rounded-box z-50 w-40 p-2 shadow-sm border border-base-300">
+                {#each rowLimitOptions as option}
+                  <li><button type="button" onclick={() => setEmployeeRowLimit(option)}>{option}</button></li>
+                {/each}
+                <li><button type="button" onclick={() => setEmployeeRowLimit(0)}>Todos</button></li>
+              </ul>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-sm md:justify-end">
+            <span class="text-base-content/80">Total</span>
+            <span class="badge badge-info badge-sm font-semibold rounded-md">{filteredEmployees.length}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 mt-4">
       <table class="table">
         <thead class="bg-base-200/60 text-base-content"><tr><th class="font-bold">Email</th><th class="font-bold">Nombre</th><th class="font-bold">Rol</th><th class="font-bold">Estado</th><th class="font-bold"></th></tr></thead>
         <tbody>
-          {#if employees.length === 0}
+          {#if filteredEmployees.length === 0}
             <tr><td colspan="5" class="text-center">No hay empleados</td></tr>
           {:else}
-          {#each employees as employee}
+          {#each visibleEmployees as employee}
             <tr class="hover:bg-base-300/40 transition-colors">
               <td>{employee.email}</td>
               <td>{employee.name || "-"}</td>
@@ -292,14 +361,11 @@
   </form>
 </dialog>
 
-<dialog class="modal" bind:this={confirmDialog}>
-  <div class="modal-box">
-    <h3 class="font-bold text-lg">{confirmTitle || "Confirmar accion"}</h3>
-    <p class="py-2 text-sm text-base-content/70">{confirmMessage}</p>
-    <div class="modal-action">
-      <button class="btn btn-ghost" type="button" onclick={closeConfirm}>Cancelar</button>
-      <button class="btn btn-primary" type="button" onclick={confirmNow} disabled={busy}>Confirmar</button>
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button type="button" onclick={closeConfirm}>close</button></form>
-</dialog>
+<ConfirmDialog
+  open={confirmOpen}
+  title={confirmTitle}
+  message={confirmMessage}
+  busy={busy}
+  onConfirm={confirmNow}
+  onCancel={closeConfirm}
+/>

@@ -1,21 +1,9 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import {
-    approveOrder,
-    createCategory,
-    createEmployee,
-    createUser,
-    createOrder,
-    createProduct,
     deleteAdminImage,
-    deleteEmployee,
-    deleteUser,
-    deleteCategory,
-    deleteOrder,
-    deleteProduct,
     getAdminTabsSettings,
     getAdminPanelConfig,
-    getOrder,
     listAdminImages,
     listCategories,
     listEmployees,
@@ -23,51 +11,38 @@
     listUsers,
     listOrders,
     listProducts,
-    rejectOrder,
     uploadAdminImage,
-    updateAdminTabsSettings,
-    updateAdminPanelConfig,
-    updateCategory,
-    updateEmployee,
-    updateOrder,
-    updateOrderNotes,
-    updateOrderStatus,
-    updateProduct,
-    updateUser,
     linkProductFlavor,
     unlinkProductFlavor,
     linkProductAddon,
     unlinkProductAddon,
     listFlavors,
     listAddons,
-    createFlavor,
-    createAddon,
-    updateFlavor,
-    updateAddon,
-    deleteFlavor,
-    deleteAddon,
   } from "../../../lib/bff/admin";
   // Re-export types from the original admin API for compatibility
   import type {
-    Addon,
-    AdminImage,
-    Category,
-    Employee,
-    Flavor,
     Order,
-    Product,
-    User,
     UserOrderHistoryItem,
   } from "../../../lib/api/admin";
-  import AdminHeader, { type TabKey } from "./AdminHeader.svelte";
-  import OrdersTab from "./tabs/OrdersTab.svelte";
-  import CategoriesTab from "./tabs/CategoriesTab.svelte";
-  import ProductsTab from "./tabs/ProductsTab.svelte";
-  import EmployeesTab from "./tabs/EmployeesTab.svelte";
-  import UsersTab from "./tabs/UsersTab.svelte";
-  import SettingsTab from "./tabs/SettingsTab.svelte";
+  import AdminHeader from "./AdminHeader.svelte";
+  import AdminTabPanels from "./AdminTabPanels.svelte";
+  import { trackAction, trackError } from "../../../lib/admin/analytics";
+  import { createDashboardCrudHandlers } from "../../../lib/admin/dashboard/crud-handlers";
+  import { createDashboardOrderHandlers } from "../../../lib/admin/dashboard/order-handlers";
+  import {
+    createPollingInterval,
+    createSessionRefresh,
+    type PollingController,
+    type SessionRefreshController,
+  } from "../../../lib/admin/dashboard/polling-helpers";
+  import {
+    adminData,
+    adminDashboardUi,
+    defaultAdminDashboardUi,
+    defaultAdminData,
+  } from "../../../lib/stores/admin";
+  import { DEFAULT_TAB_ORDER, type TabKey } from "./config/tabs";
   import type { PanelConfigValues } from "./tabs/SettingsTab.svelte";
-  import ToolsTab from "./tabs/ToolsTab.svelte";
 
   type Session = {
     id: string;
@@ -77,6 +52,7 @@
     role: "admin" | "employee";
     active?: boolean;
   };
+  type LazyTabKey = Exclude<TabKey, "ordenes">;
 
   let loading = $state(true);
   let sessionError = $state("");
@@ -85,55 +61,54 @@
 
   let activeTab = $state<TabKey>("ordenes");
 
-  let categories = $state<Category[]>([]);
-  let products = $state<Product[]>([]);
-  let productImages = $state<AdminImage[]>([]);
-  let orders = $state<Order[]>([]);
-  let employees = $state<Employee[]>([]);
-  let users = $state<User[]>([]);
-  let selectedUserOrders = $state<UserOrderHistoryItem[]>([]);
-  let usersHistoryBusy = $state(false);
-  let flavors = $state<Flavor[]>([]);
-  let addons = $state<Addon[]>([]);
-  let selectedOrder = $state<Order | null>(null);
-  let orderStatusFilter = $state("");
-  let productGalleryBusy = $state(false);
+  const categories = $derived($adminData.categories);
+  const products = $derived($adminData.products);
+  const productImages = $derived($adminData.productImages);
+  const orders = $derived($adminData.orders);
+  const employees = $derived($adminData.employees);
+  const users = $derived($adminData.users);
+  const selectedUserOrders = $derived($adminDashboardUi.selectedUserOrders);
+  const usersHistoryBusy = $derived($adminDashboardUi.usersHistoryBusy);
+  const flavors = $derived($adminData.flavors);
+  const addons = $derived($adminData.addons);
+  const selectedOrder = $derived($adminDashboardUi.selectedOrder);
+  const orderStatusFilter = $derived($adminDashboardUi.orderStatusFilter);
+  const productGalleryBusy = $derived($adminDashboardUi.productGalleryBusy);
   let hasLoadedOrdersOnce = false;
   let knownOrderIds = new Set<string>();
   let newOrdersToast = $state<{ count: number; orderNumber?: string } | null>(null);
   let newOrdersToastTimer: ReturnType<typeof setTimeout> | null = null;
-  let ordersPollingTimer: ReturnType<typeof setInterval> | null = null;
-  let settingsDialog = $state<HTMLDialogElement | null>(null);
-  const DEFAULT_TAB_ORDER: TabKey[] = ["ordenes", "categorias", "productos", "empleados", "usuarios", "herramientas"];
+  let inactivityWarningToast = $state<{ secondsRemaining: number } | null>(null);
+  let inactivityWarningTimer: ReturnType<typeof setTimeout> | null = null;
+  let inactivityWarningCountdownTimer: ReturnType<typeof setInterval> | null = null;
+  let ordersPollingController: PollingController | null = null;
+  let sessionRefreshController: SessionRefreshController | null = null;
+  let inactivityLogoutTimer: ReturnType<typeof setTimeout> | null = null;
+  let inactivityListenersAttached = false;
+  let lazyLoadedModules = new Set<string>();
+  let lazyLoadingModules = new Set<string>();
+  const DEFAULT_TAB_LAZY_STATE: Record<LazyTabKey, { loading: boolean; hydrated: boolean }> = {
+    categorias: { loading: false, hydrated: false },
+    productos: { loading: false, hydrated: false },
+    empleados: { loading: false, hydrated: false },
+    usuarios: { loading: false, hydrated: false },
+    herramientas: { loading: false, hydrated: false },
+  };
+  let tabLazyState = $state(structuredClone(DEFAULT_TAB_LAZY_STATE));
   let tabOrder = $state<TabKey[]>([...DEFAULT_TAB_ORDER]);
   const DEFAULT_PANEL_CONFIG: PanelConfigValues = {
     auth_cookie_ttl_hours: 24,
     auth_token_ttl_hours: 168,
     tracking_token_ttl_hours: 720,
+    inactivity_logout_seconds: 900,
   };
   let panelConfig = $state<PanelConfigValues>({ ...DEFAULT_PANEL_CONFIG });
+  const ORDERS_POLLING_INTERVAL_MS = 15000;
+  const SESSION_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 
-  let moduleErrors = $state({
-    ordenes: "",
-    categorias: "",
-    productos: "",
-    sabores: "",
-    complementos: "",
-    empleados: "",
-    usuarios: "",
-    configuracion: "",
-  });
+  const moduleErrors = $derived($adminDashboardUi.moduleErrors);
 
-  let busy = $state({
-    categorias: false,
-    productos: false,
-    sabores: false,
-    complementos: false,
-    ordenes: false,
-    empleados: false,
-    usuarios: false,
-    configuracion: false,
-  });
+  const busy = $derived($adminDashboardUi.busy);
 
   const isAdmin = $derived(session?.role === "admin");
 
@@ -144,13 +119,124 @@
     }, 3000);
   }
 
-  function setModuleError(module: keyof typeof moduleErrors, message: string) {
-    moduleErrors = { ...moduleErrors, [module]: message };
+  function patchAdminData(patch: Partial<typeof defaultAdminData>) {
+    adminData.update((current) => ({
+      ...current,
+      ...patch,
+    }));
   }
 
-  function clearModuleError(module: keyof typeof moduleErrors) {
+  function patchAdminUi(patch: Partial<typeof defaultAdminDashboardUi>) {
+    adminDashboardUi.update((current) => ({
+      ...current,
+      ...patch,
+      busy: patch.busy ? { ...current.busy, ...patch.busy } : current.busy,
+      moduleErrors: patch.moduleErrors ? { ...current.moduleErrors, ...patch.moduleErrors } : current.moduleErrors,
+    }));
+  }
+
+  function setBusy(module: keyof typeof defaultAdminDashboardUi.busy, value: boolean) {
+    adminDashboardUi.update((current) => ({
+      ...current,
+      busy: {
+        ...current.busy,
+        [module]: value,
+      },
+    }));
+  }
+
+  function setProductGalleryBusy(value: boolean) {
+    patchAdminUi({ productGalleryBusy: value });
+  }
+
+  function setUsersHistoryBusy(value: boolean) {
+    patchAdminUi({ usersHistoryBusy: value });
+  }
+
+  function setOrderStatusFilter(value: string) {
+    patchAdminUi({ orderStatusFilter: value });
+  }
+
+  function setSelectedOrder(value: Order | null) {
+    patchAdminUi({ selectedOrder: value });
+  }
+
+  function setSelectedUserOrders(value: UserOrderHistoryItem[]) {
+    patchAdminUi({ selectedUserOrders: value });
+  }
+
+  function setModuleError(module: keyof typeof defaultAdminDashboardUi.moduleErrors, message: string) {
+    adminDashboardUi.update((current) => ({
+      ...current,
+      moduleErrors: {
+        ...current.moduleErrors,
+        [module]: message,
+      },
+    }));
+  }
+
+  function clearModuleError(module: keyof typeof defaultAdminDashboardUi.moduleErrors) {
     if (!moduleErrors[module]) return;
-    moduleErrors = { ...moduleErrors, [module]: "" };
+    adminDashboardUi.update((current) => ({
+      ...current,
+      moduleErrors: {
+        ...current.moduleErrors,
+        [module]: "",
+      },
+    }));
+  }
+
+  async function runModuleAction<T>(params: {
+    module: keyof typeof defaultAdminDashboardUi.busy;
+    requireAdmin?: boolean;
+    errorMessage: string;
+    action: () => Promise<T>;
+    defaultValue: T;
+    analyticsAction?: string;
+    analyticsMeta?: Record<string, unknown>;
+    onSuccess?: (result: T) => void | Promise<void>;
+    onError?: (error: unknown) => void;
+  }): Promise<T> {
+    const {
+      module,
+      requireAdmin = false,
+      errorMessage,
+      action,
+      defaultValue,
+      analyticsAction,
+      analyticsMeta,
+      onSuccess,
+      onError,
+    } = params;
+    if (requireAdmin && !isAdmin) return defaultValue;
+
+    const actionName = analyticsAction ?? `admin_${module}_action`;
+    trackAction(`${actionName}_start`, {
+      module,
+      ...analyticsMeta,
+    });
+
+    setBusy(module, true);
+    clearModuleError(module);
+    try {
+      const result = await action();
+      await onSuccess?.(result);
+      trackAction(`${actionName}_success`, {
+        module,
+        ...analyticsMeta,
+      });
+      return result;
+    } catch (requestError) {
+      onError?.(requestError);
+      trackError(requestError, `AdminDashboard.runModuleAction:${actionName}`, {
+        module,
+        ...analyticsMeta,
+      });
+      setModuleError(module, requestError instanceof Error ? requestError.message : errorMessage);
+      return defaultValue;
+    } finally {
+      setBusy(module, false);
+    }
   }
 
   function showNewOrdersToast(count: number, latestOrder?: Order) {
@@ -170,22 +256,215 @@
   }
 
   function stopOrdersPolling() {
-    if (!ordersPollingTimer) return;
-    clearInterval(ordersPollingTimer);
-    ordersPollingTimer = null;
+    if (!ordersPollingController) return;
+    ordersPollingController.cleanup();
+    ordersPollingController = null;
+  }
+
+  function stopSessionRefresh() {
+    if (!sessionRefreshController) return;
+    sessionRefreshController.cleanup();
+    sessionRefreshController = null;
+  }
+
+  function stopInactivityLogoutTracking() {
+    if (inactivityLogoutTimer) {
+      clearTimeout(inactivityLogoutTimer);
+      inactivityLogoutTimer = null;
+    }
+
+    if (inactivityWarningTimer) {
+      clearTimeout(inactivityWarningTimer);
+      inactivityWarningTimer = null;
+    }
+
+    if (inactivityWarningCountdownTimer) {
+      clearInterval(inactivityWarningCountdownTimer);
+      inactivityWarningCountdownTimer = null;
+    }
+
+    inactivityWarningToast = null;
+
+    if (typeof window !== "undefined" && inactivityListenersAttached) {
+      for (const eventName of ["mousemove", "mousedown", "keydown", "scroll", "touchstart"]) {
+        window.removeEventListener(eventName, resetInactivityLogoutTimer, true);
+      }
+      inactivityListenersAttached = false;
+    }
+  }
+
+  function scheduleInactivityLogout() {
+    if (!session || typeof window === "undefined") return;
+
+    const timeoutSeconds = Math.max(1, panelConfig.inactivity_logout_seconds || DEFAULT_PANEL_CONFIG.inactivity_logout_seconds);
+    const timeoutMs = timeoutSeconds * 1000;
+
+    if (inactivityLogoutTimer) {
+      clearTimeout(inactivityLogoutTimer);
+    }
+
+    if (inactivityWarningTimer) {
+      clearTimeout(inactivityWarningTimer);
+      inactivityWarningTimer = null;
+    }
+
+    if (inactivityWarningCountdownTimer) {
+      clearInterval(inactivityWarningCountdownTimer);
+      inactivityWarningCountdownTimer = null;
+    }
+
+    inactivityWarningToast = null;
+
+    if (timeoutSeconds > 30) {
+      inactivityWarningTimer = setTimeout(() => {
+        inactivityWarningToast = { secondsRemaining: 30 };
+        inactivityWarningCountdownTimer = setInterval(() => {
+          if (!inactivityWarningToast) return;
+          if (inactivityWarningToast.secondsRemaining <= 1) {
+            clearInterval(inactivityWarningCountdownTimer!);
+            inactivityWarningCountdownTimer = null;
+            return;
+          }
+
+          inactivityWarningToast = {
+            secondsRemaining: inactivityWarningToast.secondsRemaining - 1,
+          };
+        }, 1000);
+      }, timeoutMs - 30 * 1000);
+    }
+
+    inactivityLogoutTimer = setTimeout(() => {
+      inactivityWarningToast = null;
+      void handleLogout();
+    }, timeoutMs);
+  }
+
+  function resetInactivityLogoutTimer() {
+    scheduleInactivityLogout();
+  }
+
+  function startInactivityLogoutTracking() {
+    if (typeof window === "undefined" || !session) return;
+
+    if (!inactivityListenersAttached) {
+      for (const eventName of ["mousemove", "mousedown", "keydown", "scroll", "touchstart"]) {
+        window.addEventListener(eventName, resetInactivityLogoutTimer, true);
+      }
+      inactivityListenersAttached = true;
+    }
+
+    scheduleInactivityLogout();
+  }
+
+  async function runLazyModuleLoad(key: string, loader: () => Promise<void>) {
+    if (lazyLoadedModules.has(key) || lazyLoadingModules.has(key)) return;
+    lazyLoadingModules.add(key);
+    try {
+      await loader();
+      lazyLoadedModules.add(key);
+    } finally {
+      lazyLoadingModules.delete(key);
+    }
+  }
+
+  function isLazyTabKey(tab: TabKey): tab is LazyTabKey {
+    return tab !== "ordenes";
+  }
+
+  async function ensureTabDataLoaded(tab: TabKey) {
+    if (!isAdmin) return;
+
+    if (!isLazyTabKey(tab)) return;
+    if (tabLazyState[tab].hydrated || tabLazyState[tab].loading) return;
+
+    tabLazyState = {
+      ...tabLazyState,
+      [tab]: {
+        ...tabLazyState[tab],
+        loading: true,
+      },
+    };
+
+    try {
+      if (tab === "categorias") {
+        await runLazyModuleLoad("categorias", loadCategories);
+      } else if (tab === "productos") {
+        await Promise.allSettled([
+          runLazyModuleLoad("categorias", loadCategories),
+          runLazyModuleLoad("flavors", loadFlavors),
+          runLazyModuleLoad("addons", loadAddons),
+          runLazyModuleLoad("product-images", loadProductImages),
+        ]);
+      } else if (tab === "empleados") {
+        await runLazyModuleLoad("empleados", loadEmployees);
+      } else if (tab === "usuarios") {
+        await runLazyModuleLoad("usuarios", loadUsers);
+      }
+
+      tabLazyState = {
+        ...tabLazyState,
+        [tab]: {
+          ...tabLazyState[tab],
+          loading: false,
+          hydrated: true,
+        },
+      };
+    } catch {
+      tabLazyState = {
+        ...tabLazyState,
+        [tab]: {
+          ...tabLazyState[tab],
+          loading: false,
+        },
+      };
+    }
+  }
+
+  async function refreshSession() {
+    const response = await fetch("/api/admin/session", {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache",
+      },
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.error || "No se pudo refrescar sesion");
+    }
+    session = payload as Session;
   }
 
   function startOrdersPolling() {
     stopOrdersPolling();
-    ordersPollingTimer = setInterval(() => {
+    ordersPollingController = createPollingInterval(async () => {
       if (!session) return;
+      console.debug("[admin-polling] orders", new Date().toISOString());
       void loadOrders({ silent: true });
-    }, 15000);
+    }, ORDERS_POLLING_INTERVAL_MS);
+  }
+
+  function startSessionRefresh() {
+    stopSessionRefresh();
+    sessionRefreshController = createSessionRefresh(async () => {
+      if (!session) return;
+      await refreshSession();
+      console.debug("[admin-polling] session-refresh", new Date().toISOString());
+      trackAction("admin_session_refresh_success", { at: new Date().toISOString() });
+    }, SESSION_REFRESH_INTERVAL_MS);
   }
 
   async function loadSession() {
     loading = true;
     sessionError = "";
+    lazyLoadedModules = new Set<string>();
+    lazyLoadingModules = new Set<string>();
+    tabLazyState = structuredClone(DEFAULT_TAB_LAZY_STATE);
+    adminData.set({ ...defaultAdminData });
+    adminDashboardUi.set({
+      ...defaultAdminDashboardUi,
+      busy: { ...defaultAdminDashboardUi.busy },
+      moduleErrors: { ...defaultAdminDashboardUi.moduleErrors },
+    });
     try {
       const response = await fetch("/api/admin/session", {
         cache: 'no-store',
@@ -203,6 +482,8 @@
       session = payload as Session;
     } catch (requestError) {
       stopOrdersPolling();
+      stopSessionRefresh();
+      trackError(requestError, "AdminDashboard.loadSession");
       sessionError = requestError instanceof Error ? requestError.message : "Sesion invalida";
       loading = false;
       return;
@@ -210,30 +491,38 @@
 
     // Show dashboard immediately after session resolves.
     loading = false;
+    trackAction("admin_session_loaded", { role: session?.role ?? "unknown" });
 
     // Load modules in background so a slow endpoint cannot block the UI forever.
     void (async () => {
       await Promise.allSettled([
-        loadOrders(),
-        loadProducts(),
+        runLazyModuleLoad("ordenes", async () => {
+          await loadOrders();
+        }),
+        runLazyModuleLoad("productos-core", async () => {
+          await loadProducts();
+        }),
+        runLazyModuleLoad("tabs-settings", async () => {
+          await loadTabsSettings();
+        }),
+        runLazyModuleLoad("panel-config", async () => {
+          await loadPanelConfig();
+        }),
       ]);
-      if (session?.role === "admin") {
-        await Promise.allSettled([
-          loadCategories(),
-          loadEmployees(),
-          loadUsers(),
-          loadTabsSettings(),
-          loadPanelConfig(),
-          loadProductImages(),
-          loadFlavors(),
-          loadAddons(),
-        ]);
-      }
+
+      // Prefetch data only for the currently visible tab after initial paint.
+      await ensureTabDataLoaded(activeTab);
+
+      startInactivityLogoutTracking();
       startOrdersPolling();
+      startSessionRefresh();
     })();
   }
 
   async function handleLogout() {
+    stopOrdersPolling();
+    stopSessionRefresh();
+    stopInactivityLogoutTracking();
     try {
       await fetch("/api/admin/logout", { method: "POST" });
     } catch {
@@ -243,47 +532,49 @@
 
   async function loadCategories() {
     if (!isAdmin) return;
-    busy.categorias = true;
+    setBusy("categorias", true);
     clearModuleError("categorias");
     try {
-      categories = await listCategories(true);
+      const nextCategories = await listCategories(true);
+      patchAdminData({ categories: nextCategories });
     } catch (requestError) {
       setModuleError("categorias", requestError instanceof Error ? requestError.message : "No se pudieron cargar categorias");
     } finally {
-      busy.categorias = false;
+      setBusy("categorias", false);
     }
   }
 
   async function loadProducts() {
-    busy.productos = true;
+    setBusy("productos", true);
     clearModuleError("productos");
     try {
-      products = await listProducts();
+      const nextProducts = await listProducts();
+      patchAdminData({ products: nextProducts });
     } catch (requestError) {
       setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudieron cargar productos");
     } finally {
-      busy.productos = false;
+      setBusy("productos", false);
     }
   }
 
   async function loadProductImages() {
     if (!isAdmin) return;
-    productGalleryBusy = true;
+    setProductGalleryBusy(true);
     clearModuleError("productos");
     try {
       const response = await listAdminImages();
-      productImages = response.images || [];
+      patchAdminData({ productImages: response.images || [] });
     } catch (requestError) {
       setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo cargar galeria de imagenes");
     } finally {
-      productGalleryBusy = false;
+      setProductGalleryBusy(false);
     }
   }
 
   async function loadOrders(options?: { silent?: boolean }) {
     const silent = options?.silent ?? false;
     if (!silent) {
-      busy.ordenes = true;
+      setBusy("ordenes", true);
       clearModuleError("ordenes");
     }
 
@@ -294,68 +585,71 @@
       if (hasLoadedOrdersOnce) {
         const freshOrders = incomingOrders.filter((order: Order) => !knownOrderIds.has(order.id));
         if (freshOrders.length > 0) {
+          trackAction("admin_new_orders_detected", { count: freshOrders.length });
           showNewOrdersToast(freshOrders.length, freshOrders[0]);
         }
       }
 
       knownOrderIds = new Set(incomingOrders.map((order: Order) => order.id));
       hasLoadedOrdersOnce = true;
-      orders = incomingOrders;
+      patchAdminData({ orders: incomingOrders });
     } catch (requestError) {
       if (!silent) {
         setModuleError("ordenes", requestError instanceof Error ? requestError.message : "No se pudieron cargar ordenes");
       }
     } finally {
       if (!silent) {
-        busy.ordenes = false;
+        setBusy("ordenes", false);
       }
     }
   }
 
   async function loadEmployees() {
     if (!isAdmin) return;
-    busy.empleados = true;
+    setBusy("empleados", true);
     clearModuleError("empleados");
     try {
-      employees = await listEmployees();
+      const nextEmployees = await listEmployees();
+      patchAdminData({ employees: nextEmployees });
     } catch (requestError) {
       setModuleError("empleados", requestError instanceof Error ? requestError.message : "No se pudieron cargar empleados");
     } finally {
-      busy.empleados = false;
+      setBusy("empleados", false);
     }
   }
 
   async function loadUsers() {
     if (!isAdmin) return;
-    busy.usuarios = true;
+    setBusy("usuarios", true);
     clearModuleError("usuarios");
     try {
-      users = await listUsers();
+      const nextUsers = await listUsers();
+      patchAdminData({ users: nextUsers });
     } catch (requestError) {
       setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudieron cargar usuarios");
     } finally {
-      busy.usuarios = false;
+      setBusy("usuarios", false);
     }
   }
 
   async function loadUserOrders(userId: string) {
     if (!isAdmin) return;
-    usersHistoryBusy = true;
+    setUsersHistoryBusy(true);
     clearModuleError("usuarios");
     try {
       const response = await listUserOrders(userId, 50);
-      selectedUserOrders = response.orders ?? [];
+      setSelectedUserOrders(response.orders ?? []);
     } catch (requestError) {
       setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo cargar historial del usuario");
-      selectedUserOrders = [];
+      setSelectedUserOrders([]);
     } finally {
-      usersHistoryBusy = false;
+      setUsersHistoryBusy(false);
     }
   }
 
   async function loadTabsSettings() {
     if (!isAdmin) return;
-    busy.configuracion = true;
+    setBusy("configuracion", true);
     clearModuleError("configuracion");
     try {
       const settings = await getAdminTabsSettings();
@@ -365,13 +659,13 @@
       setModuleError("configuracion", requestError instanceof Error ? requestError.message : "No se pudo cargar configuracion");
       tabOrder = [...DEFAULT_TAB_ORDER];
     } finally {
-      busy.configuracion = false;
+      setBusy("configuracion", false);
     }
   }
 
   async function loadPanelConfig() {
     if (!isAdmin) return;
-    busy.configuracion = true;
+    setBusy("configuracion", true);
     clearModuleError("configuracion");
     try {
       const config = await getAdminPanelConfig();
@@ -379,19 +673,24 @@
         auth_cookie_ttl_hours: config.auth_cookie_ttl_hours,
         auth_token_ttl_hours: config.auth_token_ttl_hours,
         tracking_token_ttl_hours: config.tracking_token_ttl_hours,
+        inactivity_logout_seconds: config.inactivity_logout_seconds ?? 900,
       };
+      if (session) {
+        startInactivityLogoutTracking();
+      }
     } catch (requestError) {
       setModuleError("configuracion", requestError instanceof Error ? requestError.message : "No se pudo cargar configuracion");
       panelConfig = { ...DEFAULT_PANEL_CONFIG };
     } finally {
-      busy.configuracion = false;
+      setBusy("configuracion", false);
     }
   }
 
   async function loadFlavors() {
     if (!isAdmin) return;
     try {
-      flavors = await listFlavors(true);
+      const nextFlavors = await listFlavors(true);
+      patchAdminData({ flavors: nextFlavors });
     } catch (requestError) {
       // Silently fail for flavors as they're supplementary
       console.error("Error loading flavors:", requestError);
@@ -401,567 +700,178 @@
   async function loadAddons() {
     if (!isAdmin) return;
     try {
-      addons = await listAddons(true);
+      const nextAddons = await listAddons(true);
+      patchAdminData({ addons: nextAddons });
     } catch (requestError) {
       // Silently fail for addons as they're supplementary
       console.error("Error loading addons:", requestError);
     }
   }
 
-  async function handleCreateOrder(payload: Parameters<typeof createOrder>[0]) {
-    busy.ordenes = true;
-    clearModuleError("ordenes");
-    try {
-      await createOrder(payload);
-      setNotice("Orden creada");
-      await loadOrders();
-      return true;
-    } catch (requestError) {
-      setModuleError("ordenes", requestError instanceof Error ? requestError.message : "No se pudo crear la orden");
-      return false;
-    } finally {
-      busy.ordenes = false;
-    }
-  }
-
-  async function handleDeleteOrder(orderId: string) {
-    if (!isAdmin) return;
-    busy.ordenes = true;
-    clearModuleError("ordenes");
-    try {
-      await deleteOrder(orderId);
-      if (selectedOrder?.id === orderId) {
-        selectedOrder = null;
-      }
-      setNotice("Orden eliminada");
-      await loadOrders();
-    } catch (requestError) {
-      setModuleError("ordenes", requestError instanceof Error ? requestError.message : "No se pudo eliminar la orden");
-    } finally {
-      busy.ordenes = false;
-    }
-  }
-
-  async function handleOpenOrder(orderId: string) {
-    busy.ordenes = true;
-    clearModuleError("ordenes");
-    try {
-      selectedOrder = await getOrder(orderId);
-      return selectedOrder;
-    } catch (requestError) {
-      setModuleError("ordenes", requestError instanceof Error ? requestError.message : "No se pudo cargar detalle de orden");
-      return null;
-    } finally {
-      busy.ordenes = false;
-    }
-  }
-
-  async function handleApprove(orderId: string, reactivationReason?: string) {
-    busy.ordenes = true;
-    clearModuleError("ordenes");
-    try {
-      const updated = await approveOrder(orderId);
-      let finalUpdated = updated;
-
-      if (reactivationReason?.trim()) {
-        const normalizedReason = reactivationReason.trim();
-        const currentNotes = updated.notes?.trim() || "";
-        const reactivationEntry = `Reactivacion: ${normalizedReason}`;
-        const mergedNotes = currentNotes
-          ? `${currentNotes}\n\n${reactivationEntry}`
-          : reactivationEntry;
-        finalUpdated = await updateOrderNotes(orderId, mergedNotes);
-      }
-
-      if (selectedOrder?.id === orderId) {
-        selectedOrder = { ...selectedOrder, ...finalUpdated };
-      }
-      setNotice(reactivationReason?.trim() ? "Orden reactivada" : "Orden aprobada");
-      await loadOrders();
-    } catch (requestError) {
-      setModuleError("ordenes", requestError instanceof Error ? requestError.message : "No se pudo aprobar orden");
-    } finally {
-      busy.ordenes = false;
-    }
-  }
-
-  async function handleReject(orderId: string, reason: string) {
-    if (!reason.trim()) {
-      setModuleError("ordenes", "Debes indicar el motivo de rechazo");
-      return;
-    }
-    busy.ordenes = true;
-    clearModuleError("ordenes");
-    try {
-      const updated = await rejectOrder(orderId, reason);
-      if (selectedOrder?.id === orderId) {
-        selectedOrder = { ...selectedOrder, ...updated };
-      }
-      setNotice("Orden rechazada");
-      await loadOrders();
-    } catch (requestError) {
-      setModuleError("ordenes", requestError instanceof Error ? requestError.message : "No se pudo rechazar orden");
-    } finally {
-      busy.ordenes = false;
-    }
-  }
-
-  async function handleStatusChange(orderId: string, status: "recibida" | "en_proceso" | "lista" | "entregada") {
-    busy.ordenes = true;
-    clearModuleError("ordenes");
-    try {
-      const updated = await updateOrderStatus(orderId, status);
-      if (selectedOrder?.id === orderId) {
-        selectedOrder = { ...selectedOrder, ...updated };
-      }
-      setNotice(`Estado actualizado a ${status}`);
-      await loadOrders();
-      return updated;
-    } catch (requestError) {
-      setModuleError("ordenes", requestError instanceof Error ? requestError.message : "No se pudo actualizar estado");
-      return null;
-    } finally {
-      busy.ordenes = false;
-    }
-  }
-
-  async function handleUpdateOrder(orderId: string, payload: Parameters<typeof updateOrder>[1]) {
-    busy.ordenes = true;
-    clearModuleError("ordenes");
-    try {
-      const updated = await updateOrder(orderId, payload);
-      if (selectedOrder?.id === orderId) {
-        selectedOrder = { ...selectedOrder, ...updated };
-      }
-      setNotice("Orden actualizada");
-      await loadOrders();
-      return updated;
-    } catch (requestError) {
-      setModuleError("ordenes", requestError instanceof Error ? requestError.message : "No se pudo actualizar la orden");
-      return null;
-    } finally {
-      busy.ordenes = false;
-    }
-  }
-
-  async function handleCreateCategory(payload: Parameters<typeof createCategory>[0]) {
-    if (!isAdmin) return;
-    busy.categorias = true;
-    clearModuleError("categorias");
-    try {
-      await createCategory(payload);
-      setNotice("Categoria creada");
-      await loadCategories();
-    } catch (requestError) {
-      setModuleError("categorias", requestError instanceof Error ? requestError.message : "No se pudo guardar categoria");
-    } finally {
-      busy.categorias = false;
-    }
-  }
-
-  async function handleUpdateCategory(id: string, payload: Parameters<typeof updateCategory>[1]) {
-    if (!isAdmin) return;
-    busy.categorias = true;
-    clearModuleError("categorias");
-    try {
-      await updateCategory(id, payload);
-      setNotice("Categoria actualizada");
-      await loadCategories();
-    } catch (requestError) {
-      setModuleError("categorias", requestError instanceof Error ? requestError.message : "No se pudo guardar categoria");
-    } finally {
-      busy.categorias = false;
-    }
-  }
-
-  async function handleDeleteCategory(id: string) {
-    if (!isAdmin) return;
-    busy.categorias = true;
-    clearModuleError("categorias");
-    try {
-      await deleteCategory(id);
-      setNotice("Categoria eliminada");
-      await loadCategories();
-    } catch (requestError) {
-      setModuleError("categorias", requestError instanceof Error ? requestError.message : "No se pudo eliminar categoria");
-    } finally {
-      busy.categorias = false;
-    }
-  }
-
-  async function handleCreateProduct(payload: Parameters<typeof createProduct>[0]) {
-    if (!isAdmin) return;
-    busy.productos = true;
-    clearModuleError("productos");
-    try {
-      await createProduct(payload);
-      setNotice("Producto creado");
-      await loadProducts();
-    } catch (requestError) {
-      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo guardar producto");
-    } finally {
-      busy.productos = false;
-    }
-  }
-
-  async function handleUpdateProduct(id: string, payload: Parameters<typeof updateProduct>[1]) {
-    if (!isAdmin) return;
-    busy.productos = true;
-    clearModuleError("productos");
-    try {
-      await updateProduct(id, payload);
-      setNotice("Producto actualizado");
-      await loadProducts();
-    } catch (requestError) {
-      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo guardar producto");
-    } finally {
-      busy.productos = false;
-    }
-  }
-
-  async function handleDeleteProduct(id: string) {
-    if (!isAdmin) return;
-    busy.productos = true;
-    clearModuleError("productos");
-    try {
-      await deleteProduct(id);
-      setNotice("Producto eliminado");
-      await loadProducts();
-    } catch (requestError) {
-      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo eliminar producto");
-    } finally {
-      busy.productos = false;
-    }
-  }
+  const {
+    handleCreateOrder,
+    handleDeleteOrder,
+    handleOpenOrder,
+    handleApprove,
+    handleReject,
+    handleStatusChange,
+    handleUpdateOrder,
+  } = createDashboardOrderHandlers({
+    runModuleAction,
+    loadOrders,
+    setNotice,
+    setOrderModuleError: (message: string) => {
+      setModuleError("ordenes", message);
+    },
+    getSelectedOrder: () => selectedOrder,
+    setSelectedOrder: (value) => {
+      setSelectedOrder(value);
+    },
+  });
 
   async function handleUploadProductImage(file: File): Promise<string | null> {
     if (!isAdmin) return null;
-    productGalleryBusy = true;
+    setProductGalleryBusy(true);
     clearModuleError("productos");
+    trackAction("admin_product_image_upload_start", { fileName: file.name, fileSize: file.size });
     try {
       const uploaded = await uploadAdminImage(file);
       setNotice("Imagen subida al bucket");
       await loadProductImages();
+      trackAction("admin_product_image_upload_success", { path: uploaded.path, fileName: file.name });
       return uploaded.path;
     } catch (requestError) {
+      trackError(requestError, "AdminDashboard.handleUploadProductImage", { fileName: file.name });
       setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo subir imagen");
       return null;
     } finally {
-      productGalleryBusy = false;
+      setProductGalleryBusy(false);
     }
   }
 
   async function handleDeleteProductImage(path: string): Promise<boolean> {
     if (!isAdmin) return false;
-    productGalleryBusy = true;
+    setProductGalleryBusy(true);
     clearModuleError("productos");
+    trackAction("admin_product_image_delete_start", { path });
     try {
       await deleteAdminImage(path);
       setNotice("Imagen eliminada del bucket");
       await loadProductImages();
+      trackAction("admin_product_image_delete_success", { path });
       return true;
     } catch (requestError) {
+      trackError(requestError, "AdminDashboard.handleDeleteProductImage", { path });
       setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo eliminar imagen");
       return false;
     } finally {
-      productGalleryBusy = false;
+      setProductGalleryBusy(false);
+    }
+  }
+
+  async function runProductRelationMutation(params: {
+    actionName: string;
+    action: () => Promise<void>;
+    successNotice: string;
+    errorMessage: string;
+  }) {
+    if (!isAdmin) return;
+    setBusy("productos", true);
+    clearModuleError("productos");
+    trackAction(`${params.actionName}_start`);
+    try {
+      await params.action();
+      setNotice(params.successNotice);
+      await loadProducts();
+      trackAction(`${params.actionName}_success`);
+    } catch (requestError) {
+      trackError(requestError, `AdminDashboard.${params.actionName}`);
+      setModuleError("productos", requestError instanceof Error ? requestError.message : params.errorMessage);
+    } finally {
+      setBusy("productos", false);
     }
   }
 
   async function handleLinkProductFlavor(productId: string, flavorId: string) {
-    if (!isAdmin) return;
-    busy.productos = true;
-    clearModuleError("productos");
-    try {
-      await linkProductFlavor(productId, flavorId);
-      setNotice("Sabor añadido al producto");
-      await loadProducts();
-    } catch (requestError) {
-      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo añadir sabor");
-    } finally {
-      busy.productos = false;
-    }
+    await runProductRelationMutation({
+      actionName: "admin_product_flavor_link",
+      action: async () => {
+        await linkProductFlavor(productId, flavorId);
+      },
+      successNotice: "Sabor añadido al producto",
+      errorMessage: "No se pudo añadir sabor",
+    });
   }
 
   async function handleUnlinkProductFlavor(productId: string, flavorId: string) {
-    if (!isAdmin) return;
-    busy.productos = true;
-    clearModuleError("productos");
-    try {
-      await unlinkProductFlavor(productId, flavorId);
-      setNotice("Sabor removido del producto");
-      await loadProducts();
-    } catch (requestError) {
-      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo remover sabor");
-    } finally {
-      busy.productos = false;
-    }
+    await runProductRelationMutation({
+      actionName: "admin_product_flavor_unlink",
+      action: async () => {
+        await unlinkProductFlavor(productId, flavorId);
+      },
+      successNotice: "Sabor removido del producto",
+      errorMessage: "No se pudo remover sabor",
+    });
   }
 
   async function handleLinkProductAddon(productId: string, addonId: string) {
-    if (!isAdmin) return;
-    busy.productos = true;
-    clearModuleError("productos");
-    try {
-      await linkProductAddon(productId, addonId);
-      setNotice("Adicional añadido al producto");
-      await loadProducts();
-    } catch (requestError) {
-      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo añadir adicional");
-    } finally {
-      busy.productos = false;
-    }
+    await runProductRelationMutation({
+      actionName: "admin_product_addon_link",
+      action: async () => {
+        await linkProductAddon(productId, addonId);
+      },
+      successNotice: "Adicional añadido al producto",
+      errorMessage: "No se pudo añadir adicional",
+    });
   }
 
   async function handleUnlinkProductAddon(productId: string, addonId: string) {
-    if (!isAdmin) return;
-    busy.productos = true;
-    clearModuleError("productos");
-    try {
-      await unlinkProductAddon(productId, addonId);
-      setNotice("Adicional removido del producto");
-      await loadProducts();
-    } catch (requestError) {
-      setModuleError("productos", requestError instanceof Error ? requestError.message : "No se pudo remover adicional");
-    } finally {
-      busy.productos = false;
-    }
+    await runProductRelationMutation({
+      actionName: "admin_product_addon_unlink",
+      action: async () => {
+        await unlinkProductAddon(productId, addonId);
+      },
+      successNotice: "Adicional removido del producto",
+      errorMessage: "No se pudo remover adicional",
+    });
   }
 
-  async function handleCreateFlavor(payload: Parameters<typeof createFlavor>[0]) {
-    if (!isAdmin) return;
-    busy.sabores = true;
-    clearModuleError("sabores");
-    try {
-      await createFlavor(payload);
-      setNotice("Sabor creado");
-      await loadFlavors();
-    } catch (requestError) {
-      setModuleError("sabores", requestError instanceof Error ? requestError.message : "No se pudo crear sabor");
-    } finally {
-      busy.sabores = false;
-    }
-  }
 
-  async function handleUpdateFlavor(id: string, payload: Parameters<typeof updateFlavor>[1]) {
-    if (!isAdmin) return;
-    busy.sabores = true;
-    clearModuleError("sabores");
-    try {
-      await updateFlavor(id, payload);
-      setNotice("Sabor actualizado");
-      await loadFlavors();
-    } catch (requestError) {
-      setModuleError("sabores", requestError instanceof Error ? requestError.message : "No se pudo actualizar sabor");
-    } finally {
-      busy.sabores = false;
-    }
-  }
-
-  async function handleDeleteFlavor(id: string) {
-    if (!isAdmin) return;
-    busy.sabores = true;
-    clearModuleError("sabores");
-    try {
-      await deleteFlavor(id);
-      setNotice("Sabor eliminado");
-      await loadFlavors();
-    } catch (requestError) {
-      setModuleError("sabores", requestError instanceof Error ? requestError.message : "No se pudo eliminar sabor");
-    } finally {
-      busy.sabores = false;
-    }
-  }
-
-  async function handleCreateAddon(payload: Parameters<typeof createAddon>[0]) {
-    if (!isAdmin) return;
-    busy.complementos = true;
-    clearModuleError("complementos");
-    try {
-      await createAddon(payload);
-      setNotice("Complemento creado");
-      await loadAddons();
-    } catch (requestError) {
-      setModuleError("complementos", requestError instanceof Error ? requestError.message : "No se pudo crear complemento");
-    } finally {
-      busy.complementos = false;
-    }
-  }
-
-  async function handleUpdateAddon(id: string, payload: Parameters<typeof updateAddon>[1]) {
-    if (!isAdmin) return;
-    busy.complementos = true;
-    clearModuleError("complementos");
-    try {
-      await updateAddon(id, payload);
-      setNotice("Complemento actualizado");
-      await loadAddons();
-    } catch (requestError) {
-      setModuleError("complementos", requestError instanceof Error ? requestError.message : "No se pudo actualizar complemento");
-    } finally {
-      busy.complementos = false;
-    }
-  }
-
-  async function handleDeleteAddon(id: string) {
-    if (!isAdmin) return;
-    busy.complementos = true;
-    clearModuleError("complementos");
-    try {
-      await deleteAddon(id);
-      setNotice("Complemento eliminado");
-      await loadAddons();
-    } catch (requestError) {
-      setModuleError("complementos", requestError instanceof Error ? requestError.message : "No se pudo eliminar complemento");
-    } finally {
-      busy.complementos = false;
-    }
-  }
-
-  async function handleCreateEmployee(payload: Parameters<typeof createEmployee>[0]) {
-    if (!isAdmin) return;
-    busy.empleados = true;
-    clearModuleError("empleados");
-    try {
-      await createEmployee(payload);
-      setNotice("Empleado creado");
-      await loadEmployees();
-    } catch (requestError) {
-      setModuleError("empleados", requestError instanceof Error ? requestError.message : "No se pudo crear empleado");
-    } finally {
-      busy.empleados = false;
-    }
-  }
-
-  async function handleUpdateEmployee(id: string, payload: Parameters<typeof updateEmployee>[1]) {
-    if (!isAdmin) return;
-    busy.empleados = true;
-    clearModuleError("empleados");
-    try {
-      await updateEmployee(id, payload);
-      setNotice("Empleado actualizado");
-      await loadEmployees();
-    } catch (requestError) {
-      setModuleError("empleados", requestError instanceof Error ? requestError.message : "No se pudo actualizar empleado");
-    } finally {
-      busy.empleados = false;
-    }
-  }
-
-  async function handleDeleteEmployee(id: string) {
-    if (!isAdmin) return;
-    busy.empleados = true;
-    clearModuleError("empleados");
-    try {
-      await deleteEmployee(id);
-      setNotice("Empleado eliminado permanentemente");
-      await loadEmployees();
-    } catch (requestError) {
-      setModuleError("empleados", requestError instanceof Error ? requestError.message : "No se pudo eliminar empleado");
-    } finally {
-      busy.empleados = false;
-    }
-  }
-
-  async function handleCreateUser(payload: Parameters<typeof createUser>[0]) {
-    if (!isAdmin) return;
-    busy.usuarios = true;
-    clearModuleError("usuarios");
-    try {
-      await createUser(payload);
-      setNotice("Usuario creado");
-      await loadUsers();
-    } catch (requestError) {
-      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo crear usuario");
-    } finally {
-      busy.usuarios = false;
-    }
-  }
-
-  async function handleUpdateUser(id: string, payload: Parameters<typeof updateUser>[1]) {
-    if (!isAdmin) return;
-    busy.usuarios = true;
-    clearModuleError("usuarios");
-    try {
-      await updateUser(id, payload);
-      setNotice("Usuario actualizado");
-      await loadUsers();
-    } catch (requestError) {
-      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo actualizar usuario");
-    } finally {
-      busy.usuarios = false;
-    }
-  }
-
-  async function handleDeleteUser(id: string) {
-    if (!isAdmin) return;
-    busy.usuarios = true;
-    clearModuleError("usuarios");
-    try {
-      await deleteUser(id);
-      setNotice("Usuario eliminado");
-      await loadUsers();
-    } catch (requestError) {
-      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo eliminar usuario");
-    } finally {
-      busy.usuarios = false;
-    }
-  }
-
-  async function handleSaveUserFromOrder(payload: Parameters<typeof createUser>[0]) {
-    if (!isAdmin) return false;
-    busy.usuarios = true;
-    clearModuleError("usuarios");
-    try {
-      await createUser(payload);
-      setNotice("Usuario guardado desde la orden");
-      await loadUsers();
-      return true;
-    } catch (requestError) {
-      setModuleError("usuarios", requestError instanceof Error ? requestError.message : "No se pudo guardar usuario desde la orden");
-      return false;
-    } finally {
-      busy.usuarios = false;
-    }
-  }
-
-  async function handleSaveTabOrder(nextTabOrder: string[]) {
-    if (!isAdmin) return;
-    busy.configuracion = true;
-    clearModuleError("configuracion");
-    try {
-      const response = await updateAdminTabsSettings(nextTabOrder as TabKey[]);
-      const incoming = (response.tab_order ?? []).filter((item): item is TabKey => DEFAULT_TAB_ORDER.includes(item as TabKey));
-      tabOrder = incoming.length > 0 ? incoming : [...DEFAULT_TAB_ORDER];
-      setNotice("Configuracion guardada");
-    } catch (requestError) {
-      setModuleError("configuracion", requestError instanceof Error ? requestError.message : "No se pudo guardar configuracion");
-    } finally {
-      busy.configuracion = false;
-    }
-  }
-
-  async function handleSavePanelConfig(nextPanelConfig: PanelConfigValues) {
-    if (!isAdmin) return;
-    busy.configuracion = true;
-    clearModuleError("configuracion");
-    try {
-      const response = await updateAdminPanelConfig(nextPanelConfig);
-      panelConfig = {
-        auth_cookie_ttl_hours: response.auth_cookie_ttl_hours,
-        auth_token_ttl_hours: response.auth_token_ttl_hours,
-        tracking_token_ttl_hours: response.tracking_token_ttl_hours,
-      };
-      setNotice("Expiraciones actualizadas");
-    } catch (requestError) {
-      setModuleError("configuracion", requestError instanceof Error ? requestError.message : "No se pudo guardar configuracion");
-    } finally {
-      busy.configuracion = false;
-    }
-  }
+  const {
+    handleCreateCategory,
+    handleUpdateCategory,
+    handleDeleteCategory,
+    handleCreateProduct,
+    handleUpdateProduct,
+    handleDeleteProduct,
+    handleCreateFlavor,
+    handleUpdateFlavor,
+    handleDeleteFlavor,
+    handleCreateAddon,
+    handleUpdateAddon,
+    handleDeleteAddon,
+    handleCreateEmployee,
+    handleUpdateEmployee,
+    handleDeleteEmployee,
+    handleCreateUser,
+    handleUpdateUser,
+    handleDeleteUser,
+    handleSaveUserFromOrder,
+  } = createDashboardCrudHandlers({
+    runModuleAction,
+    loadCategories,
+    loadProducts,
+    loadFlavors,
+    loadAddons,
+    loadEmployees,
+    loadUsers,
+    setNotice,
+    trackAction,
+    trackError,
+  });
 
   function handleFilterChange(status: string) {
-    orderStatusFilter = status;
+    setOrderStatusFilter(status);
     loadOrders();
   }
 
@@ -971,15 +881,91 @@
       return;
     }
     activeTab = tab;
+    void ensureTabDataLoaded(tab);
   }
 
-  function openSettingsModal() {
+  const sharedPanelProps = $derived({
+    isAdmin,
+    activeTab,
+    busy,
+    moduleErrors,
+    lazyTabState: tabLazyState,
+  });
+  const ordersPanelProps = $derived({
+    isAdmin,
+    orders,
+    products,
+    employees,
+    selectedOrder,
+    busy: busy.ordenes,
+    moduleError: moduleErrors.ordenes,
+    orderStatusFilter,
+    onFilterChange: handleFilterChange,
+    onReload: loadOrders,
+    onOpenOrder: handleOpenOrder,
+    onApprove: handleApprove,
+    onReject: handleReject,
+    onStatusChange: handleStatusChange,
+    onUpdateOrder: handleUpdateOrder,
+    onDelete: handleDeleteOrder,
+    onCreate: handleCreateOrder,
+    saveUserFromOrder: handleSaveUserFromOrder,
+  });
+  const categoriesPanelProps = $derived({
+    categories,
+    onCreate: handleCreateCategory,
+    onUpdate: handleUpdateCategory,
+    onDelete: handleDeleteCategory,
+  });
+  const productsPanelProps = $derived({
+    categories,
+    products,
+    flavors,
+    addons,
+    galleryImages: productImages,
+    busy: busy.productos,
+    galleryBusy: productGalleryBusy,
+    moduleError: moduleErrors.productos,
+    onCreate: handleCreateProduct,
+    onUpdate: handleUpdateProduct,
+    onDelete: handleDeleteProduct,
+    onCreateFlavor: handleCreateFlavor,
+    onUpdateFlavor: handleUpdateFlavor,
+    onDeleteFlavor: handleDeleteFlavor,
+    onCreateAddon: handleCreateAddon,
+    onUpdateAddon: handleUpdateAddon,
+    onDeleteAddon: handleDeleteAddon,
+    flavorBusy: busy.sabores,
+    addonBusy: busy.complementos,
+    flavorError: moduleErrors.sabores,
+    addonError: moduleErrors.complementos,
+    onLinkFlavor: handleLinkProductFlavor,
+    onUnlinkFlavor: handleUnlinkProductFlavor,
+    onLinkAddon: handleLinkProductAddon,
+    onUnlinkAddon: handleUnlinkProductAddon,
+    onReloadGallery: loadProductImages,
+    onUploadGalleryImage: handleUploadProductImage,
+    onDeleteGalleryImage: handleDeleteProductImage,
+  });
+  const employeesPanelProps = $derived({
+    employees,
+    onCreate: handleCreateEmployee,
+    onUpdate: handleUpdateEmployee,
+    onDelete: handleDeleteEmployee,
+  });
+  const usersPanelProps = $derived({
+    users,
+    selectedUserOrders,
+    usersHistoryBusy,
+    onCreate: handleCreateUser,
+    onUpdate: handleUpdateUser,
+    onDelete: handleDeleteUser,
+    onLoadUserOrders: loadUserOrders,
+  });
+
+  function openSettingsPage() {
     if (!isAdmin) return;
-    settingsDialog?.showModal();
-  }
-
-  function closeSettingsModal() {
-    settingsDialog?.close();
+    window.location.href = "/admin/settings";
   }
 
   onMount(() => {
@@ -988,9 +974,19 @@
 
   onDestroy(() => {
     stopOrdersPolling();
+    stopSessionRefresh();
+    stopInactivityLogoutTracking();
     if (newOrdersToastTimer) {
       clearTimeout(newOrdersToastTimer);
       newOrdersToastTimer = null;
+    }
+    if (inactivityWarningTimer) {
+      clearTimeout(inactivityWarningTimer);
+      inactivityWarningTimer = null;
+    }
+    if (inactivityWarningCountdownTimer) {
+      clearInterval(inactivityWarningCountdownTimer);
+      inactivityWarningCountdownTimer = null;
     }
   });
 </script>
@@ -1012,13 +1008,13 @@
 {:else if session}
   <div class="space-y-6">
     <AdminHeader
-      role={session.role}
+      userName={session.name}
       activeTab={activeTab}
       isAdmin={isAdmin}
       tabOrder={tabOrder}
       onLogout={handleLogout}
       onTabChange={handleTabChange}
-      onOpenSettings={openSettingsModal}
+      onOpenSettings={openSettingsPage}
     />
 
     {#if newOrdersToast}
@@ -1035,152 +1031,26 @@
       </div>
     {/if}
 
+    {#if inactivityWarningToast}
+      <div class="toast toast-top toast-end z-50 mt-24 mr-2 md:mr-4">
+        <div class="alert alert-warning shadow-lg">
+          <span>Tu sesión expirará en {inactivityWarningToast.secondsRemaining} segundos por inactividad.</span>
+        </div>
+      </div>
+    {/if}
+
     {#if notice}
       <div class="alert alert-success"><span>{notice}</span></div>
     {/if}
 
-    {#if isAdmin}
-      <dialog class="modal" bind:this={settingsDialog}>
-        <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto space-y-6">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h3 class="text-xl font-bold">Panel de configuracion</h3>
-              <p class="text-sm text-base-content/70">Ajusta el panel administrativo desde un solo lugar.</p>
-            </div>
-            <button class="btn btn-ghost btn-sm" type="button" onclick={closeSettingsModal}>Cerrar</button>
-          </div>
-
-          <SettingsTab
-            tabOrder={tabOrder}
-            panelConfig={panelConfig}
-            busy={busy.configuracion}
-            moduleError={moduleErrors.configuracion}
-            onSave={handleSaveTabOrder}
-            onSavePanelConfig={handleSavePanelConfig}
-          />
-
-          <section class="space-y-3">
-            <div class="flex items-center justify-between gap-2">
-              <h4 class="text-base font-semibold">Proximas personalizaciones</h4>
-              <span class="badge badge-outline">Muy pronto</span>
-            </div>
-            <div class="grid gap-3 md:grid-cols-3">
-              <article class="rounded-xl border border-base-300 bg-base-100 p-4">
-                <h5 class="font-semibold">Branding del panel</h5>
-                <p class="mt-1 text-sm text-base-content/70">Logo, colores administrativos y nombre visible en cabecera.</p>
-              </article>
-              <article class="rounded-xl border border-base-300 bg-base-100 p-4">
-                <h5 class="font-semibold">Widgets de inicio</h5>
-                <p class="mt-1 text-sm text-base-content/70">Define que resumenes se muestran primero al entrar.</p>
-              </article>
-              <article class="rounded-xl border border-base-300 bg-base-100 p-4">
-                <h5 class="font-semibold">Atajos de operacion</h5>
-                <p class="mt-1 text-sm text-base-content/70">Configura accesos rapidos para tareas frecuentes del equipo.</p>
-              </article>
-            </div>
-          </section>
-        </div>
-        <form method="dialog" class="modal-backdrop">
-          <button type="button" onclick={closeSettingsModal}>close</button>
-        </form>
-      </dialog>
-    {/if}
-
-    {#if activeTab === "ordenes"}
-      <OrdersTab
-        isAdmin={isAdmin}
-        orders={orders}
-        products={products}
-        employees={employees}
-        selectedOrder={selectedOrder}
-        busy={busy.ordenes}
-        moduleError={moduleErrors.ordenes}
-        orderStatusFilter={orderStatusFilter}
-        onFilterChange={handleFilterChange}
-        onReload={loadOrders}
-        onOpenOrder={handleOpenOrder}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onStatusChange={handleStatusChange}
-        onUpdateOrder={handleUpdateOrder}
-        onDelete={handleDeleteOrder}
-        onCreate={handleCreateOrder}
-        saveUserFromOrder={handleSaveUserFromOrder}
-      />
-    {/if}
-
-    {#if isAdmin && activeTab === "categorias"}
-      <CategoriesTab
-        categories={categories}
-        busy={busy.categorias}
-        moduleError={moduleErrors.categorias}
-        onCreate={handleCreateCategory}
-        onUpdate={handleUpdateCategory}
-        onDelete={handleDeleteCategory}
-      />
-    {/if}
-
-    {#if isAdmin && activeTab === "productos"}
-      <ProductsTab
-        categories={categories}
-        products={products}
-        flavors={flavors}
-        addons={addons}
-        galleryImages={productImages}
-        busy={busy.productos}
-        galleryBusy={productGalleryBusy}
-        moduleError={moduleErrors.productos}
-        onCreate={handleCreateProduct}
-        onUpdate={handleUpdateProduct}
-        onDelete={handleDeleteProduct}
-        onReloadGallery={loadProductImages}
-        onUploadGalleryImage={handleUploadProductImage}
-        onDeleteGalleryImage={handleDeleteProductImage}
-        onLinkFlavor={handleLinkProductFlavor}
-        onUnlinkFlavor={handleUnlinkProductFlavor}
-        onLinkAddon={handleLinkProductAddon}
-        onUnlinkAddon={handleUnlinkProductAddon}
-        onCreateFlavor={handleCreateFlavor}
-        onUpdateFlavor={handleUpdateFlavor}
-        onDeleteFlavor={handleDeleteFlavor}
-        onCreateAddon={handleCreateAddon}
-        onUpdateAddon={handleUpdateAddon}
-        onDeleteAddon={handleDeleteAddon}
-        flavorBusy={busy.sabores}
-        addonBusy={busy.complementos}
-        flavorError={moduleErrors.sabores}
-        addonError={moduleErrors.complementos}
-      />
-    {/if}
-
-    {#if isAdmin && activeTab === "empleados"}
-      <EmployeesTab
-        employees={employees}
-        busy={busy.empleados}
-        moduleError={moduleErrors.empleados}
-        onCreate={handleCreateEmployee}
-        onUpdate={handleUpdateEmployee}
-        onDelete={handleDeleteEmployee}
-      />
-    {/if}
-
-    {#if isAdmin && activeTab === "usuarios"}
-      <UsersTab
-        users={users}
-        busy={busy.usuarios}
-        moduleError={moduleErrors.usuarios}
-        historyBusy={usersHistoryBusy}
-        selectedUserOrders={selectedUserOrders}
-        onCreate={handleCreateUser}
-        onUpdate={handleUpdateUser}
-        onDelete={handleDeleteUser}
-        onLoadOrders={loadUserOrders}
-      />
-    {/if}
-
-    {#if isAdmin && activeTab === "herramientas"}
-      <ToolsTab />
-    {/if}
+    <AdminTabPanels
+      shared={sharedPanelProps}
+      orders={ordersPanelProps}
+      categories={categoriesPanelProps}
+      products={productsPanelProps}
+      employees={employeesPanelProps}
+      users={usersPanelProps}
+    />
 
   </div>
 {/if}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Flavor } from "../../../../lib/api/admin";
+  import ConfirmDialog from "../shared/ConfirmDialog.svelte";
 
   interface Props {
     flavors: Flavor[];
@@ -21,7 +22,7 @@
 
   let { flavors, busy, moduleError, onCreate, onUpdate, onDelete }: Props = $props();
   let flavorEditorDialog: HTMLDialogElement | null = null;
-  let confirmDialog: HTMLDialogElement | null = null;
+  let confirmOpen = $state(false);
   let confirmTitle = $state("Confirmar accion");
   let confirmMessage = $state("");
   let confirmAction = $state<null | (() => void)>(null);
@@ -108,19 +109,19 @@
     confirmTitle = title;
     confirmMessage = message;
     confirmAction = action;
-    confirmDialog?.showModal();
+    confirmOpen = true;
   }
 
   function confirmNow() {
     const action = confirmAction;
     confirmAction = null;
-    confirmDialog?.close();
+    confirmOpen = false;
     if (action) action();
   }
 
   function closeConfirm() {
     confirmAction = null;
-    confirmDialog?.close();
+    confirmOpen = false;
   }
 
   function requestDeleteFlavor(flavor: Flavor) {
@@ -267,13 +268,12 @@
   </div>
 </dialog>
 
-<dialog class="modal" bind:this={confirmDialog}>
-  <div class="modal-box">
-    <h3 class="font-bold text-lg">{confirmTitle}</h3>
-    <p class="py-4">{confirmMessage}</p>
-    <div class="modal-action">
-      <button type="button" class="btn btn-ghost" onclick={closeConfirm}>Cancelar</button>
-      <button type="button" class="btn btn-error" onclick={confirmNow} disabled={busy}>Confirmar</button>
-    </div>
-  </div>
-</dialog>
+<ConfirmDialog
+  open={confirmOpen}
+  title={confirmTitle}
+  message={confirmMessage}
+  busy={busy}
+  variant="error"
+  onConfirm={confirmNow}
+  onCancel={closeConfirm}
+/>
