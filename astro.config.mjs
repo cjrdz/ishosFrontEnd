@@ -13,8 +13,15 @@ const isVercelBuild = process.env.VERCEL === '1' || deployTarget === 'vercel';
 export default defineConfig({
   adapter: isVercelBuild ? vercel() : cloudflare(),
   output: 'server',
+  server: {
+    host: true,
+  },
   integrations: [svelte()],
   vite: {
+    server: {
+      allowedHosts: ['.vusercontent.net'],
+      cors: true,
+    },
     plugins: [tailwindcss()],
     optimizeDeps: {
       exclude: ['zod'],
