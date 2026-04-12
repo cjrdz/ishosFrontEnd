@@ -6,19 +6,14 @@
  */
 
 import type { APIRoute } from 'astro';
-import { getApiBaseUrl } from '../../../lib/config';
+import { forwardUpstreamJson, getServerApiBaseUrl } from '../../../lib/bff/proxy';
 
 export const prerender = false;
 
-export const GET: APIRoute = async () => {
+export const GET: APIRoute = async (context) => {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/categories`);
-    const data = await response.json();
-
-    return new Response(JSON.stringify(data), {
-      status: response.status,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await fetch(`${getServerApiBaseUrl(context)}/categories`);
+    return forwardUpstreamJson(response);
   } catch {
     return new Response(
       JSON.stringify({ error: 'Failed to fetch categories' }),

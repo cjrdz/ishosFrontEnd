@@ -6,7 +6,7 @@
  */
 
 import type { APIRoute } from 'astro';
-import { getApiBaseUrl } from '../../../../lib/config';
+import { forwardUpstreamJson, getServerApiBaseUrl } from '../../../../lib/bff/proxy';
 
 const ORDER_NUMBER_RE = /^ORD-\d{8}-\d{4}$/;
 
@@ -36,13 +36,8 @@ export const GET: APIRoute = async (context) => {
       tracking_token: trackingToken,
     });
 
-    const response = await fetch(`${getApiBaseUrl()}/orders/track?${query.toString()}`);
-    const data = await response.json();
-
-    return new Response(JSON.stringify(data), {
-      status: response.status,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await fetch(`${getServerApiBaseUrl(context)}/orders/track?${query.toString()}`);
+    return forwardUpstreamJson(response);
   } catch (error) {
     return new Response(
       JSON.stringify({ error: 'Order not found' }),

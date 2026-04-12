@@ -194,3 +194,11 @@ Build producción:
 pnpm build
 pnpm preview
 ```
+
+Deploy a Cloudflare Workers:
+
+```bash
+pnpm deploy
+```
+
+`pnpm deploy` recompila antes de publicar. Esto es importante porque `PUBLIC_API_BASE_URL` queda embebida en el bundle SSR si no se reconstruye.

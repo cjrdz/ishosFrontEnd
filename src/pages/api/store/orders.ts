@@ -6,7 +6,7 @@
  */
 
 import type { APIRoute } from 'astro';
-import { getApiBaseUrl } from '../../../lib/config';
+import { forwardUpstreamJson, getServerApiBaseUrl } from '../../../lib/bff/proxy';
 import { z } from 'zod';
 
 const orderItemSchema = z.object({
@@ -43,18 +43,13 @@ export const POST: APIRoute = async (context) => {
       );
     }
 
-    const response = await fetch(`${getApiBaseUrl()}/orders`, {
+    const response = await fetch(`${getServerApiBaseUrl(context)}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(parsed.data),
     });
 
-    const data = await response.json();
-
-    return new Response(JSON.stringify(data), {
-      status: response.status,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return forwardUpstreamJson(response);
   } catch (error) {
     return new Response(
       JSON.stringify({ error: 'Failed to create order' }),

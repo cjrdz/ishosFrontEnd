@@ -10,6 +10,10 @@
 import type { APIContext } from 'astro';
 import { getApiBaseUrl } from '../config';
 
+type RuntimeEnv = {
+  PUBLIC_API_BASE_URL?: unknown;
+};
+
 export interface ProxyOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
   body?: unknown;
@@ -20,6 +24,52 @@ export interface ProxyOptions {
 export interface ProxyFormDataOptions extends Omit<ProxyOptions, 'body'> {
   isFormData: true;
   body: FormData;
+}
+
+function normalizeApiBaseUrl(value: string): string {
+  return value.replace(/\/$/, '');
+}
+
+export function getServerApiBaseUrl(context: APIContext): string {
+  const runtime = (context.locals as { runtime?: { env?: RuntimeEnv } }).runtime;
+  const runtimeValue = runtime?.env?.PUBLIC_API_BASE_URL;
+
+  if (typeof runtimeValue === 'string' && runtimeValue.trim()) {
+    return normalizeApiBaseUrl(runtimeValue);
+  }
+
+  return getApiBaseUrl();
+}
+
+export async function forwardUpstreamJson(response: Response): Promise<Response> {
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+  let data: unknown;
+
+  if (contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    const rawText = await response.text();
+    const trimmedText = rawText.trim();
+
+    if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
+      try {
+        data = JSON.parse(trimmedText);
+      } catch {
+        data = response.ok
+          ? { message: trimmedText || 'OK' }
+          : { error: trimmedText || 'Request failed' };
+      }
+    } else {
+      data = response.ok
+        ? { message: trimmedText || 'OK' }
+        : { error: trimmedText || 'Request failed' };
+    }
+  }
+
+  return new Response(JSON.stringify(data), {
+    status: response.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 export async function proxyToBackend(
@@ -45,7 +95,7 @@ export async function proxyToBackend(
     headers['Content-Type'] = 'application/json';
   }
 
-  const url = new URL(`${getApiBaseUrl()}${path}`);
+  const url = new URL(`${getServerApiBaseUrl(context)}${path}`);
   if (options.query) {
     Object.entries(options.query).forEach(([key, value]) => {
       url.searchParams.set(key, String(value));
