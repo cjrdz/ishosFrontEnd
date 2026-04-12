@@ -3,6 +3,7 @@
     auth_cookie_ttl_hours: number;
     auth_token_ttl_hours: number;
     tracking_token_ttl_hours: number;
+    inactivity_logout_seconds: number;
   }
 
   interface Props {
@@ -29,6 +30,7 @@
     auth_cookie_ttl_hours: 24,
     auth_token_ttl_hours: 168,
     tracking_token_ttl_hours: 720,
+    inactivity_logout_seconds: 900,
   });
 
   $effect(() => {
@@ -40,6 +42,7 @@
       auth_cookie_ttl_hours: panelConfig.auth_cookie_ttl_hours,
       auth_token_ttl_hours: panelConfig.auth_token_ttl_hours,
       tracking_token_ttl_hours: panelConfig.tracking_token_ttl_hours,
+      inactivity_logout_seconds: panelConfig.inactivity_logout_seconds,
     };
   });
 
@@ -70,10 +73,19 @@
       auth_cookie_ttl_hours: normalizeHours(localPanelConfig.auth_cookie_ttl_hours, panelConfig.auth_cookie_ttl_hours),
       auth_token_ttl_hours: normalizeHours(localPanelConfig.auth_token_ttl_hours, panelConfig.auth_token_ttl_hours),
       tracking_token_ttl_hours: normalizeHours(localPanelConfig.tracking_token_ttl_hours, panelConfig.tracking_token_ttl_hours),
+      inactivity_logout_seconds: normalizeSeconds(localPanelConfig.inactivity_logout_seconds, panelConfig.inactivity_logout_seconds),
     });
   }
 
   function normalizeHours(value: number, fallback: number): number {
+    if (!Number.isFinite(value) || value <= 0) {
+      return fallback;
+    }
+
+    return Math.round(value);
+  }
+
+  function normalizeSeconds(value: number, fallback: number): number {
     if (!Number.isFinite(value) || value <= 0) {
       return fallback;
     }
@@ -87,11 +99,11 @@
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
 
-  <div class="card bg-base-100 shadow">
+  <div id="navegacion-panel" class="card bg-base-100 shadow">
     <div class="card-body space-y-4">
       <div>
-        <h2 class="card-title">Panel de configuracion</h2>
-        <p class="text-sm text-base-content/70">Reordena las pestanas globales del panel administrativo.</p>
+        <h2 class="card-title">Navegacion del panel</h2>
+        <p class="text-sm text-base-content/70">Reordena las pestanas globales del panel administrativo para que el equipo vea primero lo importante.</p>
       </div>
 
       <div class="rounded-xl border border-base-300 bg-base-50 p-4 space-y-2">
@@ -112,14 +124,14 @@
     </div>
   </div>
 
-  <div class="card bg-base-100 shadow">
+  <div id="seguridad-panel" class="card bg-base-100 shadow">
     <div class="card-body space-y-4">
       <div>
-        <h2 class="card-title">Expiracion de tokens</h2>
-        <p class="text-sm text-base-content/70">Configura en horas la duracion para login y seguimiento publico de ordenes.</p>
+        <h2 class="card-title">Seguridad y sesiones</h2>
+        <p class="text-sm text-base-content/70">Configura sesiones, expiraciones y reglas de seguridad del panel administrativo.</p>
       </div>
 
-      <div class="grid gap-3 md:grid-cols-3">
+      <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <label class="form-control">
           <span class="label-text font-semibold">Cookie de sesion (horas)</span>
           <input
@@ -157,6 +169,19 @@
             disabled={busy}
           />
           <span class="label-text-alt text-base-content/60">Token publico para rastreo de ordenes.</span>
+        </label>
+
+        <label class="form-control">
+          <span class="label-text font-semibold">Logout por inactividad (segundos)</span>
+          <input
+            class="input input-bordered"
+            type="number"
+            min="1"
+            step="1"
+            bind:value={localPanelConfig.inactivity_logout_seconds}
+            disabled={busy}
+          />
+          <span class="label-text-alt text-base-content/60">Cierra sesion automaticamente sin actividad. Recomendado: 300 a 900 segundos.</span>
         </label>
       </div>
 

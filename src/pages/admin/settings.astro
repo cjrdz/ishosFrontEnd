@@ -1,0 +1,10 @@
+---
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import AdminSettingsPage from "../../components/svelte/admin/config/AdminSettingsPage.svelte";
+---
+
+<AdminLayout title="Configuraciones - IshosFactory">
+  <AdminSettingsPage client:load />
+</AdminLayout>

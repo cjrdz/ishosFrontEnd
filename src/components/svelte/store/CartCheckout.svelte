@@ -5,6 +5,8 @@
   import { clearCartItems, getCartItems, setCartItems, type StoreCartItem } from "../../../lib/store/cart";
   import { saveTracking } from "../../../lib/store/tracking";
   import { formatCurrency } from "../../../lib/utils/formatters";
+  import { normalizeAddonGroupName, addonGroupLabel } from "../../../lib/admin/addon-groups";
+  import { normalizeIdList, arraysEqualUnordered } from "../../../lib/utils/collections";
 
   type CheckoutForm = {
     customer_name: string;
@@ -31,13 +33,6 @@
     table_number: "",
     notes: "",
   });
-
-  const DEFAULT_ADDON_GROUP_NAME = "extras";
-  const ADDON_GROUP_LABELS: Record<string, string> = {
-    toppings: "Toppings",
-    jalea: "Jalea",
-    extras: "Extras",
-  };
 
   type ProductAddon = NonNullable<PublicProduct["addons"]>[number];
   type ProductFlavor = NonNullable<PublicProduct["flavors"]>[number];
@@ -78,68 +73,14 @@
     return price;
   }
 
-  function normalizeAddonGroupName(value: string): string {
-    const normalized = value.trim().toLowerCase();
-    if (!normalized) {
-      return DEFAULT_ADDON_GROUP_NAME;
-    }
-
-    switch (normalized) {
-      case "topping":
-      case "toppings":
-        return "toppings";
-      case "jalea":
-      case "jaleas":
-        return "jalea";
-      case "extra":
-      case "extras":
-        return "extras";
-      default:
-        if (normalized.includes("topping")) {
-          return "toppings";
-        }
-        if (normalized.includes("jalea")) {
-          return "jalea";
-        }
-        if (normalized.includes("extra")) {
-          return "extras";
-        }
-        return normalized;
-    }
-  }
-
-  function addonGroupLabel(value: string): string {
-    const normalized = normalizeAddonGroupName(value);
-    if (ADDON_GROUP_LABELS[normalized]) {
-      return ADDON_GROUP_LABELS[normalized];
-    }
-
-    return normalized
-      .split(/[\s_-]+/)
-      .filter(Boolean)
-      .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
-      .join(" ");
-  }
-
-  function arraysEqual(a: string[], b: string[]): boolean {
-    if (a.length !== b.length) return false;
-    const sortedA = [...a].sort();
-    const sortedB = [...b].sort();
-    return sortedA.every((value, index) => value === sortedB[index]);
-  }
-
-  function normalizeIdList(values: string[] | undefined): string[] {
-    return Array.from(new Set((values ?? []).filter(Boolean))).sort();
-  }
-
   function cartItemsMatch(left: StoreCartItem, right: StoreCartItem): boolean {
     return (
       left.product_id === right.product_id &&
       (left.flavor_id || null) === (right.flavor_id || null) &&
       (left.notes || "") === (right.notes || "") &&
-      arraysEqual(left.addons || [], right.addons || []) &&
-      arraysEqual(left.included_addon_ids || [], right.included_addon_ids || []) &&
-      arraysEqual(left.extra_addon_ids || [], right.extra_addon_ids || [])
+      arraysEqualUnordered(left.addons || [], right.addons || []) &&
+      arraysEqualUnordered(left.included_addon_ids || [], right.included_addon_ids || []) &&
+      arraysEqualUnordered(left.extra_addon_ids || [], right.extra_addon_ids || [])
     );
   }
 

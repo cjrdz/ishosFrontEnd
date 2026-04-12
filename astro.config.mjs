@@ -12,5 +12,8 @@ export default defineConfig({
   integrations: [svelte()],
   vite: {
     plugins: [tailwindcss()],
+    optimizeDeps: {
+      exclude: ['zod'],
+    },
   },
 });
