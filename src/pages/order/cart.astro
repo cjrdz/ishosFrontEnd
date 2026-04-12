@@ -1,0 +1,10 @@
+---
+import StoreLayout from "../../layouts/StoreLayout.astro";
+import CartCheckout from "../../components/svelte/store/CartCheckout.svelte";
+---
+
+<StoreLayout title="IshosFactory - Carrito">
+  <main class="container mx-auto px-4 py-8">
+    <CartCheckout client:load />
+  </main>
+</StoreLayout>

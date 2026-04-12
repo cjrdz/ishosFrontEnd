@@ -1,0 +1,10 @@
+---
+import StoreLayout from "../../layouts/StoreLayout.astro";
+import OrderTracking from "../../components/svelte/store/OrderTracking.svelte";
+---
+
+<StoreLayout title="IshosFactory - Seguimiento">
+  <main class="container mx-auto px-4 py-8">
+    <OrderTracking client:load />
+  </main>
+</StoreLayout>

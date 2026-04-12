@@ -1,0 +1,43 @@
+---
+import "../styles/global.css";
+import "../styles/variables.css";
+import StoreNavbar from "../components/astro/store/StoreNavbar.astro";
+import StoreFooter from "../components/astro/store/StoreFooter.astro";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props as Props;
+---
+
+<!doctype html>
+<html lang="es" data-theme="night" class="bg-base-200">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Isho's Gelatos & Sorbetes - Tienda en línea" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <script is:inline>
+      (() => {
+        const savedTheme = localStorage.getItem("theme");
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const resolvedTheme = savedTheme === "fantasy" || savedTheme === "night"
+          ? savedTheme
+          : prefersDark
+            ? "night"
+            : "fantasy";
+
+        document.documentElement.setAttribute("data-theme", resolvedTheme);
+      })();
+    </script>
+  </head>
+  <body class="bg-base-200 text-base-content min-h-screen flex flex-col">
+    <StoreNavbar />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <StoreFooter />
+  </body>
+</html>
