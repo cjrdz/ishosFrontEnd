@@ -16,6 +16,9 @@ export default defineConfig({
   server: {
     host: true,
   },
+  security: {
+    checkOrigin: process.env.NODE_ENV === 'production',
+  },
   integrations: [svelte()],
   vite: {
     server: {
