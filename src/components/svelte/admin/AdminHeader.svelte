@@ -41,8 +41,8 @@
 
 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <div>
-    <h1 class="text-3xl font-bold">Panel administrativo</h1>
-    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-base-content/70">
+    <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-base-content/90">Panel administrativo</h1>
+    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-base-content/70">
       <p class="flex items-center gap-2">
         <span>{greetingMeta.text}, <strong>{userName || "equipo"}</strong></span>
         <Icon icon={greetingMeta.icon} class={`h-4 w-4 ${greetingMeta.iconClass}`} />
@@ -60,17 +60,20 @@
         <Icon icon="lucide:settings-2" class="h-6 w-6" />
       </button>
     {/if}
-    <button class="btn btn-outline" onclick={onLogout}>Cerrar sesion</button>
+    <button class="btn btn-outline max-sm:btn-circle" title="Cerrar sesion" aria-label="Cerrar sesion" onclick={onLogout}>
+      <Icon icon="lucide:log-out" class="h-5 w-5" />
+      <span class="hidden sm:inline">Cerrar sesion</span>
+    </button>
   </div>
 </div>
 
 <div class="overflow-x-auto pb-1">
-  <div role="tablist" class="tabs tabs-box bg-base-100 w-max min-w-full sm:w-fit sm:min-w-0">
+  <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 shadow-sm p-1 w-max min-w-full sm:w-fit sm:min-w-0">
     {#each visibleTabs as tab}
       <input
         type="radio"
         name="admin_tabs"
-        class="tab tab-md sm:tab-lg whitespace-nowrap"
+        class="tab tab-sm sm:tab-md whitespace-nowrap transition-colors"
         aria-label={TAB_LABELS[tab]}
         checked={activeTab === tab}
         onchange={() => onTabChange(tab)}

@@ -48,13 +48,28 @@
     onHandleStepClick,
     onCanChangeToStep,
   }: Props = $props();
+
+  const trackingLink = $derived.by(() => {
+    if (!selectedOrder) return "";
+    if (selectedOrder.tracking_url) {
+      if (selectedOrder.tracking_url.startsWith("http")) {
+        return selectedOrder.tracking_url;
+      }
+      const separator = selectedOrder.tracking_url.startsWith('/') ? '' : '/';
+      return `${window.location.origin}${separator}${selectedOrder.tracking_url}`;
+    }
+    if (selectedOrder.tracking_token) {
+      return `${window.location.origin}/order/tracking?token=${selectedOrder.tracking_token}`;
+    }
+    return "";
+  });
 </script>
 
-<div class="card bg-base-100 shadow">
-  <div class="card-body">
+<div class="card bg-base-100 shadow-sm border border-base-200">
+  <div class="card-body p-4 sm:p-6 text-sm">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div class="flex flex-wrap items-center gap-2">
-        <h3 class="card-title">Detalle de orden: {selectedOrder.order_number}</h3>
+        <h3 class="card-title text-base sm:text-lg">Detalle de orden: {selectedOrder.order_number}</h3>
         <button
           class="btn btn-xs btn-ghost"
           type="button"
@@ -67,12 +82,12 @@
         </button>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        {#if selectedOrder.tracking_url}
+        {#if trackingLink}
           <button
-            class="btn btn-xs btn-warning"
+            class="btn btn-xs btn-outline btn-warning gap-1"
             type="button"
             title="Copiar enlace seguro de seguimiento"
-            onclick={() => onCopyToken(selectedOrder.tracking_url!, "link")}
+            onclick={() => onCopyToken(trackingLink, "link")}
             aria-label="Copiar enlace de seguimiento"
           >
             <Icon icon={tokenCopied === "link" ? "lucide:check" : "lucide:link"} width="14" height="14" />

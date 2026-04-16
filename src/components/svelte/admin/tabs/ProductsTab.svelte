@@ -347,33 +347,14 @@
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
 
-  <div class="card bg-base-100 shadow">
-    <div class="card-body">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 class="card-title">Gestion de productos</h2>
-          <p class="text-sm text-base-content/70">Administra productos, precios y disponibilidad de forma ordenada.</p>
-        </div>
-        <div class="flex flex-wrap items-end gap-2">
-          <button class="btn btn-outline" type="button" onclick={openGlobalFlavorsModal}>
-            Sabores globales
-          </button>
-          <button class="btn btn-outline" type="button" onclick={openGlobalAddonsModal}>
-            Complementos globales
-          </button>
-          <button class="btn btn-primary" type="button" onclick={openCreateProductModal} disabled={busy}>
-            Crear producto
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <ProductList
     {products}
     {filteredProducts}
     {busy}
     {productVisibilityFilterLabel}
+    onOpenGlobalFlavors={openGlobalFlavorsModal}
+    onOpenGlobalAddons={openGlobalAddonsModal}
+    onCreateProduct={openCreateProductModal}
     onFilterChange={(value) => {
       productVisibilityFilter = value;
     }}

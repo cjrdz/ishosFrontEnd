@@ -27,20 +27,20 @@
 
   const STATUS_ICONS_ACTIVE: Record<PublicOrderStatus, string> = {
     pendiente_revision: "line-md:watch-loop",
-    recibida:           "line-md:confirm-circle",
-    en_proceso:         "line-md:loading-twotone-loop",
-    lista:              "line-md:bell-loop",
-    entregada:          "line-md:check-all",
-    cancelada:          "line-md:close-circle",
+    recibida: "line-md:confirm-circle",
+    en_proceso: "line-md:loading-twotone-loop",
+    lista: "line-md:bell-loop",
+    entregada: "line-md:check-all",
+    cancelada: "line-md:close-circle",
   };
 
   const STATUS_ICONS_STATIC: Record<PublicOrderStatus, string> = {
     pendiente_revision: "lucide:clock",
-    recibida:           "lucide:check-circle",
-    en_proceso:         "lucide:loader",
-    lista:              "lucide:bell",
-    entregada:          "lucide:check-check",
-    cancelada:          "lucide:x-circle",
+    recibida: "lucide:check-circle",
+    en_proceso: "lucide:loader",
+    lista: "lucide:bell",
+    entregada: "lucide:check-check",
+    cancelada: "lucide:x-circle",
   };
 
   let trackingOrderNumber = $state("");
@@ -52,8 +52,14 @@
 
   onMount(() => {
     const url = new URL(window.location.href);
-    const orderFromUrl = url.searchParams.get("order")?.trim() ?? url.searchParams.get("order_number")?.trim() ?? "";
-    const tokenFromUrl = url.searchParams.get("token")?.trim() ?? url.searchParams.get("tracking_token")?.trim() ?? "";
+    const orderFromUrl =
+      url.searchParams.get("order")?.trim() ??
+      url.searchParams.get("order_number")?.trim() ??
+      "";
+    const tokenFromUrl =
+      url.searchParams.get("token")?.trim() ??
+      url.searchParams.get("tracking_token")?.trim() ??
+      "";
 
     if (orderFromUrl && tokenFromUrl) {
       trackingOrderNumber = orderFromUrl;
@@ -62,12 +68,12 @@
       window.history.replaceState({}, "", url.pathname);
       void runTrackingLookup();
     } else {
-    const persisted = getTracking();
-    if (persisted) {
-      trackingOrderNumber = persisted.orderNumber;
-      trackingToken = persisted.token;
-      void runTrackingLookup();
-    }
+      const persisted = getTracking();
+      if (persisted) {
+        trackingOrderNumber = persisted.orderNumber;
+        trackingToken = persisted.token;
+        void runTrackingLookup();
+      }
     }
 
     return () => {
@@ -85,7 +91,8 @@
     }
 
     if (!token) {
-      trackingError = "El seguimiento solo está disponible desde el dispositivo donde realizaste el pedido. Si cambiaste de dispositivo, usa el enlace de seguimiento que te enviamos por WhatsApp.";
+      trackingError =
+        "El seguimiento solo está disponible desde el dispositivo donde realizaste el pedido. Si cambiaste de dispositivo, usa el enlace de seguimiento que te enviamos por WhatsApp.";
       return;
     }
 
@@ -97,7 +104,8 @@
 
       if (!order) {
         trackedOrder = null;
-        trackingError = "No encontramos la orden. Verifica el número o usa el dispositivo donde realizaste el pedido.";
+        trackingError =
+          "No encontramos la orden. Verifica el número o usa el dispositivo donde realizaste el pedido.";
         stopTrackingPolling();
         return;
       }
@@ -105,7 +113,8 @@
       trackedOrder = order;
       saveTracking(orderNumber, token);
 
-      const hasActiveOrder = order.status !== "entregada" && order.status !== "cancelada";
+      const hasActiveOrder =
+        order.status !== "entregada" && order.status !== "cancelada";
       if (hasActiveOrder) {
         startTrackingPolling();
       } else {
@@ -113,7 +122,10 @@
       }
     } catch (error) {
       trackedOrder = null;
-      trackingError = error instanceof Error ? error.message : "No se pudo consultar la orden.";
+      trackingError =
+        error instanceof Error
+          ? error.message
+          : "No se pudo consultar la orden.";
       stopTrackingPolling();
     } finally {
       trackingBusy = false;
@@ -153,72 +165,200 @@
   }
 </script>
 
-<div class="space-y-8">
-  <section class="mb-6 flex items-center justify-between flex-wrap gap-2">
-    <h1 class="text-4xl font-bold">Seguimiento de pedido</h1>
-    <a href="/menu" class="btn btn-outline">Volver al menú</a>
+<div class="max-w-4xl mx-auto space-y-6 md:space-y-8 mb-16">
+  <section
+    class="flex flex-col md:flex-row md:items-center justify-between gap-4"
+  >
+    <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight">
+      Sigue tu <span
+        class="bg-clip-text text-transparent bg-linear-to-r from-primary to-secondary"
+        >Pedido</span
+      >
+    </h1>
+    <a
+      href="/menu"
+      class="btn btn-outline rounded-full font-medium shadow-sm hover:shadow-md"
+      >← Volver al menú</a
+    >
   </section>
 
-  <section class="card bg-base-100 shadow-xl border border-base-300 rounded-2xl">
-    <div class="card-body p-8">
-      <p class="text-sm text-base-content/70">Consulta el estado de tu pedido con tu número de orden.</p>
+  <section
+    class="bg-base-100/50 backdrop-blur-xl border border-base-200/60 shadow-2xl rounded-[2.5rem] p-6 md:p-10"
+  >
+    <p class="text-base font-medium text-base-content/70 mb-6">
+      Ingresa el número de tu orden para conocer su estado en tiempo real.
+    </p>
 
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label class="form-control flex-1">
-          <span class="label-text">Número de orden</span>
+    <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+      <label class="form-control flex-1">
+        <span class="label-text font-bold text-base-content/80 ml-1 mb-1 hidden"
+          >Número de orden</span
+        >
+        <div class="relative">
+          <div
+            class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-base-content/50"
+          >
+            <Icon icon="lucide:search" width="20" height="20" />
+          </div>
           <input
-            class="input input-bordered w-full"
+            class="input input-bordered h-14 bg-base-100 focus:bg-base-200 w-full rounded-2xl pl-11 text-lg font-medium transition-all"
             bind:value={trackingOrderNumber}
-            placeholder="ORD-20260223-1234"
+            placeholder="Ej. ORD-2026..."
           />
-        </label>
-
-        <div class="form-control">
-          <button class="btn btn-outline w-full sm:w-auto" type="button" onclick={runTrackingLookup} disabled={trackingBusy}>
-            {trackingBusy ? "Consultando..." : "Consultar"}
-          </button>
         </div>
+      </label>
+
+      <button
+        class="btn btn-primary btn-lg rounded-2xl min-w-32 shadow-lg hover:shadow-xl transition-all"
+        type="button"
+        onclick={runTrackingLookup}
+        disabled={trackingBusy}
+      >
+        {trackingBusy ? "Buscando..." : "Consultar"}
+      </button>
+    </div>
+
+    {#if trackingError}
+      <div
+        class="alert alert-error shadow-sm rounded-2xl border-error/20 text-sm font-medium p-4 mt-6"
+      >
+        <span class="text-xl">⚠️</span>
+        <span>{trackingError}</span>
       </div>
+    {/if}
 
-      {#if trackingError}
-        <div class="alert alert-error mt-3">{trackingError}</div>
-      {/if}
+    {#if trackedOrder}
+      <div class="mt-8 space-y-6">
+        <div
+          class="divider text-base-content/40 font-bold uppercase tracking-wider text-sm mb-2"
+        >
+          Estado Reciente
+        </div>
 
-      {#if trackedOrder}
-        <div class="mt-4 space-y-4">
-          <div class="text-sm text-base-content/75">
-            Mostrando el estado más reciente de tu orden.
+        <article
+          class="rounded-4xl border border-base-200/80 bg-base-100 shadow-md p-6 lg:p-8 relative overflow-hidden"
+        >
+          <!-- Background decoration -->
+          <div
+            class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full pointer-events-none"
+          ></div>
+
+          <div
+            class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 relative z-10"
+          >
+            <div>
+              <h3
+                class="text-sm font-bold text-base-content/50 uppercase tracking-widest mb-1"
+              >
+                Orden
+              </h3>
+              <p
+                class="text-xl md:text-2xl font-extrabold text-base-content break-all"
+              >
+                {trackedOrder.order_number}
+              </p>
+            </div>
+            <div
+              class={`badge badge-lg font-bold border-0 px-4 py-3 ${trackedOrder.status === "entregada" ? "bg-success/20 text-success-content" : "bg-primary/20 text-primary"}`}
+            >
+              {STATUS_LABELS[trackedOrder.status]}
+            </div>
           </div>
 
-          <article class="rounded-xl border border-base-300 bg-base-200/40 p-4">
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
-              <div>
-                <span class="font-semibold">Orden:</span> {trackedOrder.order_number}
-              </div>
-              <div class="badge badge-outline">{STATUS_LABELS[trackedOrder.status]}</div>
+          <div
+            class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 bg-base-200/40 rounded-2xl p-4 relative z-10"
+          >
+            <div class="flex flex-col">
+              <span class="text-xs font-bold text-base-content/50 uppercase"
+                >Total</span
+              >
+              <span class="font-bold text-lg text-primary"
+                >{formatMoney(trackedOrder.total_amount)}</span
+              >
             </div>
-
-            <div class="mb-4 grid grid-cols-1 gap-2 text-xs text-base-content/70 sm:grid-cols-3">
-              <div><span class="font-semibold">Total:</span> {formatMoney(trackedOrder.total_amount)}</div>
-              <div><span class="font-semibold">Tipo:</span> {trackedOrder.order_type === "para_llevar" ? "Para llevar" : "En local"}</div>
-              <div><span class="font-semibold">Actualizado:</span> {formatDate(trackedOrder.updated_at)}</div>
+            <div class="flex flex-col sm:items-center">
+              <span class="text-xs font-bold text-base-content/50 uppercase"
+                >Tipo</span
+              >
+              <span
+                class="font-bold border border-base-300 rounded-full px-3 py-1 bg-base-100"
+                >{trackedOrder.order_type === "para_llevar"
+                  ? "Para llevar"
+                  : "En local"}</span
+              >
             </div>
+            <div class="flex flex-col sm:items-end">
+              <span class="text-xs font-bold text-base-content/50 uppercase"
+                >Actualizado</span
+              >
+              <span class="font-medium text-sm mt-1"
+                >{formatDate(trackedOrder.updated_at)}</span
+              >
+            </div>
+          </div>
 
-            {#if trackedOrder.status === "cancelada"}
-              <div class="alert alert-warning">Tu orden fue cancelada. Contáctanos para más información.</div>
-            {:else}
-              <ul class="steps steps-vertical xl:steps-horizontal w-full">
+          {#if trackedOrder.status === "cancelada"}
+            <div
+              class="alert alert-warning rounded-2xl shadow-sm border-warning/20 font-medium"
+            >
+              <span class="text-xl">⚠️</span>
+              <span
+                >Tu orden fue cancelada. Contáctanos para más información.</span
+              >
+            </div>
+          {:else}
+            <div class="w-full relative z-10 overflow-hidden py-4 sm:py-6">
+              <ul
+                class="steps steps-vertical sm:steps-horizontal w-full sm:min-w-0"
+              >
                 {#each STATUS_FLOW as step, index}
-                  <li class={`step ${index <= stepIndex(trackedOrder.status) ? "step-primary" : ""}`}>
-                    <span class="step-icon"><Icon icon={step === trackedOrder.status ? STATUS_ICONS_ACTIVE[step] : STATUS_ICONS_STATIC[step]} width="16" height="16" /></span>
-                    {STATUS_LABELS[step]}
+                  {@const active = index <= stepIndex(trackedOrder.status)}
+                  <li
+                    data-content={active ? "✓" : ""}
+                    class={`step font-bold ${active ? "step-primary text-primary" : "text-base-content/40"}`}
+                  >
+                    <!-- Mobile view (Left aligned with icon next to text) -->
+                    <div
+                      class="flex items-center gap-3 sm:hidden ml-4 text-left w-full overflow-visible py-2"
+                    >
+                      <span
+                        class={`p-1.5 rounded-full flex shrink-0 items-center justify-center transition-transform ${active ? (step === trackedOrder.status ? "bg-primary text-primary-content shadow-md shadow-primary/30 scale-125" : "bg-primary/10 text-primary") : "bg-base-200/50 text-base-content/30 border border-base-200"}`}
+                      >
+                        <Icon
+                          icon={step === trackedOrder.status
+                            ? STATUS_ICONS_ACTIVE[step]
+                            : STATUS_ICONS_STATIC[step]}
+                          width="18"
+                          height="18"
+                        />
+                      </span>
+                      <span class="text-base">{STATUS_LABELS[step]}</span>
+                    </div>
+
+                    <!-- Desktop view (Centered with large icon below dot) -->
+                    <div
+                      class="hidden sm:flex flex-col items-center gap-2 mt-4 ml-2"
+                    >
+                      <span
+                        class={`p-3 rounded-full flex shrink-0 items-center justify-center transition-all duration-300 ${active ? (step === trackedOrder.status ? "bg-primary text-primary-content shadow-lg shadow-primary/40 scale-110" : "bg-primary/10 text-primary") : "bg-base-200/50 text-base-content/30 border border-base-200"}`}
+                      >
+                        <Icon
+                          icon={step === trackedOrder.status
+                            ? STATUS_ICONS_ACTIVE[step]
+                            : STATUS_ICONS_STATIC[step]}
+                          width="24"
+                          height="24"
+                        />
+                      </span>
+                      <span class="text-sm mt-1">{STATUS_LABELS[step]}</span>
+                    </div>
                   </li>
                 {/each}
               </ul>
-            {/if}
-          </article>
-        </div>
-      {/if}
-    </div>
+            </div>
+          {/if}
+        </article>
+      </div>
+    {/if}
   </section>
 </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Flavor } from "../../../../lib/api/admin";
+  import Icon from "@iconify/svelte";
   import ConfirmDialog from "../shared/ConfirmDialog.svelte";
 
   interface Props {
@@ -224,12 +225,20 @@
 </section>
 
 <dialog class="modal" bind:this={flavorEditorDialog} onclose={resetForm}>
-  <div class="modal-box w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <h3 class="font-bold text-lg">{isEditing ? "Editar sabor" : "Crear sabor"}</h3>
+  <div class="modal-box w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+    <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4">
+      <div class="flex items-center gap-2.5">
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+          <Icon icon="lucide:ice-cream-bowl" width="16" height="16" class="text-primary" />
+        </div>
+        <h3 class="font-bold text-base leading-tight">{isEditing ? "Editar sabor" : "Crear sabor"}</h3>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-circle" type="button" onclick={closeFlavorEditor} aria-label="Cerrar">
+        <Icon icon="lucide:x" width="16" height="16" />
+      </button>
     </div>
 
-    <form class="mt-5 grid items-start gap-6" onsubmit={submit}>
+    <form class="p-5 space-y-5" onsubmit={submit}>
       <div class="grid gap-5">
         <div class="form-control w-full">
           <span id="flavor-name-label" class="label-text mb-1">Nombre</span>
@@ -258,14 +267,17 @@
         {/if}
       </div>
 
-      <div class="modal-action">
-        <button type="button" class="btn btn-ghost" onclick={closeFlavorEditor}>Cancelar</button>
-        <button type="submit" class="btn btn-primary" disabled={busy || !form.name.trim()}>
+      <div class="flex flex-wrap gap-2 pt-1">
+        <button class="btn btn-primary" type="submit" disabled={busy || !form.name.trim()}>
           {isEditing ? "Actualizar" : "Crear"}
         </button>
+        <button type="button" class="btn btn-ghost" onclick={closeFlavorEditor}>Cancelar</button>
       </div>
     </form>
   </div>
+  <form method="dialog" class="modal-backdrop">
+    <button type="button" onclick={closeFlavorEditor}>close</button>
+  </form>
 </dialog>
 
 <ConfirmDialog

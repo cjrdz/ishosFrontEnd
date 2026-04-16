@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Addon } from "../../../../lib/api/admin";
+    import Icon from "@iconify/svelte";
     import { normalizeAddonGroupName, addonGroupLabel } from "../../../../lib/admin/addon-groups";
     import ConfirmDialog from "../shared/ConfirmDialog.svelte";
 
@@ -329,19 +330,25 @@
 </section>
 
 <dialog class="modal" bind:this={addonEditorDialog} onclose={resetForm}>
-    <div class="modal-box w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <h3 class="font-bold text-lg">
-                {isEditing ? "Editar complemento" : "Crear complemento"}
-            </h3>
+    <div class="modal-box w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+        <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Icon icon="lucide:puzzle" width="16" height="16" class="text-primary" />
+                </div>
+                <h3 class="font-bold text-base leading-tight">
+                    {isEditing ? "Editar complemento" : "Crear complemento"}
+                </h3>
+            </div>
+            <button class="btn btn-ghost btn-sm btn-circle" type="button" onclick={closeAddonEditor} aria-label="Cerrar">
+                <Icon icon="lucide:x" width="16" height="16" />
+            </button>
         </div>
 
-        <form class="mt-5 grid items-start gap-6" onsubmit={submit}>
+        <form class="p-5 space-y-5" onsubmit={submit}>
             <div class="grid gap-5">
                 <div class="form-control w-full">
-                    <span id="addon-name-label" class="label-text mb-1"
-                        >Nombre</span
-                    >
+                    <span id="addon-name-label" class="label-text mb-1">Nombre</span>
                     <input
                         id="addon-name"
                         class="input input-bordered w-full"
@@ -353,9 +360,7 @@
                 </div>
 
                 <div class="form-control w-full">
-                    <span id="addon-group-label" class="label-text mb-1"
-                        >Grupo</span
-                    >
+                    <span id="addon-group-label" class="label-text mb-1">Grupo</span>
                     <input
                         id="addon-group"
                         class="input input-bordered w-full"
@@ -373,9 +378,7 @@
                 </div>
 
                 <div class="form-control w-full">
-                    <span id="addon-price-label" class="label-text mb-1"
-                        >Precio ($)</span
-                    >
+                    <span id="addon-price-label" class="label-text mb-1">Precio ($)</span>
                     <input
                         id="addon-price"
                         type="number"
@@ -389,9 +392,7 @@
                 </div>
 
                 <div class="form-control w-full">
-                    <span id="addon-order-label" class="label-text mb-1"
-                        >Orden de visualizacion</span
-                    >
+                    <span id="addon-order-label" class="label-text mb-1">Orden de visualizacion</span>
                     <input
                         id="addon-order"
                         type="number"
@@ -417,22 +418,17 @@
                 {/if}
             </div>
 
-            <div class="modal-action">
-                <button
-                    type="button"
-                    class="btn btn-ghost"
-                    onclick={closeAddonEditor}>Cancelar</button
-                >
-                <button
-                    type="submit"
-                    class="btn btn-primary"
-                    disabled={busy || !form.name.trim()}
-                >
+            <div class="flex flex-wrap gap-2 pt-1">
+                <button class="btn btn-primary" type="submit" disabled={busy || !form.name.trim()}>
                     {isEditing ? "Actualizar" : "Crear"}
                 </button>
+                <button type="button" class="btn btn-ghost" onclick={closeAddonEditor}>Cancelar</button>
             </div>
         </form>
     </div>
+    <form method="dialog" class="modal-backdrop">
+        <button type="button" onclick={closeAddonEditor}>close</button>
+    </form>
 </dialog>
 
 <ConfirmDialog

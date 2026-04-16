@@ -582,7 +582,7 @@
       const response = await listOrders(orderStatusFilter);
       const incomingOrders = response.orders;
 
-      if (hasLoadedOrdersOnce) {
+      if (hasLoadedOrdersOnce && silent) {
         const freshOrders = incomingOrders.filter((order: Order) => !knownOrderIds.has(order.id));
         if (freshOrders.length > 0) {
           trackAction("admin_new_orders_detected", { count: freshOrders.length });

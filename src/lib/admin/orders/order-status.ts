@@ -23,12 +23,12 @@ export const statusLabels: Record<Order["status"], string> = {
 };
 
 export const statusBadgeClass: Record<Order["status"], string> = {
-  pendiente_revision: "badge-warning",
-  recibida: "badge-success",
-  en_proceso: "badge-info",
-  lista: "badge-accent",
-  entregada: "badge-primary",
-  cancelada: "badge-error",
+  pendiente_revision: "badge-warning font-semibold text-warning-content",
+  recibida: "badge-success font-semibold !text-white",
+  en_proceso: "badge-info font-semibold !text-white",
+  lista: "badge-accent font-semibold !text-white",
+  entregada: "badge-primary font-semibold !text-white",
+  cancelada: "badge-error font-semibold !text-white",
 };
 
 export const statusStepIconsActive: Record<LinearOrderStatus, string> = {

@@ -8,10 +8,29 @@ export async function copyToClipboard(
   kind: "token" | "both" | "link",
 ): Promise<TokenCopyKind> {
   try {
-    await navigator.clipboard.writeText(text);
-    return kind;
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return kind;
+    }
   } catch {
-    // clipboard not available (e.g. insecure context) — silently ignore
+    // Fallback to legacy
+  }
+
+  // Fallback for insecure contexts (like dev over local IP)
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    // Avoid scrolling to bottom
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful ? kind : "";
+  } catch {
     return "";
   }
 }

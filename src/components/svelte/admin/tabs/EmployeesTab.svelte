@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Employee } from "../../../../lib/api/admin";
+  import Icon from "@iconify/svelte";
   import ConfirmDialog from "../shared/ConfirmDialog.svelte";
 
   interface Props {
@@ -190,64 +191,67 @@
   {/if}
 
   <div class="card bg-base-100 shadow">
-    <div class="card-body">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 class="card-title">Gestion de empleados</h2>
-          <p class="text-sm text-base-content/70">Crea, edita, desactiva o elimina cuentas de personal.</p>
+    <div class="card-body gap-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="card-title shrink-0 mr-1">Gestion de empleados</h2>
+
+        <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+
+          <div class="dropdown w-full sm:w-auto dropdown-bottom">
+            <div
+              tabindex="0"
+              role="button"
+              class="btn btn-sm btn-outline w-full sm:w-40 justify-between"
+            >
+              {employeeStateFilterLabel}
+              <span class="opacity-50">▼</span>
+            </div>
+            <ul
+              tabindex="-1"
+              class="dropdown-content menu bg-base-100 rounded-box z-100 w-full sm:w-52 p-2 mt-1 shadow-xl border border-base-300"
+            >
+              <li><button type="button" onclick={() => (employeeStateFilter = "all")}>Todos</button></li>
+              <li><button type="button" onclick={() => (employeeStateFilter = "active")}>Activos</button></li>
+              <li><button type="button" onclick={() => (employeeStateFilter = "inactive")}>Inactivos</button></li>
+            </ul>
+          </div>
+
+          <div class="dropdown w-full sm:w-auto dropdown-bottom">
+            <div
+              tabindex="0"
+              role="button"
+              class="btn btn-sm btn-outline w-full sm:w-24 justify-between"
+            >
+              {employeeRowLimitLabel}
+              <span class="opacity-50">▼</span>
+            </div>
+            <ul
+              tabindex="-1"
+              class="dropdown-content menu bg-base-100 rounded-box z-100 w-full sm:w-40 p-2 mt-1 shadow-xl border border-base-300"
+            >
+              {#each rowLimitOptions as option}
+                <li><button type="button" onclick={() => setEmployeeRowLimit(option)}>{option}</button></li>
+              {/each}
+              <li><button type="button" onclick={() => setEmployeeRowLimit(0)}>Todos</button></li>
+            </ul>
+          </div>
+
+        <div class="flex items-center gap-1.5 text-sm text-base-content/80 font-medium shrink-0">
+          <span class="badge badge-info badge-sm font-semibold rounded-md text-white!">{filteredEmployees.length}</span>
+          <span>empleados</span>
         </div>
-        <button class="btn btn-primary" type="button" onclick={openCreateEmployeeModal} disabled={busy}>
-          Crear empleado
+
+        <button class="btn btn-sm btn-primary shrink-0 ml-auto" type="button" onclick={openCreateEmployeeModal} disabled={busy}>
+          + Crear empleado
         </button>
       </div>
-    </div>
-  </div>
 
-  <div class="card bg-base-100 shadow">
-    <div class="card-body">
-      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <h4 class="card-title text-base">Listado de empleados</h4>
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="flex items-center gap-2">
-            <span class="label-text text-sm whitespace-nowrap">Filtrar</span>
-            <div class="dropdown dropdown-right dropdown-center">
-              <div tabindex="0" role="button" class="btn btn-sm btn-outline min-w-32 justify-between">
-                {employeeStateFilterLabel}
-              </div>
-              <ul tabindex="-1" class="dropdown-content menu bg-base-100 rounded-box z-50 w-44 p-2 shadow-sm border border-base-300">
-                <li><button type="button" onclick={() => (employeeStateFilter = "all")}>Todos</button></li>
-                <li><button type="button" onclick={() => (employeeStateFilter = "active")}>Activos</button></li>
-                <li><button type="button" onclick={() => (employeeStateFilter = "inactive")}>Inactivos</button></li>
-              </ul>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="label-text text-sm whitespace-nowrap">Mostrar</span>
-            <div class="dropdown dropdown-right dropdown-center">
-              <div tabindex="0" role="button" class="btn btn-sm btn-outline min-w-28 justify-between">
-                {employeeRowLimitLabel}
-              </div>
-              <ul tabindex="-1" class="dropdown-content menu bg-base-100 rounded-box z-50 w-40 p-2 shadow-sm border border-base-300">
-                {#each rowLimitOptions as option}
-                  <li><button type="button" onclick={() => setEmployeeRowLimit(option)}>{option}</button></li>
-                {/each}
-                <li><button type="button" onclick={() => setEmployeeRowLimit(0)}>Todos</button></li>
-              </ul>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 text-sm md:justify-end">
-            <span class="text-base-content/80">Total</span>
-            <span class="badge badge-info badge-sm font-semibold rounded-md">{filteredEmployees.length}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100 mt-4">
+      <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
       <table class="table">
         <thead class="bg-base-200/60 text-base-content"><tr><th class="font-bold">Email</th><th class="font-bold">Nombre</th><th class="font-bold">Rol</th><th class="font-bold">Estado</th><th class="font-bold"></th></tr></thead>
         <tbody>
           {#if filteredEmployees.length === 0}
-            <tr><td colspan="5" class="text-center">No hay empleados</td></tr>
+            <tr><td colspan="5" class="text-center py-6 text-base-content/50">No hay empleados</td></tr>
           {:else}
           {#each visibleEmployees as employee}
             <tr class="hover:bg-base-300/40 transition-colors">
@@ -290,12 +294,20 @@
 </section>
 
 <dialog class="modal" bind:this={employeeEditorDialog} onclose={resetForm}>
-  <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <h3 class="font-bold text-lg">{isEditing ? "Editar empleado" : "Crear empleado"}</h3>
+  <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+    <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4">
+      <div class="flex items-center gap-2.5">
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+          <Icon icon="lucide:user-check" width="16" height="16" class="text-primary" />
+        </div>
+        <h3 class="font-bold text-base leading-tight">{isEditing ? "Editar empleado" : "Crear empleado"}</h3>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-circle" type="button" onclick={closeEmployeeEditor} aria-label="Cerrar">
+        <Icon icon="lucide:x" width="16" height="16" />
+      </button>
     </div>
 
-    <form class="mt-5 grid gap-6" onsubmit={submit}>
+    <form class="p-5 grid gap-6" onsubmit={submit}>
       <div class="grid items-start gap-5 md:grid-cols-2">
         <div class="form-control w-full">
           <span id="employee-email-label" class="label-text mb-1">Correo</span>
@@ -348,7 +360,7 @@
         </div>
       </div>
 
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2 pt-1">
         <button class="btn btn-primary" type="submit" disabled={busy}>
           {isEditing ? "Actualizar" : "Crear"}
         </button>
