@@ -76,6 +76,16 @@
     onManualItemSubtotal,
     onDraftItemKey,
   }: Props = $props();
+
+  const requiresFlavorSelection = $derived(
+    selectedProductFlavors.length > 0 && !selectedFlavorId,
+  );
+  const canAddCurrentItem = $derived(
+    !busy && products.length > 0 && !requiresFlavorSelection,
+  );
+  const hasIncludedAddonSelectors = $derived(
+    toppingAddons.length > 0 || jaleaAddons.length > 0,
+  );
 </script>
 
 <section class="rounded-2xl border border-base-300 bg-base-200/50 p-4 space-y-4">
@@ -87,12 +97,12 @@
     <div class="text-sm text-base-content/70">{manualItems.length} item(s) agregados</div>
   </div>
 
-  <div class="grid md:grid-cols-[minmax(0,1fr)_140px] gap-4">
+  <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,180px)] md:items-end">
     <div class="form-control">
       <span id="order-product-label" class="label-text mb-1">Producto</span>
       <select
         id="order-product"
-        class="select select-bordered"
+        class="select select-bordered w-full"
         value={orderForm.product_id}
         required
         aria-labelledby="order-product-label"
@@ -111,7 +121,7 @@
       <span id="order-quantity-label" class="label-text mb-1">Cantidad</span>
       <input
         id="order-quantity"
-        class="input input-bordered"
+        class="input input-bordered w-full"
         type="number"
         min="1"
         value={orderForm.quantity}
@@ -124,55 +134,64 @@
 
   {#if hasCustomizationOptions}
     <section class="rounded-2xl border border-base-300 bg-base-100 p-4 space-y-4">
-      {#if selectedProductFlavors.length > 0}
-        <div class="form-control">
-          <span id="order-flavor-label" class="label-text mb-1">Sabor</span>
-          <select
-            id="order-flavor"
-            class="select select-bordered"
-            value={selectedFlavorId}
-            aria-labelledby="order-flavor-label"
-            onchange={(event) => onFlavorChange((event.currentTarget as HTMLSelectElement).value)}
-          >
-            <option value="">Selecciona un sabor</option>
-            {#each selectedProductFlavors as flavor}
-              <option value={flavor.id}>{flavor.name}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
-      {#if toppingAddons.length > 0}
-        <div class="form-control">
-          <span id="order-included-topping-label" class="label-text mb-1">Topping opcional</span>
-          <select
-            id="order-included-topping"
-            class="select select-bordered"
-            value={includedToppingId}
-            onchange={(event) => onChangeIncludedTopping((event.currentTarget as HTMLSelectElement).value)}
-            aria-labelledby="order-included-topping-label"
-          >
-            <option value="">Sin topping</option>
-            {#each toppingAddons as addon}
-              <option value={addon.id}>{addon.name}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
-      {#if jaleaAddons.length > 0}
-        <div class="form-control">
-          <span id="order-included-jalea-label" class="label-text mb-1">Jalea opcional</span>
-          <select
-            id="order-included-jalea"
-            class="select select-bordered"
-            value={includedJaleaId}
-            onchange={(event) => onChangeIncludedJalea((event.currentTarget as HTMLSelectElement).value)}
-            aria-labelledby="order-included-jalea-label"
-          >
-            <option value="">Sin jalea</option>
-            {#each jaleaAddons as addon}
-              <option value={addon.id}>{addon.name}</option>
-            {/each}
-          </select>
+      {#if selectedProductFlavors.length > 0 || hasIncludedAddonSelectors}
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {#if selectedProductFlavors.length > 0}
+            <div class="form-control">
+              <span id="order-flavor-label" class="label-text mb-1">
+                Sabor
+                <span class="text-error">*</span>
+              </span>
+              <select
+                id="order-flavor"
+                class="select select-bordered w-full"
+                value={selectedFlavorId}
+                aria-labelledby="order-flavor-label"
+                onchange={(event) => onFlavorChange((event.currentTarget as HTMLSelectElement).value)}
+              >
+                <option value="">Selecciona un sabor</option>
+                {#each selectedProductFlavors as flavor}
+                  <option value={flavor.id}>{flavor.name}</option>
+                {/each}
+              </select>
+            </div>
+          {/if}
+
+          {#if toppingAddons.length > 0}
+            <div class="form-control">
+              <span id="order-included-topping-label" class="label-text mb-1">Topping opcional</span>
+              <select
+                id="order-included-topping"
+                class="select select-bordered w-full"
+                value={includedToppingId}
+                onchange={(event) => onChangeIncludedTopping((event.currentTarget as HTMLSelectElement).value)}
+                aria-labelledby="order-included-topping-label"
+              >
+                <option value="">Sin topping</option>
+                {#each toppingAddons as addon}
+                  <option value={addon.id}>{addon.name}</option>
+                {/each}
+              </select>
+            </div>
+          {/if}
+
+          {#if jaleaAddons.length > 0}
+            <div class="form-control">
+              <span id="order-included-jalea-label" class="label-text mb-1">Jalea opcional</span>
+              <select
+                id="order-included-jalea"
+                class="select select-bordered w-full"
+                value={includedJaleaId}
+                onchange={(event) => onChangeIncludedJalea((event.currentTarget as HTMLSelectElement).value)}
+                aria-labelledby="order-included-jalea-label"
+              >
+                <option value="">Sin jalea</option>
+                {#each jaleaAddons as addon}
+                  <option value={addon.id}>{addon.name}</option>
+                {/each}
+              </select>
+            </div>
+          {/if}
         </div>
       {/if}
       {#if selectedProductAddons.length > 0}
@@ -185,7 +204,7 @@
                 <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Toppings extra</p>
                 <div class="grid gap-2 md:grid-cols-2">
                   {#each toppingAddons as addon}
-                    <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
+                    <label class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
                       <input
                         type="checkbox"
                         class="checkbox checkbox-sm"
@@ -206,7 +225,7 @@
                 <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Jalea extra</p>
                 <div class="grid gap-2 md:grid-cols-2">
                   {#each jaleaAddons as addon}
-                    <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
+                    <label class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
                       <input
                         type="checkbox"
                         class="checkbox checkbox-sm"
@@ -227,7 +246,7 @@
                 <p class="text-xs font-semibold uppercase tracking-wide text-base-content/60">{group.label}</p>
                 <div class="grid gap-2 md:grid-cols-2">
                   {#each group.items as addon}
-                    <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
+                    <label class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2">
                       <input
                         type="checkbox"
                         class="checkbox checkbox-sm"
@@ -252,12 +271,14 @@
       <p>Subtotal de esta configuracion: <strong>{formatCurrency(totalPreview)}</strong></p>
       <p>Total acumulado en la orden: <strong>{formatCurrency(manualOrderTotal)}</strong></p>
     </div>
-    <div class="space-y-1 text-right">
-      <button class="btn btn-outline btn-primary" type="button" onclick={onAddDraftItem} disabled={busy || products.length === 0}>
+    <div class="space-y-1 md:text-right">
+      <button class="btn btn-outline btn-primary" type="button" onclick={onAddDraftItem} disabled={!canAddCurrentItem}>
         Agregar producto
       </button>
       {#if addItemError}
         <p class="text-xs text-error">{addItemError}</p>
+      {:else if requiresFlavorSelection}
+        <p class="text-xs text-warning">Selecciona un sabor para habilitar la accion.</p>
       {:else}
         <p class="text-xs text-base-content/60">La configuracion actual se agrega a la orden solo cuando presionas este boton.</p>
       {/if}

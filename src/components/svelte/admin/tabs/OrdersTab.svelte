@@ -636,22 +636,6 @@
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
 
-  <div class="card bg-base-100 shadow">
-    <div class="card-body">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 class="card-title">Gestion de ordenes</h2>
-          <p class="text-sm text-base-content/70">Crea ordenes nuevas o busca rapidamente por numero.</p>
-        </div>
-        <div class="flex flex-wrap items-end gap-2">
-          <button class="btn btn-primary" type="button" onclick={openCreateOrderModal} disabled={busy}>
-            Crear orden
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <OrderList
     {orders}
     {filteredOrders}
@@ -666,6 +650,7 @@
     }}
     onFilterChange={onFilterChange}
     onReload={onReload}
+    onCreateOrder={openCreateOrderModal}
     onOpenOrder={(orderId) => {
       void onOpenOrder(orderId);
     }}

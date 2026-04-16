@@ -36,17 +36,25 @@
 {#if shared.isAdmin && shared.activeTab === "categorias"}
   {#if shared.lazyTabState.categorias.loading && !shared.lazyTabState.categorias.hydrated}
     <section class="space-y-4" aria-busy="true" aria-live="polite">
-      <div class="flex items-center justify-between">
-        <div class="skeleton h-8 w-44"></div>
-        <div class="skeleton h-10 w-44"></div>
-      </div>
-      <div class="space-y-3">
-        {#each [1, 2, 3, 4, 5] as item (item)}
-          <div class="card bg-base-100 shadow border border-base-300/50 p-4 space-y-2" aria-hidden="true">
-            <div class="skeleton h-4 w-1/2"></div>
-            <div class="skeleton h-4 w-1/3"></div>
+      <div class="card bg-base-100 shadow" aria-hidden="true">
+        <div class="card-body gap-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="skeleton h-8 w-48"></div>
+            <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+            <div class="skeleton h-9 w-36"></div>
+            <div class="skeleton h-9 w-20"></div>
+            <div class="skeleton h-5 w-24"></div>
+            <div class="skeleton h-9 w-36 ml-auto"></div>
           </div>
-        {/each}
+          <div class="rounded-box border border-base-content/5 overflow-hidden">
+            <div class="bg-base-200/60 p-3"><div class="skeleton h-5 w-full"></div></div>
+            <div class="p-3 space-y-3">
+              {#each [1, 2, 3, 4, 5] as item (item)}
+                <div class="skeleton h-10 w-full"></div>
+              {/each}
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   {:else}
@@ -64,17 +72,27 @@
 {#if shared.isAdmin && shared.activeTab === "productos"}
   {#if shared.lazyTabState.productos.loading && !shared.lazyTabState.productos.hydrated}
     <section class="space-y-4" aria-busy="true" aria-live="polite">
-      <div class="flex items-center justify-between">
-        <div class="skeleton h-8 w-44"></div>
-        <div class="skeleton h-10 w-44"></div>
-      </div>
-      <div class="space-y-3">
-        {#each [1, 2, 3, 4, 5] as item (item)}
-          <div class="card bg-base-100 shadow border border-base-300/50 p-4 space-y-2" aria-hidden="true">
-            <div class="skeleton h-4 w-2/3"></div>
-            <div class="skeleton h-4 w-1/2"></div>
+      <div class="card bg-base-100 shadow" aria-hidden="true">
+        <div class="card-body gap-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="skeleton h-8 w-48"></div>
+            <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+            <div class="skeleton h-9 w-36"></div>
+            <div class="skeleton h-9 w-20"></div>
+            <div class="skeleton h-5 w-24"></div>
+            <div class="skeleton h-9 w-32 ml-auto"></div>
+            <div class="skeleton h-9 w-36"></div>
+            <div class="skeleton h-9 w-36"></div>
           </div>
-        {/each}
+          <div class="rounded-box border border-base-content/5 overflow-hidden">
+            <div class="bg-base-200/60 p-3"><div class="skeleton h-5 w-full"></div></div>
+            <div class="p-3 space-y-3">
+              {#each [1, 2, 3, 4, 5] as item (item)}
+                <div class="skeleton h-10 w-full"></div>
+              {/each}
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   {:else}
@@ -114,17 +132,25 @@
 {#if shared.isAdmin && shared.activeTab === "empleados"}
   {#if shared.lazyTabState.empleados.loading && !shared.lazyTabState.empleados.hydrated}
     <section class="space-y-4" aria-busy="true" aria-live="polite">
-      <div class="flex items-center justify-between">
-        <div class="skeleton h-8 w-44"></div>
-        <div class="skeleton h-10 w-40"></div>
-      </div>
-      <div class="space-y-3">
-        {#each [1, 2, 3, 4, 5] as item (item)}
-          <div class="card bg-base-100 shadow border border-base-300/50 p-4 space-y-2" aria-hidden="true">
-            <div class="skeleton h-4 w-1/3"></div>
-            <div class="skeleton h-4 w-2/3"></div>
+      <div class="card bg-base-100 shadow" aria-hidden="true">
+        <div class="card-body gap-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="skeleton h-8 w-48"></div>
+            <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+            <div class="skeleton h-9 w-36"></div>
+            <div class="skeleton h-9 w-20"></div>
+            <div class="skeleton h-5 w-24"></div>
+            <div class="skeleton h-9 w-36 ml-auto"></div>
           </div>
-        {/each}
+          <div class="rounded-box border border-base-content/5 overflow-hidden">
+            <div class="bg-base-200/60 p-3"><div class="skeleton h-5 w-full"></div></div>
+            <div class="p-3 space-y-3">
+              {#each [1, 2, 3, 4, 5] as item (item)}
+                <div class="skeleton h-10 w-full"></div>
+              {/each}
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   {:else}
@@ -142,17 +168,25 @@
 {#if shared.isAdmin && shared.activeTab === "usuarios"}
   {#if shared.lazyTabState.usuarios.loading && !shared.lazyTabState.usuarios.hydrated}
     <section class="space-y-4" aria-busy="true" aria-live="polite">
-      <div class="flex items-center justify-between">
-        <div class="skeleton h-8 w-44"></div>
-        <div class="skeleton h-10 w-44"></div>
-      </div>
-      <div class="space-y-3">
-        {#each [1, 2, 3, 4, 5] as item (item)}
-          <div class="card bg-base-100 shadow border border-base-300/50 p-4 space-y-2" aria-hidden="true">
-            <div class="skeleton h-4 w-2/3"></div>
-            <div class="skeleton h-4 w-1/2"></div>
+      <div class="card bg-base-100 shadow" aria-hidden="true">
+        <div class="card-body gap-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="skeleton h-8 w-48"></div>
+            <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+            <div class="skeleton h-9 w-36"></div>
+            <div class="skeleton h-9 w-20"></div>
+            <div class="skeleton h-5 w-24"></div>
+            <div class="skeleton h-9 w-36 ml-auto"></div>
           </div>
-        {/each}
+          <div class="rounded-box border border-base-content/5 overflow-hidden">
+            <div class="bg-base-200/60 p-3"><div class="skeleton h-5 w-full"></div></div>
+            <div class="p-3 space-y-3">
+              {#each [1, 2, 3, 4, 5] as item (item)}
+                <div class="skeleton h-10 w-full"></div>
+              {/each}
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   {:else}

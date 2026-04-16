@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { AdminImage, Category } from "../../../../lib/api/admin";
+  import Icon from "@iconify/svelte";
 
   interface ProductFormState {
     id: string;
@@ -58,22 +59,30 @@
 </script>
 
 <dialog class="modal" bind:this={dialogRef} onclose={onClose}>
-  <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <h3 class="font-bold text-lg">{isEditing ? "Editar producto" : "Crear producto"}</h3>
-      {#if isEditing}
-        <div class="flex flex-wrap items-center gap-2">
+  <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto p-0">
+    <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4">
+      <div class="flex items-center gap-2.5">
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+          <Icon icon="lucide:package" width="16" height="16" class="text-primary" />
+        </div>
+        <h3 class="font-bold text-base leading-tight">{isEditing ? "Editar producto" : "Crear producto"}</h3>
+      </div>
+      <div class="flex items-center gap-2">
+        {#if isEditing}
           <button class="btn btn-sm btn-soft btn-info" type="button" onclick={onOpenFlavorAssignmentForEditingProduct}>
             Editar sabores
           </button>
           <button class="btn btn-sm btn-soft btn-secondary" type="button" onclick={onOpenAddonAssignmentForEditingProduct}>
             Editar complementos
           </button>
-        </div>
-      {/if}
+        {/if}
+        <button class="btn btn-ghost btn-sm btn-circle" type="button" onclick={onClose} aria-label="Cerrar">
+          <Icon icon="lucide:x" width="16" height="16" />
+        </button>
+      </div>
     </div>
 
-    <form class="mt-5 grid items-start gap-6 md:grid-cols-[1.15fr_0.85fr]" onsubmit={onSubmit}>
+    <form class="p-5 grid items-start gap-6 md:grid-cols-[1.15fr_0.85fr]" onsubmit={onSubmit}>
       <div class="grid gap-5">
         <div class="grid items-start gap-5 md:grid-cols-2">
           <div class="form-control w-full md:col-span-2">
@@ -148,7 +157,7 @@
           </div>
         </div>
 
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2 pt-1">
           <button class="btn btn-primary" type="submit" disabled={busy}>
             {isEditing ? "Actualizar" : "Crear"}
           </button>
