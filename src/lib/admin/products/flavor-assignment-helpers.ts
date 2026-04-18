@@ -1,6 +1,9 @@
 import type { Flavor } from "../../api/admin";
 
-export function splitFlavorAssignments(allFlavors: Flavor[], assignedFlavorIds: string[]): {
+export function splitFlavorAssignments(
+  allFlavors: Flavor[],
+  assignedFlavorIds: string[],
+): {
   available: Flavor[];
   assigned: Flavor[];
 } {

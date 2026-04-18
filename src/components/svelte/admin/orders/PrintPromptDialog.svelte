@@ -27,13 +27,23 @@
     <h3 class="font-bold text-lg">Orden lista</h3>
     <p class="text-sm text-base-content/70">
       {#if printTarget}
-        La orden {printTarget.order_number} paso a estado lista. Deseas imprimir el recibo?
+        La orden {printTarget.order_number} paso a estado lista. Deseas imprimir el
+        recibo?
       {/if}
     </p>
     <div class="modal-action">
-      <button class="btn btn-ghost" type="button" onclick={onClose}>Cancelar</button>
-      <button class="btn btn-primary" type="button" onclick={onConfirm} disabled={busy}>Actualizar</button>
+      <button class="btn btn-ghost" type="button" onclick={onClose}
+        >Cancelar</button
+      >
+      <button
+        class="btn btn-primary"
+        type="button"
+        onclick={onConfirm}
+        disabled={busy}>Actualizar</button
+      >
     </div>
   </div>
-  <form method="dialog" class="modal-backdrop"><button type="button" onclick={onClose}>close</button></form>
+  <form method="dialog" class="modal-backdrop">
+    <button type="button" onclick={onClose}>close</button>
+  </form>
 </dialog>

@@ -2,8 +2,8 @@
  * Route guards for protected pages
  */
 
-import type { APIContext } from 'astro';
-import { getCachedSession, isAdmin, isManagerial } from '../auth/session';
+import type { APIContext } from "astro";
+import { getCachedSession, isAdmin, isManagerial } from "../auth/session";
 
 /**
  * Guard that requires authentication
@@ -12,7 +12,7 @@ import { getCachedSession, isAdmin, isManagerial } from '../auth/session';
 export async function requireAuth(context: APIContext): Promise<void> {
   const session = getCachedSession();
   if (!session) {
-    context.redirect('/admin/login');
+    context.redirect("/admin/login");
   }
 }
 
@@ -23,7 +23,7 @@ export async function requireAuth(context: APIContext): Promise<void> {
 export async function requireAdmin(context: APIContext): Promise<void> {
   await requireAuth(context);
   if (!isAdmin()) {
-    context.redirect('/admin/login');
+    context.redirect("/admin/login");
   }
 }
 
@@ -34,6 +34,6 @@ export async function requireAdmin(context: APIContext): Promise<void> {
 export async function requireManagerial(context: APIContext): Promise<void> {
   await requireAuth(context);
   if (!isManagerial()) {
-    context.redirect('/admin/login');
+    context.redirect("/admin/login");
   }
 }

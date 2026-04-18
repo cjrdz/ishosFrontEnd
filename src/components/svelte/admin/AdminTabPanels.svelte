@@ -5,9 +5,17 @@
   import ProductsTab from "./tabs/ProductsTab.svelte";
   import EmployeesTab from "./tabs/EmployeesTab.svelte";
   import UsersTab from "./tabs/UsersTab.svelte";
+  import OffersTab from "./tabs/OffersTab.svelte";
   import ToolsTab from "./tabs/ToolsTab.svelte";
 
-  let { shared, orders, products, categories, employees, users }: AdminTabsProps = $props();
+  let {
+    shared,
+    orders,
+    products,
+    categories,
+    employees,
+    users,
+  }: AdminTabsProps = $props();
 </script>
 
 {#if shared.activeTab === "ordenes"}
@@ -47,7 +55,9 @@
             <div class="skeleton h-9 w-36 ml-auto"></div>
           </div>
           <div class="rounded-box border border-base-content/5 overflow-hidden">
-            <div class="bg-base-200/60 p-3"><div class="skeleton h-5 w-full"></div></div>
+            <div class="bg-base-200/60 p-3">
+              <div class="skeleton h-5 w-full"></div>
+            </div>
             <div class="p-3 space-y-3">
               {#each [1, 2, 3, 4, 5] as item (item)}
                 <div class="skeleton h-10 w-full"></div>
@@ -85,7 +95,9 @@
             <div class="skeleton h-9 w-36"></div>
           </div>
           <div class="rounded-box border border-base-content/5 overflow-hidden">
-            <div class="bg-base-200/60 p-3"><div class="skeleton h-5 w-full"></div></div>
+            <div class="bg-base-200/60 p-3">
+              <div class="skeleton h-5 w-full"></div>
+            </div>
             <div class="p-3 space-y-3">
               {#each [1, 2, 3, 4, 5] as item (item)}
                 <div class="skeleton h-10 w-full"></div>
@@ -129,8 +141,8 @@
   {/if}
 {/if}
 
-{#if shared.isAdmin && shared.activeTab === "empleados"}
-  {#if shared.lazyTabState.empleados.loading && !shared.lazyTabState.empleados.hydrated}
+{#if shared.isAdmin && shared.activeTab === "personas"}
+  {#if shared.lazyTabState.personas.loading && !shared.lazyTabState.personas.hydrated}
     <section class="space-y-4" aria-busy="true" aria-live="polite">
       <div class="card bg-base-100 shadow" aria-hidden="true">
         <div class="card-body gap-4">
@@ -143,9 +155,11 @@
             <div class="skeleton h-9 w-36 ml-auto"></div>
           </div>
           <div class="rounded-box border border-base-content/5 overflow-hidden">
-            <div class="bg-base-200/60 p-3"><div class="skeleton h-5 w-full"></div></div>
+            <div class="bg-base-200/60 p-3">
+              <div class="skeleton h-5 w-full"></div>
+            </div>
             <div class="p-3 space-y-3">
-              {#each [1, 2, 3, 4, 5] as item (item)}
+              {#each [1, 2, 3, 4, 5, 6] as item (item)}
                 <div class="skeleton h-10 w-full"></div>
               {/each}
             </div>
@@ -154,34 +168,43 @@
       </div>
     </section>
   {:else}
-    <EmployeesTab
-      employees={employees.employees}
-      busy={shared.busy.empleados}
-      moduleError={shared.moduleErrors.empleados}
-      onCreate={employees.onCreate}
-      onUpdate={employees.onUpdate}
-      onDelete={employees.onDelete}
-    />
+    <section class="space-y-6">
+      <EmployeesTab
+        employees={employees.employees}
+        busy={shared.busy.empleados}
+        moduleError={shared.moduleErrors.empleados}
+        onCreate={employees.onCreate}
+        onUpdate={employees.onUpdate}
+        onDelete={employees.onDelete}
+      />
+
+      <UsersTab
+        users={users.users}
+        busy={shared.busy.usuarios}
+        moduleError={shared.moduleErrors.usuarios}
+        historyBusy={users.usersHistoryBusy}
+        selectedUserOrders={users.selectedUserOrders}
+        onCreate={users.onCreate}
+        onUpdate={users.onUpdate}
+        onDelete={users.onDelete}
+        onLoadOrders={users.onLoadUserOrders}
+      />
+    </section>
   {/if}
 {/if}
 
-{#if shared.isAdmin && shared.activeTab === "usuarios"}
-  {#if shared.lazyTabState.usuarios.loading && !shared.lazyTabState.usuarios.hydrated}
+{#if shared.isAdmin && shared.activeTab === "ofertas"}
+  {#if shared.lazyTabState.ofertas.loading && !shared.lazyTabState.ofertas.hydrated}
     <section class="space-y-4" aria-busy="true" aria-live="polite">
       <div class="card bg-base-100 shadow" aria-hidden="true">
         <div class="card-body gap-4">
-          <div class="flex flex-wrap items-center gap-3">
-            <div class="skeleton h-8 w-48"></div>
-            <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
-            <div class="skeleton h-9 w-36"></div>
-            <div class="skeleton h-9 w-20"></div>
-            <div class="skeleton h-5 w-24"></div>
-            <div class="skeleton h-9 w-36 ml-auto"></div>
-          </div>
+          <div class="skeleton h-8 w-52"></div>
           <div class="rounded-box border border-base-content/5 overflow-hidden">
-            <div class="bg-base-200/60 p-3"><div class="skeleton h-5 w-full"></div></div>
+            <div class="bg-base-200/60 p-3">
+              <div class="skeleton h-5 w-full"></div>
+            </div>
             <div class="p-3 space-y-3">
-              {#each [1, 2, 3, 4, 5] as item (item)}
+              {#each [1, 2, 3, 4] as item (item)}
                 <div class="skeleton h-10 w-full"></div>
               {/each}
             </div>
@@ -190,17 +213,7 @@
       </div>
     </section>
   {:else}
-    <UsersTab
-      users={users.users}
-      busy={shared.busy.usuarios}
-      moduleError={shared.moduleErrors.usuarios}
-      historyBusy={users.usersHistoryBusy}
-      selectedUserOrders={users.selectedUserOrders}
-      onCreate={users.onCreate}
-      onUpdate={users.onUpdate}
-      onDelete={users.onDelete}
-      onLoadOrders={users.onLoadUserOrders}
-    />
+    <OffersTab products={products.products} />
   {/if}
 {/if}
 

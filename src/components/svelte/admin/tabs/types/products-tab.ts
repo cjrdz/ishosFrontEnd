@@ -1,4 +1,10 @@
-import type { Addon, AdminImage, Category, Flavor, Product } from "../../../../../lib/api/admin";
+import type {
+  Addon,
+  AdminImage,
+  Category,
+  Flavor,
+  Product,
+} from "../../../../../lib/api/admin";
 
 export interface ProductsTabProps {
   categories: Category[];
@@ -17,26 +23,32 @@ export interface ProductsTabProps {
     image_path?: string;
     is_available: boolean;
   }) => void;
-  onUpdate: (id: string, payload: {
-    name: string;
-    description: string;
-    price: number;
-    category_id: string;
-    image_path?: string;
-    is_available: boolean;
-  }) => void;
+  onUpdate: (
+    id: string,
+    payload: {
+      name: string;
+      description: string;
+      price: number;
+      category_id: string;
+      image_path?: string;
+      is_available: boolean;
+    },
+  ) => void;
   onDelete: (id: string) => void;
   onCreateFlavor: (payload: {
     name: string;
     display_order: number;
     is_seasonal: boolean;
   }) => void;
-  onUpdateFlavor: (id: string, payload: {
-    name: string;
-    display_order: number;
-    is_seasonal: boolean;
-    is_active: boolean;
-  }) => void;
+  onUpdateFlavor: (
+    id: string,
+    payload: {
+      name: string;
+      display_order: number;
+      is_seasonal: boolean;
+      is_active: boolean;
+    },
+  ) => void;
   onDeleteFlavor: (id: string) => void;
   onCreateAddon: (payload: {
     name: string;

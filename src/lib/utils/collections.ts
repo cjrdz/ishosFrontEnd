@@ -10,5 +10,7 @@ export function normalizeIdList(values: string[] | undefined): string[] {
 }
 
 export function toggleSelection(list: string[], id: string): string[] {
-  return list.includes(id) ? list.filter((value) => value !== id) : [...list, id];
+  return list.includes(id)
+    ? list.filter((value) => value !== id)
+    : [...list, id];
 }

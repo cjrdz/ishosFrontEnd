@@ -140,7 +140,10 @@ export interface OrdersPaginatedResponse {
   };
 }
 
-export async function listCategories(token: string, includeAll = false): Promise<Category[]> {
+export async function listCategories(
+  token: string,
+  includeAll = false,
+): Promise<Category[]> {
   const suffix = includeAll ? "?all=true" : "";
   return apiRequest<Category[]>(`/categories${suffix}`, { token });
 }
@@ -181,14 +184,20 @@ export async function updateCategory(
   });
 }
 
-export async function deleteCategory(token: string, id: string): Promise<{ message: string }> {
+export async function deleteCategory(
+  token: string,
+  id: string,
+): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/categories/${id}`, {
     method: "DELETE",
     token,
   });
 }
 
-export async function listProducts(token: string, includeAll = true): Promise<Product[]> {
+export async function listProducts(
+  token: string,
+  includeAll = true,
+): Promise<Product[]> {
   const suffix = includeAll ? "?all=true" : "";
   return apiRequest<Product[]>(`/products${suffix}`, { token });
 }
@@ -228,7 +237,10 @@ export async function updateProduct(
   });
 }
 
-export async function deleteProduct(token: string, id: string): Promise<{ message: string }> {
+export async function deleteProduct(
+  token: string,
+  id: string,
+): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/products/${id}`, {
     method: "DELETE",
     token,
@@ -263,8 +275,18 @@ export async function createOrder(
       customizations?: Record<string, unknown>;
     }>;
   },
-): Promise<{ order_number: string; status: string; total: number; message: string }> {
-  return apiRequest<{ order_number: string; status: string; total: number; message: string }>("/orders", {
+): Promise<{
+  order_number: string;
+  status: string;
+  total: number;
+  message: string;
+}> {
+  return apiRequest<{
+    order_number: string;
+    status: string;
+    total: number;
+    message: string;
+  }>("/orders", {
     method: "POST",
     token,
     body: payload,
@@ -278,7 +300,11 @@ export async function approveOrder(token: string, id: string): Promise<Order> {
   });
 }
 
-export async function rejectOrder(token: string, id: string, reason: string): Promise<Order> {
+export async function rejectOrder(
+  token: string,
+  id: string,
+  reason: string,
+): Promise<Order> {
   return apiRequest<Order>(`/orders/${id}/reject`, {
     method: "POST",
     token,
@@ -335,7 +361,10 @@ export async function updateOrderNotes(
   });
 }
 
-export async function deleteOrder(token: string, id: string): Promise<{ message: string }> {
+export async function deleteOrder(
+  token: string,
+  id: string,
+): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/orders/${id}`, {
     method: "DELETE",
     token,
@@ -364,7 +393,10 @@ export async function createEmployee(
   });
 }
 
-export async function deactivateEmployee(token: string, id: string): Promise<{ message: string }> {
+export async function deactivateEmployee(
+  token: string,
+  id: string,
+): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/employees/${id}/deactivate`, {
     method: "POST",
     token,
@@ -390,14 +422,20 @@ export async function updateEmployee(
   });
 }
 
-export async function deleteEmployee(token: string, id: string): Promise<{ message: string }> {
+export async function deleteEmployee(
+  token: string,
+  id: string,
+): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/employees/${id}`, {
     method: "DELETE",
     token,
   });
 }
 
-export async function listUsers(token: string, options?: { status?: string; search?: string }): Promise<User[]> {
+export async function listUsers(
+  token: string,
+  options?: { status?: string; search?: string },
+): Promise<User[]> {
   const params = new URLSearchParams();
   if (options?.status) {
     params.set("status", options.status);
@@ -449,18 +487,30 @@ export async function updateUser(
   });
 }
 
-export async function deleteUser(token: string, id: string): Promise<{ message: string }> {
+export async function deleteUser(
+  token: string,
+  id: string,
+): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/users/${id}`, {
     method: "DELETE",
     token,
   });
 }
 
-export async function listUserOrders(token: string, id: string, limit = 50): Promise<{ orders: UserOrderHistoryItem[] }> {
-  return apiRequest<{ orders: UserOrderHistoryItem[] }>(`/users/${id}/orders?limit=${limit}`, { token });
+export async function listUserOrders(
+  token: string,
+  id: string,
+  limit = 50,
+): Promise<{ orders: UserOrderHistoryItem[] }> {
+  return apiRequest<{ orders: UserOrderHistoryItem[] }>(
+    `/users/${id}/orders?limit=${limit}`,
+    { token },
+  );
 }
 
-export async function getAdminTabsSettings(token: string): Promise<AdminTabsSettings> {
+export async function getAdminTabsSettings(
+  token: string,
+): Promise<AdminTabsSettings> {
   return apiRequest<AdminTabsSettings>("/settings/tabs", { token });
 }
 
@@ -477,7 +527,10 @@ export async function updateAdminTabsSettings(
 
 // ─── Flavors ─────────────────────────────────────────────────────────────
 
-export async function listFlavors(token: string, includeAll = false): Promise<Flavor[]> {
+export async function listFlavors(
+  token: string,
+  includeAll = false,
+): Promise<Flavor[]> {
   const suffix = includeAll ? "?all=true" : "";
   return apiRequest<Flavor[]>(`/flavors${suffix}`, { token });
 }
@@ -518,7 +571,10 @@ export async function updateFlavor(
   });
 }
 
-export async function deleteFlavor(token: string, id: string): Promise<{ message: string }> {
+export async function deleteFlavor(
+  token: string,
+  id: string,
+): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/flavors/${id}`, {
     method: "DELETE",
     token,
@@ -527,7 +583,10 @@ export async function deleteFlavor(token: string, id: string): Promise<{ message
 
 // ─── Addons ──────────────────────────────────────────────────────────────
 
-export async function listAddons(token: string, includeAll = false): Promise<Addon[]> {
+export async function listAddons(
+  token: string,
+  includeAll = false,
+): Promise<Addon[]> {
   const suffix = includeAll ? "?all=true" : "";
   return apiRequest<Addon[]>(`/addons${suffix}`, { token });
 }
@@ -570,7 +629,10 @@ export async function updateAddon(
   });
 }
 
-export async function deleteAddon(token: string, id: string): Promise<{ message: string }> {
+export async function deleteAddon(
+  token: string,
+  id: string,
+): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/addons/${id}`, {
     method: "DELETE",
     token,
@@ -584,10 +646,13 @@ export async function linkProductFlavor(
   productId: string,
   flavorId: string,
 ): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`/products/${productId}/flavors/${flavorId}`, {
-    method: "POST",
-    token,
-  });
+  return apiRequest<{ message: string }>(
+    `/products/${productId}/flavors/${flavorId}`,
+    {
+      method: "POST",
+      token,
+    },
+  );
 }
 
 export async function unlinkProductFlavor(
@@ -595,10 +660,13 @@ export async function unlinkProductFlavor(
   productId: string,
   flavorId: string,
 ): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`/products/${productId}/flavors/${flavorId}`, {
-    method: "DELETE",
-    token,
-  });
+  return apiRequest<{ message: string }>(
+    `/products/${productId}/flavors/${flavorId}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
 }
 
 // ─── Product-Addon Links ─────────────────────────────────────────────────
@@ -608,10 +676,13 @@ export async function linkProductAddon(
   productId: string,
   addonId: string,
 ): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`/products/${productId}/addons/${addonId}`, {
-    method: "POST",
-    token,
-  });
+  return apiRequest<{ message: string }>(
+    `/products/${productId}/addons/${addonId}`,
+    {
+      method: "POST",
+      token,
+    },
+  );
 }
 
 export async function unlinkProductAddon(
@@ -619,15 +690,21 @@ export async function unlinkProductAddon(
   productId: string,
   addonId: string,
 ): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`/products/${productId}/addons/${addonId}`, {
-    method: "DELETE",
-    token,
-  });
+  return apiRequest<{ message: string }>(
+    `/products/${productId}/addons/${addonId}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
 }
 
 // ─── Admin Images ─────────────────────────────────────────────────────────
 export async function listAdminImages(token: string): Promise<AdminImage[]> {
-  const response = await apiRequest<{ images?: AdminImage[] }>("/upload/images", { token });
+  const response = await apiRequest<{ images?: AdminImage[] }>(
+    "/upload/images",
+    { token },
+  );
   return response.images ?? [];
 }
 
@@ -653,7 +730,10 @@ export async function uploadAdminImage(
   if (!response.ok) {
     let message = "Request failed";
     try {
-      const payload = (await response.json()) as { error?: string; message?: string };
+      const payload = (await response.json()) as {
+        error?: string;
+        message?: string;
+      };
       message = payload.error ?? payload.message ?? message;
     } catch {
       message = response.statusText || message;
@@ -664,7 +744,10 @@ export async function uploadAdminImage(
   return (await response.json()) as { path: string; message: string };
 }
 
-export async function deleteAdminImage(token: string, path: string): Promise<{ message: string }> {
+export async function deleteAdminImage(
+  token: string,
+  path: string,
+): Promise<{ message: string }> {
   return apiRequest<{ message: string }>("/upload/image", {
     method: "DELETE",
     token,

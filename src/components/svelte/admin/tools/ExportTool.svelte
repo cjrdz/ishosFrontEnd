@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from "@iconify/svelte";
+  import Icon from "../../shared/AppIcon.svelte";
   import {
     exportOrders,
     purgeOrdersByStatuses,
@@ -19,25 +19,45 @@
   let selectedPurgeStatuses = $state<OrderStatus[]>(["entregada", "cancelada"]);
   let purgeConfirmDialog: HTMLDialogElement | null = null;
 
-  const purgeStatusOptions: Array<{ value: OrderStatus; label: string; icon: string }> = [
-    { value: "pendiente_revision", label: "Pendiente revisión", icon: "lucide:clock"         },
-    { value: "recibida",           label: "Recibida",           icon: "lucide:circle-check"  },
-    { value: "en_proceso",         label: "En proceso",         icon: "lucide:refresh-cw"    },
-    { value: "lista",              label: "Lista",              icon: "lucide:bell"           },
-    { value: "entregada",          label: "Entregada",          icon: "lucide:package"        },
-    { value: "cancelada",          label: "Cancelada",          icon: "lucide:x-circle"       },
+  const purgeStatusOptions: Array<{
+    value: OrderStatus;
+    label: string;
+    icon: string;
+  }> = [
+    {
+      value: "pendiente_revision",
+      label: "Pendiente revisión",
+      icon: "lucide:clock",
+    },
+    { value: "recibida", label: "Recibida", icon: "lucide:circle-check" },
+    { value: "en_proceso", label: "En proceso", icon: "lucide:refresh-cw" },
+    { value: "lista", label: "Lista", icon: "lucide:bell" },
+    { value: "entregada", label: "Entregada", icon: "lucide:package" },
+    { value: "cancelada", label: "Cancelada", icon: "lucide:x-circle" },
   ];
 
-  function toISODate(d: Date) { return d.toISOString().slice(0, 10); }
+  function toISODate(d: Date) {
+    return d.toISOString().slice(0, 10);
+  }
 
   function formatDateDisplay(s: string) {
     if (!s) return "";
-    return new Date(`${s}T00:00:00`).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+    return new Date(`${s}T00:00:00`).toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   }
 
   function getDaysDiff() {
     if (!startDate || !endDate) return 0;
-    return Math.ceil((new Date(`${endDate}T00:00:00`).getTime() - new Date(`${startDate}T00:00:00`).getTime()) / 86400000) + 1;
+    return (
+      Math.ceil(
+        (new Date(`${endDate}T00:00:00`).getTime() -
+          new Date(`${startDate}T00:00:00`).getTime()) /
+          86400000,
+      ) + 1
+    );
   }
 
   function applyPreset(days: 7 | 30 | 90) {
@@ -64,9 +84,12 @@
   }
 
   function hasExportForCurrentRange() {
-    return Boolean(startDate) && Boolean(endDate) &&
+    return (
+      Boolean(startDate) &&
+      Boolean(endDate) &&
       startDate === lastExportedStartDate &&
-      endDate === lastExportedEndDate;
+      endDate === lastExportedEndDate
+    );
   }
 
   function download(content: string, mime: string, filename: string) {
@@ -86,8 +109,15 @@
     notice = "";
     try {
       const blob = await exportOrders(startDate, endDate, format);
-      const mime = format === "csv" ? "text/csv;charset=utf-8" : "application/json;charset=utf-8";
-      download(await blob.text(), mime, `ordenes_${startDate}_a_${endDate}_${new Date().toISOString().slice(0,10)}.${format}`);
+      const mime =
+        format === "csv"
+          ? "text/csv;charset=utf-8"
+          : "application/json;charset=utf-8";
+      download(
+        await blob.text(),
+        mime,
+        `ordenes_${startDate}_a_${endDate}_${new Date().toISOString().slice(0, 10)}.${format}`,
+      );
       lastExportedStartDate = startDate;
       lastExportedEndDate = endDate;
       lastExportFormat = format;
@@ -101,8 +131,14 @@
 
   function openPurgeModal() {
     if (!ensureDates()) return;
-    if (selectedPurgeStatuses.length === 0) { error = "Selecciona al menos un estado"; return; }
-    if (!hasExportForCurrentRange()) { error = "Primero exporta CSV o JSON para este rango de fechas"; return; }
+    if (selectedPurgeStatuses.length === 0) {
+      error = "Selecciona al menos un estado";
+      return;
+    }
+    if (!hasExportForCurrentRange()) {
+      error = "Primero exporta CSV o JSON para este rango de fechas";
+      return;
+    }
     purgeConfirmDialog?.showModal();
   }
 
@@ -112,13 +148,18 @@
     deleting = true;
     notice = "";
     try {
-      const result = await purgeOrdersByStatuses(startDate, endDate, selectedPurgeStatuses);
+      const result = await purgeOrdersByStatuses(
+        startDate,
+        endDate,
+        selectedPurgeStatuses,
+      );
       const count = result.deleted_count ?? result.archived_count ?? 0;
       notice = `${count} órdenes eliminadas correctamente (${selectedPurgeStatuses.join(", ")})`;
       lastExportedStartDate = "";
       lastExportedEndDate = "";
     } catch (err) {
-      error = err instanceof Error ? err.message : "No se pudieron eliminar órdenes";
+      error =
+        err instanceof Error ? err.message : "No se pudieron eliminar órdenes";
     } finally {
       deleting = false;
     }
@@ -139,30 +180,39 @@
         <button
           type="button"
           class="flex items-center gap-3 text-left hover:opacity-75 transition-opacity"
-          onclick={() => isCollapsed = !isCollapsed}
+          onclick={() => (isCollapsed = !isCollapsed)}
           aria-expanded={!isCollapsed}
         >
-          <div class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+          <div
+            class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0"
+          >
             <Icon icon="lucide:upload" class="h-5 w-5 text-warning" />
           </div>
           <div>
-            <h2 class="card-title text-base leading-tight">Exportación y mantenimiento</h2>
-            <p class="text-xs text-base-content/55">Exporta datos y libera espacio en la BD</p>
+            <h2 class="card-title text-base leading-tight">
+              Exportación y mantenimiento
+            </h2>
+            <p class="text-xs text-base-content/55">
+              Exporta datos y libera espacio en la BD
+            </p>
           </div>
-          <span class="h-4 w-4 text-base-content/40 transition-transform duration-200 ml-1 flex items-center" class:rotate-180={!isCollapsed}>
+          <span
+            class="h-4 w-4 text-base-content/40 transition-transform duration-200 ml-1 flex items-center"
+            class:rotate-180={!isCollapsed}
+          >
             <Icon icon="lucide:chevron-down" />
           </span>
         </button>
 
         <div class="join">
-          {#each [[7,"7d"],[30,"30d"],[90,"90d"]] as [days, lbl]}
+          {#each [[7, "7d"], [30, "30d"], [90, "90d"]] as [days, lbl]}
             <button
               type="button"
               class="btn btn-sm join-item"
               class:btn-neutral={startDate && endDate && getDaysDiff() === days}
               class:btn-ghost={!startDate || !endDate || getDaysDiff() !== days}
-              onclick={() => applyPreset(days as 7|30|90)}
-            >{lbl}</button>
+              onclick={() => applyPreset(days as 7 | 30 | 90)}>{lbl}</button
+            >
           {/each}
         </div>
       </div>
@@ -171,13 +221,18 @@
 
   <!-- Collapsible body -->
   {#if !isCollapsed}
-    <div class="card bg-base-100 shadow border border-base-300/60 animate-fadeIn">
+    <div
+      class="card bg-base-100 shadow border border-base-300/60 animate-fadeIn"
+    >
       <div class="card-body space-y-5">
-
         {#if error}
           <div class="alert alert-error">
             <span>{error}</span>
-            <button type="button" class="btn btn-ghost btn-xs ml-auto" onclick={() => error = ""}>✕</button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-xs ml-auto"
+              onclick={() => (error = "")}>✕</button
+            >
           </div>
         {/if}
 
@@ -187,20 +242,38 @@
 
         <!-- Step indicator -->
         <ul class="steps steps-horizontal w-full text-xs">
-          <li class="step" class:step-primary={Boolean(startDate && endDate)}>Seleccionar fechas</li>
-          <li class="step" class:step-primary={hasExportForCurrentRange()}>Exportar</li>
+          <li class="step" class:step-primary={Boolean(startDate && endDate)}>
+            Seleccionar fechas
+          </li>
+          <li class="step" class:step-primary={hasExportForCurrentRange()}>
+            Exportar
+          </li>
           <li class="step">Eliminar (opcional)</li>
         </ul>
 
         <!-- Date pickers -->
         <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <label class="flex items-center gap-3">
-            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60">Fecha inicio</span>
-            <input id="export-start-date" type="date" class="input input-bordered h-11 w-full" bind:value={startDate} />
+            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60"
+              >Fecha inicio</span
+            >
+            <input
+              id="export-start-date"
+              type="date"
+              class="input input-bordered h-11 w-full"
+              bind:value={startDate}
+            />
           </label>
           <label class="flex items-center gap-3">
-            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60">Fecha fin</span>
-            <input id="export-end-date" type="date" class="input input-bordered h-11 w-full" bind:value={endDate} />
+            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60"
+              >Fecha fin</span
+            >
+            <input
+              id="export-end-date"
+              type="date"
+              class="input input-bordered h-11 w-full"
+              bind:value={endDate}
+            />
           </label>
         </div>
 
@@ -208,19 +281,26 @@
         {#if startDate && endDate}
           <div class="flex items-center gap-2 text-sm text-base-content/60">
             <Icon icon="lucide:calendar" class="h-4 w-4 shrink-0" />
-            <span>{formatDateDisplay(startDate)} – {formatDateDisplay(endDate)}</span>
+            <span
+              >{formatDateDisplay(startDate)} – {formatDateDisplay(
+                endDate,
+              )}</span
+            >
             <span class="badge badge-ghost badge-sm">{getDaysDiff()} días</span>
           </div>
         {/if}
 
         <!-- Actions -->
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:flex-wrap">
+        <div
+          class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:flex-wrap"
+        >
           <button
             class="btn btn-primary gap-2 w-full sm:w-auto"
             disabled={exporting || deleting || !startDate || !endDate}
             onclick={() => handleExport("csv")}
           >
-            {#if exporting}<span class="loading loading-spinner loading-sm"></span>{:else}
+            {#if exporting}<span class="loading loading-spinner loading-sm"
+              ></span>{:else}
               <Icon icon="lucide:file-down" class="h-4 w-4" />
             {/if}
             Exportar CSV
@@ -231,7 +311,8 @@
             disabled={exporting || deleting || !startDate || !endDate}
             onclick={() => handleExport("json")}
           >
-            {#if exporting}<span class="loading loading-spinner loading-sm"></span>{:else}
+            {#if exporting}<span class="loading loading-spinner loading-sm"
+              ></span>{:else}
               <Icon icon="lucide:file-code" class="h-4 w-4" />
             {/if}
             Exportar JSON
@@ -245,32 +326,42 @@
               disabled={deleting || exporting || !hasExportForCurrentRange()}
               onclick={openPurgeModal}
             >
-              {#if deleting}<span class="loading loading-spinner loading-sm"></span>{:else}
+              {#if deleting}<span class="loading loading-spinner loading-sm"
+                ></span>{:else}
                 <Icon icon="lucide:trash-2" class="h-4 w-4" />
               {/if}
               Eliminar exportadas
             </button>
             {#if !hasExportForCurrentRange() && startDate && endDate}
-              <span class="text-xs text-base-content/40">Exporta primero este rango</span>
+              <span class="text-xs text-base-content/40"
+                >Exporta primero este rango</span
+              >
             {/if}
           </div>
         </div>
-
       </div>
     </div>
   {/if}
 </section>
 
 <!-- Purge modal -->
-<dialog class="modal modal-bottom sm:modal-middle" bind:this={purgeConfirmDialog}>
+<dialog
+  class="modal modal-bottom sm:modal-middle"
+  bind:this={purgeConfirmDialog}
+>
   <div class="modal-box max-w-lg">
     <div class="flex items-center gap-3 mb-5">
-      <div class="w-11 h-11 rounded-full bg-error/10 flex items-center justify-center shrink-0">
+      <div
+        class="w-11 h-11 rounded-full bg-error/10 flex items-center justify-center shrink-0"
+      >
         <Icon icon="lucide:triangle-alert" class="h-6 w-6 text-error" />
       </div>
       <div>
         <h3 class="font-bold text-base">Confirmar eliminación</h3>
-        <p class="text-xs text-base-content/55">{formatDateDisplay(startDate)} – {formatDateDisplay(endDate)} · Esta acción no se puede deshacer</p>
+        <p class="text-xs text-base-content/55">
+          {formatDateDisplay(startDate)} – {formatDateDisplay(endDate)} · Esta acción
+          no se puede deshacer
+        </p>
       </div>
     </div>
 
@@ -284,9 +375,13 @@
             type="checkbox"
             class="checkbox checkbox-sm checkbox-error"
             checked={selectedPurgeStatuses.includes(opt.value)}
-            onchange={(e) => toggleStatus(opt.value, (e.currentTarget as HTMLInputElement).checked)}
+            onchange={(e) =>
+              toggleStatus(
+                opt.value,
+                (e.currentTarget as HTMLInputElement).checked,
+              )}
           />
-            <Icon icon={opt.icon} class="h-4 w-4 text-base-content/40 shrink-0" />
+          <Icon icon={opt.icon} class="h-4 w-4 text-base-content/40 shrink-0" />
           <span class="text-sm">{opt.label}</span>
         </label>
       {/each}
@@ -294,31 +389,51 @@
 
     {#if lastExportFormat}
       <div class="alert bg-success/10 border-success/25 mb-4 py-2.5">
-        <Icon icon="lucide:circle-check" class="text-success h-4 w-4 shrink-0" />
-        <span class="text-sm">Tienes respaldo {lastExportFormat.toUpperCase()} de este rango.</span>
+        <Icon
+          icon="lucide:circle-check"
+          class="text-success h-4 w-4 shrink-0"
+        />
+        <span class="text-sm"
+          >Tienes respaldo {lastExportFormat.toUpperCase()} de este rango.</span
+        >
       </div>
     {/if}
 
     <div class="modal-action">
-      <button class="btn btn-ghost btn-sm" type="button" onclick={() => purgeConfirmDialog?.close()}>Cancelar</button>
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={() => purgeConfirmDialog?.close()}>Cancelar</button
+      >
       <button
         class="btn btn-error btn-sm gap-2"
         type="button"
         disabled={deleting || selectedPurgeStatuses.length === 0}
         onclick={confirmPurge}
       >
-        {#if deleting}<span class="loading loading-spinner loading-xs"></span>{/if}
+        {#if deleting}<span class="loading loading-spinner loading-xs"
+          ></span>{/if}
         Eliminar órdenes
       </button>
     </div>
   </div>
-  <form method="dialog" class="modal-backdrop"><button type="submit">close</button></form>
+  <form method="dialog" class="modal-backdrop">
+    <button type="submit">close</button>
+  </form>
 </dialog>
 
 <style>
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  .animate-fadeIn { animation: fadeIn 0.18s ease-out; }
+  .animate-fadeIn {
+    animation: fadeIn 0.18s ease-out;
+  }
 </style>

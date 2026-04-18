@@ -5,7 +5,7 @@
  * All requests automatically use HttpOnly cookies for auth.
  */
 
-import { ApiError } from '../errors/api';
+import { ApiError } from "../errors/api";
 
 export interface BFFResponse<T> {
   data?: T;
@@ -14,7 +14,7 @@ export interface BFFResponse<T> {
 }
 
 export interface AnalyticsOverview {
-  period: 'week' | 'month' | 'year';
+  period: "week" | "month" | "year";
   total_orders: number;
   total_revenue: number;
   avg_order_value: number;
@@ -34,18 +34,20 @@ export interface AnalyticsTopProduct {
 }
 
 export type OrderStatus =
-  | 'pendiente_revision'
-  | 'recibida'
-  | 'en_proceso'
-  | 'lista'
-  | 'entregada'
-  | 'cancelada';
+  | "pendiente_revision"
+  | "recibida"
+  | "en_proceso"
+  | "lista"
+  | "entregada"
+  | "cancelada";
 
 type ParsedResponseBody = Record<string, unknown> | string | null;
 
-async function parseResponseBody(response: Response): Promise<ParsedResponseBody> {
-  const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('application/json')) {
+async function parseResponseBody(
+  response: Response,
+): Promise<ParsedResponseBody> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
     try {
       return (await response.json()) as Record<string, unknown>;
     } catch {
@@ -61,21 +63,29 @@ async function parseResponseBody(response: Response): Promise<ParsedResponseBody
   }
 }
 
-function responseErrorMessage(body: ParsedResponseBody, fallback: string): string {
+function responseErrorMessage(
+  body: ParsedResponseBody,
+  fallback: string,
+): string {
   if (!body) return fallback;
-  if (typeof body === 'string') return body;
+  if (typeof body === "string") return body;
 
   const error = body.error;
-  if (typeof error === 'string' && error.trim()) return error;
+  if (typeof error === "string" && error.trim()) return error;
 
   const message = body.message;
-  if (typeof message === 'string' && message.trim()) return message;
+  if (typeof message === "string" && message.trim()) return message;
 
   return fallback;
 }
 
 function responseErrorCode(body: ParsedResponseBody, fallback: string): string {
-  if (body && typeof body !== 'string' && typeof body.code === 'string' && body.code.trim()) {
+  if (
+    body &&
+    typeof body !== "string" &&
+    typeof body.code === "string" &&
+    body.code.trim()
+  ) {
     return body.code;
   }
   return fallback;
@@ -84,13 +94,13 @@ function responseErrorCode(body: ParsedResponseBody, fallback: string): string {
 async function bffRequest<T>(
   path: string,
   options: {
-    method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+    method?: "GET" | "POST" | "PATCH" | "DELETE";
     body?: unknown;
     query?: Record<string, string | number | boolean>;
   } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   };
 
   let fullPath = path;
@@ -106,23 +116,23 @@ async function bffRequest<T>(
 
   try {
     const response = await fetch(url.toString(), {
-      method: options.method ?? 'GET',
+      method: options.method ?? "GET",
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
-      credentials: 'include',
+      credentials: "include",
     });
 
     const body = await parseResponseBody(response);
 
     if (!response.ok) {
       throw new ApiError(
-        responseErrorMessage(body, 'Request failed'),
+        responseErrorMessage(body, "Request failed"),
         response.status,
-        responseErrorCode(body, 'BFF_ERROR'),
+        responseErrorCode(body, "BFF_ERROR"),
       );
     }
 
-    if (!body || typeof body === 'string') {
+    if (!body || typeof body === "string") {
       return {} as T;
     }
 
@@ -130,9 +140,9 @@ async function bffRequest<T>(
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(
-      error instanceof Error ? error.message : 'BFF request failed',
+      error instanceof Error ? error.message : "BFF request failed",
       0,
-      'BFF_ERROR'
+      "BFF_ERROR",
     );
   }
 }
@@ -140,7 +150,7 @@ async function bffRequest<T>(
 // Orders
 export async function listOrders(status?: string) {
   const query = status ? { status } : undefined;
-  return bffRequest<any>('/api/admin/orders', { query });
+  return bffRequest<any>("/api/admin/orders", { query });
 }
 
 export async function getOrder(id: string) {
@@ -148,210 +158,226 @@ export async function getOrder(id: string) {
 }
 
 export async function createOrder(payload: any) {
-  return bffRequest<any>('/api/admin/orders', {
-    method: 'POST',
+  return bffRequest<any>("/api/admin/orders", {
+    method: "POST",
     body: payload,
   });
 }
 
 export async function updateOrder(id: string, payload: any) {
   return bffRequest<any>(`/api/admin/orders/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: payload,
   });
 }
 
 export async function approveOrder(id: string) {
   return bffRequest<any>(`/api/admin/orders/${id}`, {
-    method: 'POST',
+    method: "POST",
     body: {},
-    query: { action: 'approve' },
+    query: { action: "approve" },
   });
 }
 
 export async function rejectOrder(id: string, reason: string) {
   return bffRequest<any>(`/api/admin/orders/${id}`, {
-    method: 'POST',
+    method: "POST",
     body: { reason },
-    query: { action: 'reject' },
+    query: { action: "reject" },
   });
 }
 
 export async function updateOrderStatus(id: string, status: string) {
   return bffRequest<any>(`/api/admin/orders/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: { status },
-    query: { action: 'status' },
+    query: { action: "status" },
   });
 }
 
 export async function updateOrderNotes(id: string, notes: string | null) {
   return bffRequest<any>(`/api/admin/orders/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: { notes },
-    query: { action: 'notes' },
+    query: { action: "notes" },
   });
 }
 
 export async function deleteOrder(id: string) {
   return bffRequest<any>(`/api/admin/orders/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
 // Categories
 export async function listCategories(includeAll = false) {
   const query = includeAll ? { all: true } : undefined;
-  return bffRequest<any>('/api/admin/categories', { query });
+  return bffRequest<any>("/api/admin/categories", { query });
 }
 
 export async function createCategory(payload: any) {
-  return bffRequest<any>('/api/admin/categories', {
-    method: 'POST',
+  return bffRequest<any>("/api/admin/categories", {
+    method: "POST",
     body: payload,
   });
 }
 
 export async function updateCategory(id: string, payload: any) {
   return bffRequest<any>(`/api/admin/categories/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: payload,
   });
 }
 
 export async function deleteCategory(id: string) {
   return bffRequest<any>(`/api/admin/categories/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
 // Products
 export async function listProducts() {
-  return bffRequest<any>('/api/admin/products', { query: { all: true } });
+  return bffRequest<any>("/api/admin/products", { query: { all: true } });
 }
 
 export async function createProduct(payload: any) {
-  return bffRequest<any>('/api/admin/products', {
-    method: 'POST',
+  return bffRequest<any>("/api/admin/products", {
+    method: "POST",
     body: payload,
   });
 }
 
 export async function updateProduct(id: string, payload: any) {
   return bffRequest<any>(`/api/admin/products/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: payload,
   });
 }
 
 export async function deleteProduct(id: string) {
   return bffRequest<any>(`/api/admin/products/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
 // Product Flavors and Addons
 export async function linkProductFlavor(productId: string, flavorId: string) {
-  return bffRequest<any>(`/api/admin/products/${productId}/flavors/${flavorId}`, {
-    method: 'POST',
-  });
+  return bffRequest<any>(
+    `/api/admin/products/${productId}/flavors/${flavorId}`,
+    {
+      method: "POST",
+    },
+  );
 }
 
 export async function unlinkProductFlavor(productId: string, flavorId: string) {
-  return bffRequest<any>(`/api/admin/products/${productId}/flavors/${flavorId}`, {
-    method: 'DELETE',
-  });
+  return bffRequest<any>(
+    `/api/admin/products/${productId}/flavors/${flavorId}`,
+    {
+      method: "DELETE",
+    },
+  );
 }
 
 export async function linkProductAddon(productId: string, addonId: string) {
   return bffRequest<any>(`/api/admin/products/${productId}/addons/${addonId}`, {
-    method: 'POST',
+    method: "POST",
   });
 }
 
 export async function unlinkProductAddon(productId: string, addonId: string) {
   return bffRequest<any>(`/api/admin/products/${productId}/addons/${addonId}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
 // Images
 export async function listAdminImages() {
-  const response = await bffRequest<{ images?: any[] }>('/api/admin/images');
+  const response = await bffRequest<{ images?: any[] }>("/api/admin/images");
   return response;
 }
 
-export async function uploadAdminImage(file: File, folder = ''): Promise<{ path: string; message: string }> {
+export async function uploadAdminImage(
+  file: File,
+  folder = "",
+): Promise<{ path: string; message: string }> {
   const formData = new FormData();
-  formData.append('image', file);
+  formData.append("image", file);
   if (folder.trim()) {
-    formData.append('folder', folder.trim());
+    formData.append("folder", folder.trim());
   }
 
   try {
-    const response = await fetch('/api/admin/images', {
-      method: 'POST',
+    const response = await fetch("/api/admin/images", {
+      method: "POST",
       body: formData,
-      credentials: 'include',
+      credentials: "include",
     });
 
     const body = await parseResponseBody(response);
 
     if (!response.ok) {
-      throw new ApiError(responseErrorMessage(body, 'Upload failed'), response.status);
+      throw new ApiError(
+        responseErrorMessage(body, "Upload failed"),
+        response.status,
+      );
     }
 
-    if (!body || typeof body === 'string') {
-      throw new ApiError('Upload failed: invalid response', response.status, 'UPLOAD_ERROR');
+    if (!body || typeof body === "string") {
+      throw new ApiError(
+        "Upload failed: invalid response",
+        response.status,
+        "UPLOAD_ERROR",
+      );
     }
 
     return body as { path: string; message: string };
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(
-      error instanceof Error ? error.message : 'Upload failed',
+      error instanceof Error ? error.message : "Upload failed",
       0,
-      'UPLOAD_ERROR'
+      "UPLOAD_ERROR",
     );
   }
 }
 
 export async function deleteAdminImage(path: string) {
-  return bffRequest<any>('/api/admin/images', {
-    method: 'DELETE',
+  return bffRequest<any>("/api/admin/images", {
+    method: "DELETE",
     body: { path },
   });
 }
 
 // Employees
 export async function listEmployees() {
-  return bffRequest<any>('/api/admin/employees');
+  return bffRequest<any>("/api/admin/employees");
 }
 
 export async function createEmployee(payload: any) {
-  return bffRequest<any>('/api/admin/employees', {
-    method: 'POST',
+  return bffRequest<any>("/api/admin/employees", {
+    method: "POST",
     body: payload,
   });
 }
 
 export async function updateEmployee(id: string, payload: any) {
   return bffRequest<any>(`/api/admin/employees/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: payload,
   });
 }
 
 export async function deleteEmployee(id: string) {
   return bffRequest<any>(`/api/admin/employees/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
 export async function deactivateEmployee(id: string) {
   return bffRequest<any>(`/api/admin/employees/${id}`, {
-    method: 'DELETE',
-    query: { action: 'deactivate' },
+    method: "DELETE",
+    query: { action: "deactivate" },
   });
 }
 
@@ -360,7 +386,7 @@ export async function listUsers(status?: string, search?: string) {
   const query: Record<string, string> = {};
   if (status) query.status = status;
   if (search) query.search = search;
-  return bffRequest<any>('/api/admin/users', {
+  return bffRequest<any>("/api/admin/users", {
     query: Object.keys(query).length > 0 ? query : undefined,
   });
 }
@@ -370,22 +396,22 @@ export async function getUser(id: string) {
 }
 
 export async function createUser(payload: any) {
-  return bffRequest<any>('/api/admin/users', {
-    method: 'POST',
+  return bffRequest<any>("/api/admin/users", {
+    method: "POST",
     body: payload,
   });
 }
 
 export async function updateUser(id: string, payload: any) {
   return bffRequest<any>(`/api/admin/users/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: payload,
   });
 }
 
 export async function deleteUser(id: string) {
   return bffRequest<any>(`/api/admin/users/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
@@ -397,12 +423,12 @@ export async function listUserOrders(id: string, limit = 50) {
 
 // Admin settings
 export async function getAdminTabsSettings() {
-  return bffRequest<{ tab_order: string[] }>('/api/admin/settings/tabs');
+  return bffRequest<{ tab_order: string[] }>("/api/admin/settings/tabs");
 }
 
 export async function updateAdminTabsSettings(tabOrder: string[]) {
-  return bffRequest<{ tab_order: string[] }>('/api/admin/settings/tabs', {
-    method: 'PATCH',
+  return bffRequest<{ tab_order: string[] }>("/api/admin/settings/tabs", {
+    method: "PATCH",
     body: { tab_order: tabOrder },
   });
 }
@@ -415,12 +441,12 @@ export type AdminPanelConfig = {
 };
 
 export async function getAdminPanelConfig() {
-  return bffRequest<AdminPanelConfig>('/api/admin/settings/panel-config');
+  return bffRequest<AdminPanelConfig>("/api/admin/settings/panel-config");
 }
 
 export async function updateAdminPanelConfig(payload: AdminPanelConfig) {
-  return bffRequest<AdminPanelConfig>('/api/admin/settings/panel-config', {
-    method: 'PATCH',
+  return bffRequest<AdminPanelConfig>("/api/admin/settings/panel-config", {
+    method: "PATCH",
     body: payload,
   });
 }
@@ -428,58 +454,58 @@ export async function updateAdminPanelConfig(payload: AdminPanelConfig) {
 // Flavors
 export async function listFlavors(includeAll = false) {
   const query = includeAll ? { all: true } : undefined;
-  return bffRequest<any>('/api/admin/flavors', { query });
+  return bffRequest<any>("/api/admin/flavors", { query });
 }
 
 export async function createFlavor(payload: any) {
-  return bffRequest<any>('/api/admin/flavors', {
-    method: 'POST',
+  return bffRequest<any>("/api/admin/flavors", {
+    method: "POST",
     body: payload,
   });
 }
 
 export async function updateFlavor(id: string, payload: any) {
   return bffRequest<any>(`/api/admin/flavors/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: payload,
   });
 }
 
 export async function deleteFlavor(id: string) {
   return bffRequest<any>(`/api/admin/flavors/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
 // Addons
 export async function listAddons(includeAll = false) {
   const query = includeAll ? { all: true } : undefined;
-  return bffRequest<any>('/api/admin/addons', { query });
+  return bffRequest<any>("/api/admin/addons", { query });
 }
 
 export async function createAddon(payload: any) {
-  return bffRequest<any>('/api/admin/addons', {
-    method: 'POST',
+  return bffRequest<any>("/api/admin/addons", {
+    method: "POST",
     body: payload,
   });
 }
 
 export async function updateAddon(id: string, payload: any) {
   return bffRequest<any>(`/api/admin/addons/${id}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: payload,
   });
 }
 
 export async function deleteAddon(id: string) {
   return bffRequest<any>(`/api/admin/addons/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 }
 
 // Analytics
-export async function getAnalyticsOverview(period: 'week' | 'month' | 'year') {
-  return bffRequest<AnalyticsOverview>('/api/admin/analytics/overview', {
+export async function getAnalyticsOverview(period: "week" | "month" | "year") {
+  return bffRequest<AnalyticsOverview>("/api/admin/analytics/overview", {
     query: { period },
   });
 }
@@ -487,48 +513,58 @@ export async function getAnalyticsOverview(period: 'week' | 'month' | 'year') {
 export async function getAnalyticsOrdersOverTime(
   start: string,
   end: string,
-  groupBy: 'day' | 'week' | 'month' = 'day',
+  groupBy: "day" | "week" | "month" = "day",
 ) {
-  return bffRequest<AnalyticsTimelinePoint[]>('/api/admin/analytics/orders-over-time', {
-    query: { start, end, groupBy },
-  });
+  return bffRequest<AnalyticsTimelinePoint[]>(
+    "/api/admin/analytics/orders-over-time",
+    {
+      query: { start, end, groupBy },
+    },
+  );
 }
 
-export async function getAnalyticsTopProducts(limit = 10, start?: string, end?: string) {
+export async function getAnalyticsTopProducts(
+  limit = 10,
+  start?: string,
+  end?: string,
+) {
   const query: Record<string, string | number> = { limit };
   if (start) query.start = start;
   if (end) query.end = end;
 
-  return bffRequest<AnalyticsTopProduct[]>('/api/admin/analytics/top-products', {
-    query,
-  });
+  return bffRequest<AnalyticsTopProduct[]>(
+    "/api/admin/analytics/top-products",
+    {
+      query,
+    },
+  );
 }
 
 // Export
 export async function exportOrders(
   start: string,
   end: string,
-  format: 'csv' | 'json',
+  format: "csv" | "json",
   statuses?: OrderStatus[],
 ): Promise<Blob> {
-  const url = new URL('/api/admin/export/orders', window.location.origin);
-  url.searchParams.set('start', start);
-  url.searchParams.set('end', end);
-  url.searchParams.set('format', format);
+  const url = new URL("/api/admin/export/orders", window.location.origin);
+  url.searchParams.set("start", start);
+  url.searchParams.set("end", end);
+  url.searchParams.set("format", format);
   if (statuses && statuses.length > 0) {
-    url.searchParams.set('statuses', statuses.join(','));
+    url.searchParams.set("statuses", statuses.join(","));
   }
 
   const response = await fetch(url.toString(), {
-    method: 'GET',
-    credentials: 'include',
+    method: "GET",
+    credentials: "include",
   });
 
   if (!response.ok) {
-    let message = 'Export failed';
+    let message = "Export failed";
     const body = await parseResponseBody(response);
     message = responseErrorMessage(body, message);
-    throw new ApiError(message, response.status, 'EXPORT_ERROR');
+    throw new ApiError(message, response.status, "EXPORT_ERROR");
   }
 
   return response.blob();
@@ -541,8 +577,8 @@ export async function archiveExportedOrders(start: string, end: string) {
     deleted_count?: number;
     deleted_items_count?: number;
     statuses?: string[];
-  }>('/api/admin/export/orders', {
-    method: 'DELETE',
+  }>("/api/admin/export/orders", {
+    method: "DELETE",
     query: {
       start,
       end,
@@ -550,19 +586,49 @@ export async function archiveExportedOrders(start: string, end: string) {
   });
 }
 
-export async function purgeOrdersByStatuses(start: string, end: string, statuses: OrderStatus[]) {
+export async function purgeOrdersByStatuses(
+  start: string,
+  end: string,
+  statuses: OrderStatus[],
+) {
   return bffRequest<{
     message: string;
     archived_count?: number;
     deleted_count?: number;
     deleted_items_count?: number;
     statuses?: string[];
-  }>('/api/admin/export/orders', {
-    method: 'DELETE',
+  }>("/api/admin/export/orders", {
+    method: "DELETE",
     query: {
       start,
       end,
-      statuses: statuses.join(','),
+      statuses: statuses.join(","),
     },
+  });
+}
+
+// ── Store Settings (kill switch + offers) ────────────────────────────
+
+export interface StoreOfferItem {
+  product_id: string;
+  label: string;
+  note?: string;
+  discount_price?: number;
+  expires_at: string;
+}
+
+export interface AdminStoreSettings {
+  orders_enabled: boolean;
+  offers: StoreOfferItem[];
+}
+
+export async function getAdminStoreSettings() {
+  return bffRequest<AdminStoreSettings>("/api/admin/settings/store");
+}
+
+export async function updateAdminStoreSettings(payload: AdminStoreSettings) {
+  return bffRequest<AdminStoreSettings>("/api/admin/settings/store", {
+    method: "PATCH",
+    body: payload,
   });
 }

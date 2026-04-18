@@ -3,7 +3,11 @@ import type { ManualOrderItemDraft } from "../../../components/svelte/admin/tabs
 import type { CreateOrderPayload } from "../../../components/svelte/admin/tabs/types/orders-tab";
 
 /** Resolves a flavor name by product and flavor ID */
-export function resolveFlavorName(productId: string, flavorId: string | undefined, products: Product[]): string | null {
+export function resolveFlavorName(
+  productId: string,
+  flavorId: string | undefined,
+  products: Product[],
+): string | null {
   if (!flavorId) return null;
   const product = products.find((p) => p.id === productId);
   const flavor = product?.flavors?.find((f) => f.id === flavorId);
@@ -11,7 +15,11 @@ export function resolveFlavorName(productId: string, flavorId: string | undefine
 }
 
 /** Resolves addon names by product and addon IDs */
-export function resolveAddonNames(productId: string, addonIds: string[], products: Product[]): string[] {
+export function resolveAddonNames(
+  productId: string,
+  addonIds: string[],
+  products: Product[],
+): string[] {
   if (addonIds.length === 0) return [];
   const product = products.find((p) => p.id === productId);
   const addons = product?.addons ?? [];
@@ -21,7 +29,10 @@ export function resolveAddonNames(productId: string, addonIds: string[], product
 }
 
 /** Calculates the unit price for a manual item (product + addon prices) */
-export function manualItemUnitPrice(item: ManualOrderItemDraft, products: Product[]): number {
+export function manualItemUnitPrice(
+  item: ManualOrderItemDraft,
+  products: Product[],
+): number {
   const product = products.find((p) => p.id === item.product_id);
   const addonPrice = (item.extra_addon_ids ?? []).reduce((sum, addonId) => {
     const addon = product?.addons?.find((a) => a.id === addonId);
@@ -31,17 +42,28 @@ export function manualItemUnitPrice(item: ManualOrderItemDraft, products: Produc
 }
 
 /** Calculates the subtotal for a manual item (unit price × quantity) */
-export function manualItemSubtotal(item: ManualOrderItemDraft, products: Product[]): number {
+export function manualItemSubtotal(
+  item: ManualOrderItemDraft,
+  products: Product[],
+): number {
   return manualItemUnitPrice(item, products) * item.quantity;
 }
 
 /** Calculates the total of all manual items */
-export function manualOrderTotal(items: ManualOrderItemDraft[], products: Product[]): number {
-  return items.reduce((sum, item) => sum + manualItemSubtotal(item, products), 0);
+export function manualOrderTotal(
+  items: ManualOrderItemDraft[],
+  products: Product[],
+): number {
+  return items.reduce(
+    (sum, item) => sum + manualItemSubtotal(item, products),
+    0,
+  );
 }
 
 /** Builds the customizations object from a draft item for API submission */
-export function buildCustomizationsFromDraft(item: ManualOrderItemDraft): Record<string, unknown> | undefined {
+export function buildCustomizationsFromDraft(
+  item: ManualOrderItemDraft,
+): Record<string, unknown> | undefined {
   const customizations: Record<string, unknown> = {};
   if (item.flavor_id) {
     customizations.flavor_id = item.flavor_id;

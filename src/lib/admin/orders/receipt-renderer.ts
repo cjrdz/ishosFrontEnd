@@ -8,17 +8,34 @@ export function renderReceipt(order: Order): string {
       let details = "";
       if (item.customizations) {
         const parts: string[] = [];
-        if (item.customizations.flavor_name) parts.push(`Sabor: ${item.customizations.flavor_name}`);
-        if (Array.isArray(item.customizations.included_addon_names) && item.customizations.included_addon_names.length > 0) {
-          parts.push(`Incluidos: ${(item.customizations.included_addon_names as string[]).join(", ")}`);
+        if (item.customizations.flavor_name)
+          parts.push(`Sabor: ${item.customizations.flavor_name}`);
+        if (
+          Array.isArray(item.customizations.included_addon_names) &&
+          item.customizations.included_addon_names.length > 0
+        ) {
+          parts.push(
+            `Incluidos: ${(item.customizations.included_addon_names as string[]).join(", ")}`,
+          );
         }
-        if (Array.isArray(item.customizations.extra_addon_names) && item.customizations.extra_addon_names.length > 0) {
-          parts.push(`Extras: ${(item.customizations.extra_addon_names as string[]).join(", ")}`);
+        if (
+          Array.isArray(item.customizations.extra_addon_names) &&
+          item.customizations.extra_addon_names.length > 0
+        ) {
+          parts.push(
+            `Extras: ${(item.customizations.extra_addon_names as string[]).join(", ")}`,
+          );
         }
-        if (Array.isArray(item.customizations.addon_names) && item.customizations.addon_names.length > 0) {
-          parts.push(`Complementos: ${(item.customizations.addon_names as string[]).join(", ")}`);
+        if (
+          Array.isArray(item.customizations.addon_names) &&
+          item.customizations.addon_names.length > 0
+        ) {
+          parts.push(
+            `Complementos: ${(item.customizations.addon_names as string[]).join(", ")}`,
+          );
         }
-        if (item.customizations.notes) parts.push(`Nota: ${item.customizations.notes}`);
+        if (item.customizations.notes)
+          parts.push(`Nota: ${item.customizations.notes}`);
         if (parts.length > 0) {
           details = `<br><span style="font-size:11px;color:#666">${parts.join(" | ")}</span>`;
         }
@@ -27,7 +44,7 @@ export function renderReceipt(order: Order): string {
     })
     .join("");
 
-  const itemsTable = itemsMarkup || "<tr><td colspan=\"3\">Sin items</td></tr>";
+  const itemsTable = itemsMarkup || '<tr><td colspan="3">Sin items</td></tr>';
 
   return `<!doctype html>
 <html>

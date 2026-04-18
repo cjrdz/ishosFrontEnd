@@ -5,8 +5,11 @@
  * No authentication required
  */
 
-import type { APIRoute } from 'astro';
-import { forwardUpstreamJson, getServerApiBaseUrl } from '../../../../lib/bff/proxy';
+import type { APIRoute } from "astro";
+import {
+  forwardUpstreamJson,
+  getServerApiBaseUrl,
+} from "../../../../lib/bff/proxy";
 
 const ORDER_NUMBER_RE = /^ORD-\d{8}-\d{4}$/;
 
@@ -14,19 +17,20 @@ export const prerender = false;
 
 export const GET: APIRoute = async (context) => {
   const { orderNumber } = context.params;
-  const trackingToken = context.url.searchParams.get('tracking_token')?.trim() ?? '';
+  const trackingToken =
+    context.url.searchParams.get("tracking_token")?.trim() ?? "";
 
   if (!orderNumber || !trackingToken) {
     return new Response(
-      JSON.stringify({ error: 'orderNumber and tracking_token are required' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: "orderNumber and tracking_token are required" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
 
   if (!ORDER_NUMBER_RE.test(orderNumber)) {
     return new Response(
-      JSON.stringify({ error: 'Invalid order number format' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: "Invalid order number format" }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
 
@@ -36,12 +40,14 @@ export const GET: APIRoute = async (context) => {
       tracking_token: trackingToken,
     });
 
-    const response = await fetch(`${getServerApiBaseUrl(context)}/orders/track?${query.toString()}`);
+    const response = await fetch(
+      `${getServerApiBaseUrl(context)}/orders/track?${query.toString()}`,
+    );
     return forwardUpstreamJson(response);
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: 'Order not found' }),
-      { status: 404, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: "Order not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 };

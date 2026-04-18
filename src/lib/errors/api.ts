@@ -10,9 +10,14 @@ export class ApiError extends Error {
   code: string;
   details?: Record<string, string[]>;
 
-  constructor(message: string, status: number, code: string = 'API_ERROR', details?: Record<string, string[]>) {
+  constructor(
+    message: string,
+    status: number,
+    code: string = "API_ERROR",
+    details?: Record<string, string[]>,
+  ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.details = details;
@@ -43,7 +48,7 @@ export class ApiError extends Error {
    * Check if error is network/connectivity issue
    */
   isNetworkError(): boolean {
-    return this.status === 0 || this.code === 'NETWORK_ERROR';
+    return this.status === 0 || this.code === "NETWORK_ERROR";
   }
 }
 
@@ -55,7 +60,7 @@ export class ValidationError extends Error {
 
   constructor(message: string, fields: Record<string, string[]>) {
     super(message);
-    this.name = 'ValidationError';
+    this.name = "ValidationError";
     this.fields = fields;
   }
 
@@ -70,9 +75,7 @@ export class ValidationError extends Error {
    * Get all field errors as a flat string
    */
   getAllErrors(): string {
-    return Object.values(this.fields)
-      .flat()
-      .join(', ');
+    return Object.values(this.fields).flat().join(", ");
   }
 }
 
@@ -80,8 +83,10 @@ export class ValidationError extends Error {
  * Authorization error
  */
 export class AuthorizationError extends ApiError {
-  constructor(message: string = 'You do not have permission to perform this action') {
-    super(message, 403, 'FORBIDDEN');
+  constructor(
+    message: string = "You do not have permission to perform this action",
+  ) {
+    super(message, 403, "FORBIDDEN");
   }
 }
 
@@ -89,8 +94,8 @@ export class AuthorizationError extends ApiError {
  * Authentication error
  */
 export class AuthenticationError extends ApiError {
-  constructor(message: string = 'Authentication required') {
-    super(message, 401, 'UNAUTHORIZED');
+  constructor(message: string = "Authentication required") {
+    super(message, 401, "UNAUTHORIZED");
   }
 }
 
@@ -98,7 +103,7 @@ export class AuthenticationError extends ApiError {
  * Not found error
  */
 export class NotFoundError extends ApiError {
-  constructor(resource: string = 'Resource') {
-    super(`${resource} not found`, 404, 'NOT_FOUND');
+  constructor(resource: string = "Resource") {
+    super(`${resource} not found`, 404, "NOT_FOUND");
   }
 }

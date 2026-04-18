@@ -4,26 +4,37 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "PUBLIC_API_BASE_URL": "https://ishosbackend-production.up.railway.app/api/v1"
-  }
+  },
 
-  // Astro SSR generates the dist folder with server entrypoints
-  // The Cloudflare adapter handles the build output automatically
+  // KV namespace for session/rate-limit data.
+  // Create with: wrangler kv namespace create SESSION
+  // Then replace the IDs below.
+  "kv_namespaces": [
+    {
+      "binding": "ishosfactory-session",
+      "id": "d62b6149e04647519249ea03086ff621",
+      "preview_id": "d62b6149e04647519249ea03086ff621"
+    }
+  ],
 
-  // Uncomment and add your actual IDs after creating KV namespace in Cloudflare
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "SESSION",
-  //     "id": "your_kv_namespace_id",
-  //     "preview_id": "your_preview_kv_namespace_id"
-  //   }
-  // ],
+  // R2 bucket for menu images (read-only access from Workers).
+  // Create with: wrangler r2 bucket create menu
+  // NOTE: Do NOT name this binding "IMAGES" — @astrojs/cloudflare reserves
+  // that name to enable Cloudflare Images service (URL rewriting).
+  "r2_buckets": [
+    {
+      "binding": "MENU_IMAGES",
+      "bucket_name": "menu",
+      "preview_bucket_name": "menu-preview"
+    }
+  ],
 
-  // Uncomment and add your actual bucket after creating R2 bucket in Cloudflare  
-  // "r2_buckets": [
-  //   {
-  //     "binding": "IMAGES",
-  //     "bucket_name": "your-images-bucket",
-  //     "preview_bucket_name": "your-preview-images-bucket"
-  //   }
-  // ]
+  // Cache rules: cache static assets at edge for 1 year,
+  // HTML pages for 60s with stale-while-revalidate.
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": ["**/*.mjs"]
+    }
+  ]
 }

@@ -92,13 +92,50 @@
           tabindex="-1"
           class="dropdown-content menu bg-base-100 rounded-box z-100 w-full sm:w-52 p-2 mt-1 shadow-xl border border-base-300"
         >
-          <li><button type="button" onclick={() => setOrderStatusFilter("")}>Todos</button></li>
-          <li><button type="button" onclick={() => setOrderStatusFilter("pendiente_revision")}>pendiente</button></li>
-          <li><button type="button" onclick={() => setOrderStatusFilter("recibida")}>recibida</button></li>
-          <li><button type="button" onclick={() => setOrderStatusFilter("en_proceso")}>preparando</button></li>
-          <li><button type="button" onclick={() => setOrderStatusFilter("lista")}>lista</button></li>
-          <li><button type="button" onclick={() => setOrderStatusFilter("entregada")}>entregada</button></li>
-          <li><button type="button" onclick={() => setOrderStatusFilter("cancelada")}>cancelada</button></li>
+          <li>
+            <button type="button" onclick={() => setOrderStatusFilter("")}
+              >Todos</button
+            >
+          </li>
+          <li>
+            <button
+              type="button"
+              onclick={() => setOrderStatusFilter("pendiente_revision")}
+              >pendiente</button
+            >
+          </li>
+          <li>
+            <button
+              type="button"
+              onclick={() => setOrderStatusFilter("recibida")}>recibida</button
+            >
+          </li>
+          <li>
+            <button
+              type="button"
+              onclick={() => setOrderStatusFilter("en_proceso")}
+              >preparando</button
+            >
+          </li>
+          <li>
+            <button type="button" onclick={() => setOrderStatusFilter("lista")}
+              >lista</button
+            >
+          </li>
+          <li>
+            <button
+              type="button"
+              onclick={() => setOrderStatusFilter("entregada")}
+              >entregada</button
+            >
+          </li>
+          <li>
+            <button
+              type="button"
+              onclick={() => setOrderStatusFilter("cancelada")}
+              >cancelada</button
+            >
+          </li>
         </ul>
       </div>
 
@@ -116,14 +153,25 @@
           class="dropdown-content menu bg-base-100 rounded-box z-100 w-full sm:w-40 p-2 mt-1 shadow-xl border border-base-300"
         >
           {#each rowLimitOptions as option}
-            <li><button type="button" onclick={() => setRowLimit(option)}>{option}</button></li>
+            <li>
+              <button type="button" onclick={() => setRowLimit(option)}
+                >{option}</button
+              >
+            </li>
           {/each}
-          <li><button type="button" onclick={() => setRowLimit(0)}>Todos</button></li>
+          <li>
+            <button type="button" onclick={() => setRowLimit(0)}>Todos</button>
+          </li>
         </ul>
       </div>
 
-      <div class="flex items-center gap-1.5 text-sm text-base-content/80 font-medium shrink-0">
-        <span class="badge badge-info badge-sm font-semibold rounded-md text-white!">{orders.length}</span>
+      <div
+        class="flex items-center gap-1.5 text-sm text-base-content/80 font-medium shrink-0"
+      >
+        <span
+          class="badge badge-info badge-sm font-semibold rounded-md text-white!"
+          >{orders.length}</span
+        >
         <span>ordenes</span>
       </div>
 
@@ -137,7 +185,9 @@
       </button>
     </div>
 
-    <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+    <div
+      class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
+    >
       <table class="table w-full">
         <thead class="bg-base-200/60 text-base-content">
           <tr>
@@ -149,7 +199,11 @@
         </thead>
         <tbody>
           {#if filteredOrders.length === 0}
-            <tr><td colspan="4" class="text-center py-6 text-base-content/50">No hay ordenes</td></tr>
+            <tr
+              ><td colspan="4" class="text-center py-6 text-base-content/50"
+                >No hay ordenes</td
+              ></tr
+            >
           {:else}
             {#each visibleOrders as order}
               <tr class="hover:bg-base-300/40 transition-colors">
@@ -176,7 +230,9 @@
                   </div>
                 </td>
                 <td class="text-center align-middle">
-                  <div class="flex flex-wrap md:flex-nowrap items-center justify-center gap-2">
+                  <div
+                    class="flex flex-wrap md:flex-nowrap items-center justify-center gap-2"
+                  >
                     <button
                       class="btn btn-xs sm:btn-sm btn-soft btn-info whitespace-nowrap"
                       onclick={() => onPrintOrder(order.id)}

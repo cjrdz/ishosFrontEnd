@@ -1,5 +1,15 @@
 import { writable } from "svelte/store";
-import type { Addon, AdminImage, Category, Employee, Flavor, Order, Product, User, UserOrderHistoryItem } from "../api/admin";
+import type {
+  Addon,
+  AdminImage,
+  Category,
+  Employee,
+  Flavor,
+  Order,
+  Product,
+  User,
+  UserOrderHistoryItem,
+} from "../api/admin";
 
 export const defaultAdminState = {
   busy: false,

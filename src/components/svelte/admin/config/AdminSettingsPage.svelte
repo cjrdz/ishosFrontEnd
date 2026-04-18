@@ -1,17 +1,20 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import Icon from "@iconify/svelte";
+  import Icon from "../../shared/AppIcon.svelte";
   import ThemeToggle from "../../shared/ThemeToggle.svelte";
   import {
     getAdminPanelConfig,
+    getAdminStoreSettings,
     getAdminTabsSettings,
     updateAdminPanelConfig,
+    updateAdminStoreSettings,
     updateAdminTabsSettings,
   } from "../../../../lib/bff/admin";
   import { trackAction, trackError } from "../../../../lib/admin/analytics";
   import SettingsTab from "../tabs/SettingsTab.svelte";
   import type { PanelConfigValues } from "../tabs/SettingsTab.svelte";
-  import { DEFAULT_TAB_ORDER, type TabKey } from "./tabs";
+  import { DEFAULT_TAB_ORDER, normalizeTabOrder, type TabKey } from "./tabs";
+  import type { StoreOfferItem } from "../../../../lib/bff/admin";
 
   type Session = {
     id: string;
@@ -42,7 +45,15 @@
       title: "Seguridad y sesiones",
       description: "Cookies, tokens y timeout de inactividad",
       icon: "lucide:shield-check",
-      keywords: ["sesion", "cookie", "token", "inactividad", "seguridad", "logout", "expiracion"],
+      keywords: [
+        "sesion",
+        "cookie",
+        "token",
+        "inactividad",
+        "seguridad",
+        "logout",
+        "expiracion",
+      ],
     },
     {
       id: "proximas-personalizaciones",
@@ -50,6 +61,20 @@
       description: "Branding, widgets y atajos futuros",
       icon: "lucide:sparkles",
       keywords: ["branding", "widgets", "atajos", "personalizar", "proximo"],
+    },
+    {
+      id: "operacion-tienda",
+      title: "Operacion de tienda",
+      description: "Pausar o reactivar pedidos publicos",
+      icon: "lucide:store",
+      keywords: [
+        "ofertas",
+        "tienda",
+        "pedidos",
+        "pausar",
+        "activar",
+        "kill switch",
+      ],
     },
   ] as const;
 
@@ -61,6 +86,8 @@
   let session = $state<Session | null>(null);
   let tabOrder = $state<TabKey[]>([...DEFAULT_TAB_ORDER]);
   let panelConfig = $state<PanelConfigValues>({ ...DEFAULT_PANEL_CONFIG });
+  let storeOrdersEnabled = $state(true);
+  let storeOffers = $state<StoreOfferItem[]>([]);
 
   // Search palette
   let searchQuery = $state("");
@@ -111,7 +138,9 @@
   function navigateTo(id: string) {
     closeSearch();
     requestAnimationFrame(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -159,15 +188,22 @@
 
       const currentSession = payload as Session;
       if (currentSession.role !== "admin") {
-        throw new Error("Solo administradores pueden acceder a esta configuracion");
+        throw new Error(
+          "Solo administradores pueden acceder a esta configuracion",
+        );
       }
 
       session = currentSession;
-      trackAction("admin_settings_session_loaded", { role: currentSession.role });
+      trackAction("admin_settings_session_loaded", {
+        role: currentSession.role,
+      });
       await loadSettings();
     } catch (requestError) {
       trackError(requestError, "AdminSettingsPage.loadPage");
-      sessionError = requestError instanceof Error ? requestError.message : "Sesion invalida";
+      sessionError =
+        requestError instanceof Error
+          ? requestError.message
+          : "Sesion invalida";
     } finally {
       loading = false;
     }
@@ -177,17 +213,21 @@
     busy = true;
     moduleError = "";
 
-    const [tabsResult, panelConfigResult] = await Promise.allSettled([
-      getAdminTabsSettings(),
-      getAdminPanelConfig(),
-    ]);
+    const [tabsResult, panelConfigResult, storeSettingsResult] =
+      await Promise.allSettled([
+        getAdminTabsSettings(),
+        getAdminPanelConfig(),
+        getAdminStoreSettings(),
+      ]);
 
     if (tabsResult.status === "fulfilled") {
-      const incoming = (tabsResult.value.tab_order ?? []).filter((item): item is TabKey => DEFAULT_TAB_ORDER.includes(item as TabKey));
-      tabOrder = incoming.length > 0 ? incoming : [...DEFAULT_TAB_ORDER];
+      tabOrder = normalizeTabOrder(tabsResult.value.tab_order);
     } else {
       trackError(tabsResult.reason, "AdminSettingsPage.loadSettings.tabs");
-      moduleError = tabsResult.reason instanceof Error ? tabsResult.reason.message : "No se pudo cargar la configuracion de pestanas";
+      moduleError =
+        tabsResult.reason instanceof Error
+          ? tabsResult.reason.message
+          : "No se pudo cargar la configuracion de pestanas";
       tabOrder = [...DEFAULT_TAB_ORDER];
     }
 
@@ -195,15 +235,41 @@
       panelConfig = {
         auth_cookie_ttl_hours: panelConfigResult.value.auth_cookie_ttl_hours,
         auth_token_ttl_hours: panelConfigResult.value.auth_token_ttl_hours,
-        tracking_token_ttl_hours: panelConfigResult.value.tracking_token_ttl_hours,
-        inactivity_logout_seconds: panelConfigResult.value.inactivity_logout_seconds ?? 900,
+        tracking_token_ttl_hours:
+          panelConfigResult.value.tracking_token_ttl_hours,
+        inactivity_logout_seconds:
+          panelConfigResult.value.inactivity_logout_seconds ?? 900,
       };
     } else {
-      trackError(panelConfigResult.reason, "AdminSettingsPage.loadSettings.panelConfig");
+      trackError(
+        panelConfigResult.reason,
+        "AdminSettingsPage.loadSettings.panelConfig",
+      );
       if (!moduleError) {
-        moduleError = panelConfigResult.reason instanceof Error ? panelConfigResult.reason.message : "No se pudo cargar la configuracion de seguridad";
+        moduleError =
+          panelConfigResult.reason instanceof Error
+            ? panelConfigResult.reason.message
+            : "No se pudo cargar la configuracion de seguridad";
       }
       panelConfig = { ...DEFAULT_PANEL_CONFIG };
+    }
+
+    if (storeSettingsResult.status === "fulfilled") {
+      storeOrdersEnabled = storeSettingsResult.value.orders_enabled;
+      storeOffers = storeSettingsResult.value.offers ?? [];
+    } else {
+      trackError(
+        storeSettingsResult.reason,
+        "AdminSettingsPage.loadSettings.storeSettings",
+      );
+      if (!moduleError) {
+        moduleError =
+          storeSettingsResult.reason instanceof Error
+            ? storeSettingsResult.reason.message
+            : "No se pudo cargar la operacion de tienda";
+      }
+      storeOrdersEnabled = true;
+      storeOffers = [];
     }
 
     busy = false;
@@ -214,13 +280,19 @@
     moduleError = "";
     try {
       const response = await updateAdminTabsSettings(nextTabOrder as TabKey[]);
-      const incoming = (response.tab_order ?? []).filter((item): item is TabKey => DEFAULT_TAB_ORDER.includes(item as TabKey));
-      tabOrder = incoming.length > 0 ? incoming : [...DEFAULT_TAB_ORDER];
+      tabOrder = normalizeTabOrder(response.tab_order);
       setNotice("Orden del panel actualizada");
-      trackAction("admin_settings_tab_order_saved", { tabCount: nextTabOrder.length });
+      trackAction("admin_settings_tab_order_saved", {
+        tabCount: nextTabOrder.length,
+      });
     } catch (requestError) {
-      trackError(requestError, "AdminSettingsPage.handleSaveTabOrder", { tabCount: nextTabOrder.length });
-      moduleError = requestError instanceof Error ? requestError.message : "No se pudo guardar el orden global";
+      trackError(requestError, "AdminSettingsPage.handleSaveTabOrder", {
+        tabCount: nextTabOrder.length,
+      });
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo guardar el orden global";
     } finally {
       busy = false;
     }
@@ -238,10 +310,48 @@
         inactivity_logout_seconds: response.inactivity_logout_seconds ?? 900,
       };
       setNotice("Configuracion de seguridad actualizada");
-      trackAction("admin_settings_panel_config_saved", nextPanelConfig as unknown as Record<string, unknown>);
+      trackAction(
+        "admin_settings_panel_config_saved",
+        nextPanelConfig as unknown as Record<string, unknown>,
+      );
     } catch (requestError) {
-      trackError(requestError, "AdminSettingsPage.handleSavePanelConfig", nextPanelConfig as unknown as Record<string, unknown>);
-      moduleError = requestError instanceof Error ? requestError.message : "No se pudo guardar la configuracion de seguridad";
+      trackError(
+        requestError,
+        "AdminSettingsPage.handleSavePanelConfig",
+        nextPanelConfig as unknown as Record<string, unknown>,
+      );
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo guardar la configuracion de seguridad";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleToggleStoreOrders(enabled: boolean) {
+    busy = true;
+    moduleError = "";
+
+    try {
+      const response = await updateAdminStoreSettings({
+        orders_enabled: enabled,
+        offers: storeOffers,
+      });
+      storeOrdersEnabled = response.orders_enabled;
+      storeOffers = response.offers ?? [];
+      setNotice(
+        enabled ? "Pedidos publicos activados" : "Pedidos publicos pausados",
+      );
+      trackAction("admin_settings_store_orders_toggled", { enabled });
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.handleToggleStoreOrders", {
+        enabled,
+      });
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo actualizar la operacion de tienda";
     } finally {
       busy = false;
     }
@@ -250,8 +360,7 @@
   async function handleLogout() {
     try {
       await fetch("/api/admin/logout", { method: "POST" });
-    } catch {
-    }
+    } catch {}
 
     window.location.href = "/admin/login";
   }
@@ -259,7 +368,9 @@
 
 {#if loading}
   <div class="flex min-h-[45vh] w-full items-center justify-center">
-    <div class="flex items-center gap-3 rounded-2xl border border-base-300 bg-base-100 px-6 py-5 shadow-sm">
+    <div
+      class="flex items-center gap-3 rounded-2xl border border-base-300 bg-base-100 px-6 py-5 shadow-sm"
+    >
       <span class="loading loading-spinner loading-md"></span>
       <span>Cargando configuraciones...</span>
     </div>
@@ -280,17 +391,23 @@
   </div>
 {:else if session}
   <div class="space-y-6">
-
     <!-- Header — same layout as AdminHeader -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+    >
       <div>
         <h1 class="text-3xl font-bold">Configuraciones</h1>
-        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-base-content/70">
+        <div
+          class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-base-content/70"
+        >
           <p class="flex items-center gap-2">
             <span>Administrador, <strong>{session.name}</strong></span>
             <Icon icon="lucide:settings-2" class="h-4 w-4" />
           </p>
-          <a href="/admin" class="flex items-center gap-1.5 transition hover:text-base-content">
+          <a
+            href="/admin"
+            class="flex items-center gap-1.5 transition hover:text-base-content"
+          >
             <Icon icon="lucide:arrow-left" class="h-3.5 w-3.5" />
             <span>Panel administrativo</span>
           </a>
@@ -305,15 +422,21 @@
           title="Buscar ajuste (Ctrl+K)"
         >
           <Icon icon="lucide:search" class="h-4 w-4" />
-          <span class="hidden text-sm text-base-content/50 sm:inline">Buscar ajuste...</span>
+          <span class="hidden text-sm text-base-content/50 sm:inline"
+            >Buscar ajuste...</span
+          >
           <kbd class="kbd kbd-sm hidden sm:inline">Ctrl K</kbd>
         </button>
-        <button class="btn btn-outline" type="button" onclick={handleLogout}>Cerrar sesion</button>
+        <button class="btn btn-outline" type="button" onclick={handleLogout}
+          >Cerrar sesion</button
+        >
       </div>
     </div>
 
     {#if notice}
-      <div role="alert" class="alert alert-success shadow-sm"><span>{notice}</span></div>
+      <div role="alert" class="alert alert-success shadow-sm">
+        <span>{notice}</span>
+      </div>
     {/if}
 
     <!-- Settings forms -->
@@ -321,17 +444,22 @@
       <SettingsTab
         {tabOrder}
         {panelConfig}
+        {storeOrdersEnabled}
         {busy}
         {moduleError}
         onSave={handleSaveTabOrder}
         onSavePanelConfig={handleSavePanelConfig}
+        onToggleStoreOrders={handleToggleStoreOrders}
       />
 
       <section id="proximas-personalizaciones" class="card bg-base-100 shadow">
         <div class="card-body space-y-4">
           <div>
             <h2 class="card-title">Proximas personalizaciones</h2>
-            <p class="text-sm text-base-content/70">Esta pagina queda preparada para crecer nuevas opciones sin tocar la operacion diaria.</p>
+            <p class="text-sm text-base-content/70">
+              Esta pagina queda preparada para crecer nuevas opciones sin tocar
+              la operacion diaria.
+            </p>
           </div>
           <div class="grid gap-4 md:grid-cols-3">
             <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
@@ -341,7 +469,9 @@
                 </span>
                 <h3 class="font-semibold">Branding del panel</h3>
               </div>
-              <p class="mt-3 text-sm text-base-content/70">Logo, colores y nombre visible para el equipo.</p>
+              <p class="mt-3 text-sm text-base-content/70">
+                Logo, colores y nombre visible para el equipo.
+              </p>
             </article>
             <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
               <div class="flex items-center gap-3">
@@ -350,7 +480,9 @@
                 </span>
                 <h3 class="font-semibold">Widgets de inicio</h3>
               </div>
-              <p class="mt-3 text-sm text-base-content/70">Define que resumenes aparecen primero al entrar al panel.</p>
+              <p class="mt-3 text-sm text-base-content/70">
+                Define que resumenes aparecen primero al entrar al panel.
+              </p>
             </article>
             <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
               <div class="flex items-center gap-3">
@@ -359,7 +491,9 @@
                 </span>
                 <h3 class="font-semibold">Atajos de operacion</h3>
               </div>
-              <p class="mt-3 text-sm text-base-content/70">Accesos rapidos para procesos frecuentes del equipo.</p>
+              <p class="mt-3 text-sm text-base-content/70">
+                Accesos rapidos para procesos frecuentes del equipo.
+              </p>
             </article>
           </div>
         </div>
@@ -371,12 +505,17 @@
   <dialog
     bind:this={searchDialog}
     class="modal"
-    onclose={() => { searchQuery = ""; }}
+    onclose={() => {
+      searchQuery = "";
+    }}
   >
     <div class="modal-box max-w-lg overflow-hidden rounded-2xl p-0">
       <!-- Input row -->
       <div class="flex items-center gap-3 border-b border-base-300 px-4 py-3">
-        <Icon icon="lucide:search" class="h-5 w-5 flex-shrink-0 text-base-content/40" />
+        <Icon
+          icon="lucide:search"
+          class="h-5 w-5 shrink-0 text-base-content/40"
+        />
         <input
           bind:this={searchInput}
           bind:value={searchQuery}
@@ -387,7 +526,11 @@
           autocomplete="off"
           spellcheck="false"
         />
-        <button type="button" class="btn btn-ghost btn-xs" onclick={closeSearch}>
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          onclick={closeSearch}
+        >
           <kbd class="kbd kbd-sm">Esc</kbd>
         </button>
       </div>
@@ -395,21 +538,30 @@
       <!-- Results -->
       <div class="max-h-64 overflow-y-auto">
         {#if filteredItems.length === 0}
-          <p class="px-4 py-8 text-center text-sm text-base-content/50">Sin resultados para "{searchQuery}"</p>
+          <p class="px-4 py-8 text-center text-sm text-base-content/50">
+            Sin resultados para "{searchQuery}"
+          </p>
         {:else}
           {#each filteredItems as item, i}
             <button
               type="button"
-              class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-base-200 {i === selectedIndex ? 'bg-base-200' : ''}"
+              class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-base-200 {i ===
+              selectedIndex
+                ? 'bg-base-200'
+                : ''}"
               onclick={() => navigateTo(item.id)}
-              onmouseenter={() => { selectedIndex = i; }}
+              onmouseenter={() => {
+                selectedIndex = i;
+              }}
             >
               <span class="rounded-xl bg-base-200 p-2">
                 <Icon icon={item.icon} class="h-4 w-4 text-base-content/70" />
               </span>
               <span>
                 <span class="block font-medium">{item.title}</span>
-                <span class="block text-sm text-base-content/60">{item.description}</span>
+                <span class="block text-sm text-base-content/60"
+                  >{item.description}</span
+                >
               </span>
             </button>
           {/each}
@@ -417,7 +569,9 @@
       </div>
 
       <!-- Keyboard hints -->
-      <div class="flex items-center gap-4 border-t border-base-300 px-4 py-2.5 text-xs text-base-content/40">
+      <div
+        class="flex items-center gap-4 border-t border-base-300 px-4 py-2.5 text-xs text-base-content/40"
+      >
         <span class="flex items-center gap-1">
           <kbd class="kbd kbd-xs">↑</kbd><kbd class="kbd kbd-xs">↓</kbd>
           <span class="ml-1">navegar</span>

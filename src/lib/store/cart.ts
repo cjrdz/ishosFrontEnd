@@ -22,7 +22,10 @@ function itemsMatch(a: StoreCartItem, b: StoreCartItem): boolean {
     (a.flavor_id || null) === (b.flavor_id || null) &&
     (a.notes || "") === (b.notes || "") &&
     arraysEqualUnordered(a.addons || [], b.addons || []) &&
-    arraysEqualUnordered(a.included_addon_ids || [], b.included_addon_ids || []) &&
+    arraysEqualUnordered(
+      a.included_addon_ids || [],
+      b.included_addon_ids || [],
+    ) &&
     arraysEqualUnordered(a.extra_addon_ids || [], b.extra_addon_ids || [])
   );
 }
@@ -31,7 +34,9 @@ function syncCartCount(items: StoreCartItem[]) {
   if (typeof window === "undefined") return;
   const count = items.reduce((total, item) => total + item.quantity, 0);
   localStorage.setItem(CART_COUNT_KEY, String(count));
-  window.dispatchEvent(new CustomEvent("storefront-cart-count", { detail: count }));
+  window.dispatchEvent(
+    new CustomEvent("storefront-cart-count", { detail: count }),
+  );
 }
 
 export function getCartItems(): StoreCartItem[] {
@@ -87,7 +92,10 @@ export function updateCartItemQuantity(
         (item.flavor_id || null) === (flavorId || null) &&
         (item.notes || "") === (notes || "") &&
         arraysEqualUnordered(item.addons || [], addons || []) &&
-        arraysEqualUnordered(item.included_addon_ids || [], includedAddonIds || []) &&
+        arraysEqualUnordered(
+          item.included_addon_ids || [],
+          includedAddonIds || [],
+        ) &&
         arraysEqualUnordered(item.extra_addon_ids || [], extraAddonIds || [])
       ) {
         return { ...item, quantity };
@@ -114,7 +122,10 @@ export function removeCartItem(
         (item.flavor_id || null) === (flavorId || null) &&
         (item.notes || "") === (notes || "") &&
         arraysEqualUnordered(item.addons || [], addons || []) &&
-        arraysEqualUnordered(item.included_addon_ids || [], includedAddonIds || []) &&
+        arraysEqualUnordered(
+          item.included_addon_ids || [],
+          includedAddonIds || [],
+        ) &&
         arraysEqualUnordered(item.extra_addon_ids || [], extraAddonIds || [])
       ),
   );

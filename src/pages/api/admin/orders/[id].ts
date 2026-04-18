@@ -11,71 +11,77 @@
  * Requires: auth_token HttpOnly cookie
  */
 
-import type { APIRoute } from 'astro';
-import { requireAction, requireUuidParam } from '../../../../lib/bff/params';
-import { proxyToBackend } from '../../../../lib/bff/proxy';
+import type { APIRoute } from "astro";
+import { requireAction, requireUuidParam } from "../../../../lib/bff/params";
+import { proxyToBackend } from "../../../../lib/bff/proxy";
 
 export const prerender = false;
 
 export const GET: APIRoute = async (context) => {
-  const id = requireUuidParam(context, 'id');
+  const id = requireUuidParam(context, "id");
   if (id instanceof Response) return id;
   return proxyToBackend(context, `/orders/${id}`);
 };
 
 export const PATCH: APIRoute = async (context) => {
-  const id = requireUuidParam(context, 'id');
+  const id = requireUuidParam(context, "id");
   if (id instanceof Response) return id;
-  const action = context.url.searchParams.get('action')?.trim() ?? '';
-  if (action && action !== 'status' && action !== 'notes') {
+  const action = context.url.searchParams.get("action")?.trim() ?? "";
+  if (action && action !== "status" && action !== "notes") {
     return new Response(
-      JSON.stringify({ error: 'Invalid action query parameter', code: 'VALIDATION_ERROR' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error: "Invalid action query parameter",
+        code: "VALIDATION_ERROR",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
   try {
     const body = await context.request.json();
     const targetPath =
-      action === 'status'
+      action === "status"
         ? `/orders/${id}/status`
-        : action === 'notes'
+        : action === "notes"
           ? `/orders/${id}/notes`
           : `/orders/${id}`;
 
     return proxyToBackend(context, targetPath, {
-      method: 'PATCH',
+      method: "PATCH",
       body,
     });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid request body' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: "Invalid request body" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 };
 
 export const DELETE: APIRoute = async (context) => {
-  const id = requireUuidParam(context, 'id');
+  const id = requireUuidParam(context, "id");
   if (id instanceof Response) return id;
-  return proxyToBackend(context, `/orders/${id}`, { method: 'DELETE' });
+  return proxyToBackend(context, `/orders/${id}`, { method: "DELETE" });
 };
 
 export const POST: APIRoute = async (context) => {
-  const id = requireUuidParam(context, 'id');
+  const id = requireUuidParam(context, "id");
   if (id instanceof Response) return id;
-  const action = requireAction(context.url.searchParams.get('action'), ['approve', 'reject']);
+  const action = requireAction(context.url.searchParams.get("action"), [
+    "approve",
+    "reject",
+  ]);
   if (action instanceof Response) return action;
 
   try {
     const body = await context.request.json().catch(() => ({}));
     return proxyToBackend(context, `/orders/${id}/${action}`, {
-      method: 'POST',
+      method: "POST",
       body,
     });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: 'Invalid request' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: "Invalid request" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 };

@@ -13,7 +13,9 @@ const links = [
 ];
 ---
 
-<header class="navbar bg-base-100/80 backdrop-blur-sm border-b border-base-300 sticky top-0 z-50 shadow-sm transition-all duration-300">
+<header
+  class="navbar bg-base-100/80 backdrop-blur-sm border-b border-base-300 sticky top-0 z-50 shadow-sm transition-all duration-300 py-0 md:py-1"
+>
   <div class="navbar-start">
     <StoreLogo client:load />
   </div>
@@ -25,7 +27,7 @@ const links = [
           <li>
             <a
               href={link.href}
-              class={`text-lg ${currentPath === link.href ? "text-primary font-semibold" : ""}`}
+              class={`text-sm md:text-base nav-link-dot ${currentPath === link.href ? "text-primary font-semibold active" : ""}`}
             >
               {link.label}
             </a>

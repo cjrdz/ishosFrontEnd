@@ -5,8 +5,11 @@
  * No authentication required
  */
 
-import type { APIRoute } from 'astro';
-import { forwardUpstreamJson, getServerApiBaseUrl } from '../../../lib/bff/proxy';
+import type { APIRoute } from "astro";
+import {
+  forwardUpstreamJson,
+  getServerApiBaseUrl,
+} from "../../../lib/bff/proxy";
 
 export const prerender = false;
 
@@ -16,8 +19,8 @@ export const GET: APIRoute = async (context) => {
     return forwardUpstreamJson(response);
   } catch {
     return new Response(
-      JSON.stringify({ error: 'Failed to fetch categories' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: "Failed to fetch categories" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 };

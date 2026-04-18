@@ -1,5 +1,9 @@
 <script lang="ts">
-  import type { AdminImage, Category, Product } from "../../../../lib/api/admin";
+  import type {
+    AdminImage,
+    Category,
+    Product,
+  } from "../../../../lib/api/admin";
   import ProductList from "../products/ProductList.svelte";
   import ProductEditorDialog from "../products/ProductEditorDialog.svelte";
   import ImageGalleryPanel from "../products/ImageGalleryPanel.svelte";
@@ -61,7 +65,9 @@
     productVisibilityFilter === "all"
       ? products
       : products.filter((product) =>
-          productVisibilityFilter === "active" ? product.is_available : !product.is_available,
+          productVisibilityFilter === "active"
+            ? product.is_available
+            : !product.is_available,
         ),
   );
   const productVisibilityFilterLabel = $derived(
@@ -83,14 +89,22 @@
   });
 
   const isEditing = $derived(!!editingProductId);
-  const selectedGalleryImage = $derived(galleryImages.find((image) => image.name === form.image_path) ?? null);
+  const selectedGalleryImage = $derived(
+    galleryImages.find((image) => image.name === form.image_path) ?? null,
+  );
   const currentProductForFlavorAddon = $derived(
     currentProductForFlavorAddonId
-      ? products.find((product) => product.id === currentProductForFlavorAddonId) ?? null
+      ? (products.find(
+          (product) => product.id === currentProductForFlavorAddonId,
+        ) ?? null)
       : null,
   );
-  const currentProductFlavorIds = $derived((currentProductForFlavorAddon?.flavors ?? []).map((flavor) => flavor.id));
-  const currentProductAddonIds = $derived((currentProductForFlavorAddon?.addons ?? []).map((addon) => addon.id));
+  const currentProductFlavorIds = $derived(
+    (currentProductForFlavorAddon?.flavors ?? []).map((flavor) => flavor.id),
+  );
+  const currentProductAddonIds = $derived(
+    (currentProductForFlavorAddon?.addons ?? []).map((addon) => addon.id),
+  );
 
   $effect(() => {
     if (!form.category_id && categories.length > 0) {
@@ -258,7 +272,11 @@
         productId: currentProductForFlavorAddon.id,
         count: flavorIds.length,
       });
-      await Promise.all(flavorIds.map((flavorId) => onLinkFlavor(currentProductForFlavorAddon.id, flavorId)));
+      await Promise.all(
+        flavorIds.map((flavorId) =>
+          onLinkFlavor(currentProductForFlavorAddon.id, flavorId),
+        ),
+      );
     } catch (error) {
       trackError(error, "ProductsTab.assignFlavorsToCurrentProduct", {
         productId: currentProductForFlavorAddon.id,
@@ -277,7 +295,11 @@
         productId: currentProductForFlavorAddon.id,
         count: flavorIds.length,
       });
-      await Promise.all(flavorIds.map((flavorId) => onUnlinkFlavor(currentProductForFlavorAddon.id, flavorId)));
+      await Promise.all(
+        flavorIds.map((flavorId) =>
+          onUnlinkFlavor(currentProductForFlavorAddon.id, flavorId),
+        ),
+      );
     } catch (error) {
       trackError(error, "ProductsTab.unassignFlavorsFromCurrentProduct", {
         productId: currentProductForFlavorAddon.id,
@@ -296,7 +318,11 @@
         productId: currentProductForFlavorAddon.id,
         count: addonIds.length,
       });
-      await Promise.all(addonIds.map((addonId) => onLinkAddon(currentProductForFlavorAddon.id, addonId)));
+      await Promise.all(
+        addonIds.map((addonId) =>
+          onLinkAddon(currentProductForFlavorAddon.id, addonId),
+        ),
+      );
     } catch (error) {
       trackError(error, "ProductsTab.assignAddonsToCurrentProduct", {
         productId: currentProductForFlavorAddon.id,
@@ -315,7 +341,11 @@
         productId: currentProductForFlavorAddon.id,
         count: addonIds.length,
       });
-      await Promise.all(addonIds.map((addonId) => onUnlinkAddon(currentProductForFlavorAddon.id, addonId)));
+      await Promise.all(
+        addonIds.map((addonId) =>
+          onUnlinkAddon(currentProductForFlavorAddon.id, addonId),
+        ),
+      );
     } catch (error) {
       trackError(error, "ProductsTab.unassignAddonsFromCurrentProduct", {
         productId: currentProductForFlavorAddon.id,
@@ -339,7 +369,6 @@
       is_available: nextAvailability,
     });
   }
-
 </script>
 
 <section class="space-y-4">
@@ -383,7 +412,7 @@
 
 <GlobalFlavorsManager
   open={globalFlavorsOpen}
-  flavors={flavors}
+  {flavors}
   busy={flavorBusy}
   error={flavorError}
   onClose={closeGlobalFlavorsModal}
@@ -394,7 +423,7 @@
 
 <GlobalAddonsManager
   open={globalAddonsOpen}
-  addons={addons}
+  {addons}
   busy={addonBusy}
   error={addonError}
   onClose={closeGlobalAddonsModal}
@@ -449,7 +478,7 @@
   open={confirmOpen}
   title={confirmTitle}
   message={confirmMessage}
-  busy={busy}
+  {busy}
   onConfirm={confirmNow}
   onCancel={closeConfirm}
 />

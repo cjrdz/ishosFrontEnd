@@ -7,17 +7,17 @@
  * - Error handling and response forwarding
  */
 
-import type { APIContext } from 'astro';
-import { getApiBaseUrl } from '../config';
+import type { APIContext } from "astro";
+import { getApiBaseUrl } from "../config";
 
 export interface ProxyOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
+  method?: "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
   body?: unknown;
   query?: Record<string, string | number | boolean>;
   isFormData?: boolean;
 }
 
-export interface ProxyFormDataOptions extends Omit<ProxyOptions, 'body'> {
+export interface ProxyFormDataOptions extends Omit<ProxyOptions, "body"> {
   isFormData: true;
   body: FormData;
 }
@@ -26,34 +26,36 @@ export function getServerApiBaseUrl(_context: APIContext): string {
   return getApiBaseUrl();
 }
 
-export async function forwardUpstreamJson(response: Response): Promise<Response> {
-  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+export async function forwardUpstreamJson(
+  response: Response,
+): Promise<Response> {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   let data: unknown;
 
-  if (contentType.includes('application/json')) {
+  if (contentType.includes("application/json")) {
     data = await response.json();
   } else {
     const rawText = await response.text();
     const trimmedText = rawText.trim();
 
-    if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
+    if (trimmedText.startsWith("{") || trimmedText.startsWith("[")) {
       try {
         data = JSON.parse(trimmedText);
       } catch {
         data = response.ok
-          ? { message: trimmedText || 'OK' }
-          : { error: trimmedText || 'Request failed' };
+          ? { message: trimmedText || "OK" }
+          : { error: trimmedText || "Request failed" };
       }
     } else {
       data = response.ok
-        ? { message: trimmedText || 'OK' }
-        : { error: trimmedText || 'Request failed' };
+        ? { message: trimmedText || "OK" }
+        : { error: trimmedText || "Request failed" };
     }
   }
 
   return new Response(JSON.stringify(data), {
     status: response.status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -62,12 +64,12 @@ export async function proxyToBackend(
   path: string,
   options: ProxyOptions | ProxyFormDataOptions = {},
 ): Promise<Response> {
-  const token = context.cookies.get('auth_token')?.value;
+  const token = context.cookies.get("auth_token")?.value;
 
   if (!token) {
     return new Response(
-      JSON.stringify({ error: 'Unauthorized', code: 'UNAUTHORIZED' }),
-      { status: 401, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: "Unauthorized", code: "UNAUTHORIZED" }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
     );
   }
 
@@ -77,7 +79,7 @@ export async function proxyToBackend(
 
   // Only set Content-Type for non-FormData requests
   if (!options.isFormData) {
-    headers['Content-Type'] = 'application/json';
+    headers["Content-Type"] = "application/json";
   }
 
   const url = new URL(`${getServerApiBaseUrl(context)}${path}`);
@@ -89,54 +91,58 @@ export async function proxyToBackend(
 
   try {
     const response = await fetch(url.toString(), {
-      method: options.method ?? 'GET',
+      method: options.method ?? "GET",
       headers,
       body:
         options.isFormData && options.body instanceof FormData
           ? (options.body as FormData)
           : options.body
-          ? JSON.stringify(options.body)
-          : undefined,
+            ? JSON.stringify(options.body)
+            : undefined,
     });
 
-    const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+    const contentType =
+      response.headers.get("content-type")?.toLowerCase() ?? "";
     let data: unknown;
 
-    if (contentType.includes('application/json')) {
+    if (contentType.includes("application/json")) {
       data = await response.json();
     } else {
       const rawText = await response.text();
       const trimmedText = rawText.trim();
 
-      if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
+      if (trimmedText.startsWith("{") || trimmedText.startsWith("[")) {
         try {
           data = JSON.parse(trimmedText);
         } catch {
           data = response.ok
-            ? { message: trimmedText || 'OK' }
-            : { error: trimmedText || 'Request failed' };
+            ? { message: trimmedText || "OK" }
+            : { error: trimmedText || "Request failed" };
         }
       } else {
         data = response.ok
-          ? { message: trimmedText || 'OK' }
-          : { error: trimmedText || 'Request failed' };
+          ? { message: trimmedText || "OK" }
+          : { error: trimmedText || "Request failed" };
       }
     }
 
     return new Response(JSON.stringify(data), {
       status: response.status,
       headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     });
   } catch (error) {
-    console.error('Backend proxy error:', error);
+    console.error("Backend proxy error:", error);
     return new Response(
-      JSON.stringify({ error: 'Backend request failed', code: 'BACKEND_ERROR' }),
-      { status: 502, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error: "Backend request failed",
+        code: "BACKEND_ERROR",
+      }),
+      { status: 502, headers: { "Content-Type": "application/json" } },
     );
   }
 }

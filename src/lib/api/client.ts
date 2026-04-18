@@ -4,13 +4,13 @@
  * Supports both HttpOnly cookie auth and Bearer token fallback.
  */
 
-import { getApiBaseUrl } from '../config';
-import { ApiError } from '../errors';
+import { getApiBaseUrl } from "../config";
+import { ApiError } from "../errors";
 
 export { ApiError };
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
+  method?: "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
   body?: unknown;
   headers?: Record<string, string>;
   token?: string;
@@ -22,7 +22,7 @@ export async function apiRequest<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...options.headers,
   };
 
@@ -39,24 +39,24 @@ export async function apiRequest<T>(
   let response: Response;
   try {
     response = await fetch(url, {
-      method: options.method ?? 'GET',
+      method: options.method ?? "GET",
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
-      credentials: 'include',
+      credentials: "include",
       signal: controller.signal,
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new ApiError('Request timed out', 504, 'TIMEOUT');
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError("Request timed out", 504, "TIMEOUT");
     }
-    throw new ApiError('Network request failed', 0, 'NETWORK_ERROR');
+    throw new ApiError("Network request failed", 0, "NETWORK_ERROR");
   } finally {
     clearTimeout(timeout);
   }
 
   if (!response.ok) {
-    let message = 'Request failed';
-    let code = 'API_ERROR';
+    let message = "Request failed";
+    let code = "API_ERROR";
     try {
       const payload = (await response.json()) as {
         error?: string;

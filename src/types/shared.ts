@@ -5,16 +5,18 @@
 /**
  * Standard API response wrapper
  */
-export type ApiResponse<T> = {
-  success: true;
-  data: T;
-} | {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-  };
-};
+export type ApiResponse<T> =
+  | {
+      success: true;
+      data: T;
+    }
+  | {
+      success: false;
+      error: {
+        code: string;
+        message: string;
+      };
+    };
 
 /**
  * Paginated API response

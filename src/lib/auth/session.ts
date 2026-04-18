@@ -1,11 +1,11 @@
 /**
  * Authentication session utilities
- * 
+ *
  * Backend sets HttpOnly cookies on login. This module only caches
  * session data in the browser runtime for UI state.
  */
 
-import type { Session } from '../../types/auth';
+import type { Session } from "../../types/auth";
 
 /**
  * Store session data in memory (not localStorage)
@@ -17,7 +17,7 @@ let cachedSession: Session | null = null;
  * Get cached session from memory
  */
 export function getCachedSession(): Session | null {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return null;
   }
   return cachedSession;
@@ -27,7 +27,7 @@ export function getCachedSession(): Session | null {
  * Set cached session in memory
  */
 export function setCachedSession(session: Session | null): void {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return;
   }
   cachedSession = session;
@@ -37,7 +37,7 @@ export function setCachedSession(session: Session | null): void {
  * Clear cached session
  */
 export function clearCachedSession(): void {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return;
   }
   cachedSession = null;
@@ -69,7 +69,7 @@ export function getSessionRole(): string | null {
  * Check if user is admin
  */
 export function isAdmin(): boolean {
-  return getCachedSession()?.role === 'admin';
+  return getCachedSession()?.role === "admin";
 }
 
 /**
@@ -77,5 +77,5 @@ export function isAdmin(): boolean {
  */
 export function isManagerial(): boolean {
   const role = getCachedSession()?.role;
-  return role === 'admin' || role === 'manager';
+  return role === "admin" || role === "manager";
 }
