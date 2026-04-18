@@ -10,7 +10,10 @@ export interface SaveUserFormData {
 }
 
 /** Validates save user form */
-export function validateSaveUserForm(form: SaveUserFormData): { valid: boolean; error: string } {
+export function validateSaveUserForm(form: SaveUserFormData): {
+  valid: boolean;
+  error: string;
+} {
   if (!form.name.trim()) {
     return { valid: false, error: "El nombre es requerido" };
   }

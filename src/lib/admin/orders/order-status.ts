@@ -1,6 +1,11 @@
 import type { Order } from "../../api/admin";
 
-export type LinearOrderStatus = "pendiente_revision" | "recibida" | "en_proceso" | "lista" | "entregada";
+export type LinearOrderStatus =
+  | "pendiente_revision"
+  | "recibida"
+  | "en_proceso"
+  | "lista"
+  | "entregada";
 export type CanceledOrderStatus = "pendiente_revision" | "cancelada";
 
 export const linearStatuses: LinearOrderStatus[] = [
@@ -11,7 +16,10 @@ export const linearStatuses: LinearOrderStatus[] = [
   "entregada",
 ];
 
-export const canceledFlow: CanceledOrderStatus[] = ["pendiente_revision", "cancelada"];
+export const canceledFlow: CanceledOrderStatus[] = [
+  "pendiente_revision",
+  "cancelada",
+];
 
 export const statusLabels: Record<Order["status"], string> = {
   pendiente_revision: "pendiente",
@@ -62,20 +70,38 @@ export const canceledStepIconsStatic: Record<CanceledOrderStatus, string> = {
   cancelada: "lucide:x-circle",
 };
 
-export function kitchenBadge(order: Order): { text: string; className: string } | null {
+export function kitchenBadge(
+  order: Order,
+): { text: string; className: string } | null {
   if (order.status === "recibida") {
-    return { text: "Nueva orden", className: "badge badge-success badge-outline" };
+    return {
+      text: "Nueva orden",
+      className: "badge badge-success badge-outline",
+    };
   }
   return null;
 }
 
-export function isStepReached(current: Order["status"], step: LinearOrderStatus): boolean {
+export function isStepReached(
+  current: Order["status"],
+  step: LinearOrderStatus,
+): boolean {
   if (current === "cancelada") return false;
-  return linearStatuses.indexOf(current as LinearOrderStatus) >= linearStatuses.indexOf(step);
+  return (
+    linearStatuses.indexOf(current as LinearOrderStatus) >=
+    linearStatuses.indexOf(step)
+  );
 }
 
-export function canChangeToStep(order: Order, stepStatus: LinearOrderStatus): boolean {
-  return order.status !== "cancelada" && order.status !== stepStatus && stepStatus !== "pendiente_revision";
+export function canChangeToStep(
+  order: Order,
+  stepStatus: LinearOrderStatus,
+): boolean {
+  return (
+    order.status !== "cancelada" &&
+    order.status !== stepStatus &&
+    stepStatus !== "pendiente_revision"
+  );
 }
 
 export function amountColumnLabel(status: Order["status"]): string {
@@ -86,7 +112,10 @@ export function orderTypeLabel(orderType: Order["order_type"]): string {
   return orderType === "en_local" ? "En local" : "Para llevar";
 }
 
-export function createdByLabel(order: Order, employeeById: Record<string, string>): string {
+export function createdByLabel(
+  order: Order,
+  employeeById: Record<string, string>,
+): string {
   const explicitName = order.created_by_name?.trim();
   if (explicitName) return explicitName;
   if (!order.created_by_user_id) return order.customer_name;

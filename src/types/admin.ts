@@ -2,17 +2,17 @@
  * Admin dashboard types
  */
 
-import type { Order } from './store';
-import type { UserRole } from './auth';
+import type { Order } from "./store";
+import type { UserRole } from "./auth";
 import type {
   Category,
   Employee as ApiEmployee,
   User,
   UserOrderHistoryItem,
-} from '../lib/api/admin';
-import type { TabKey } from '../components/svelte/admin/config/tabs';
-import type { OrdersTabProps } from '../components/svelte/admin/tabs/types/orders-tab';
-import type { ProductsTabProps } from '../components/svelte/admin/tabs/types/products-tab';
+} from "../lib/api/admin";
+import type { TabKey } from "../components/svelte/admin/config/tabs";
+import type { OrdersTabProps } from "../components/svelte/admin/tabs/types/orders-tab";
+import type { ProductsTabProps } from "../components/svelte/admin/tabs/types/products-tab";
 
 /**
  * Employee record (admin/staff)
@@ -99,8 +99,8 @@ export interface TabPanelSharedProps {
   lazyTabState: {
     categorias: { loading: boolean; hydrated: boolean };
     productos: { loading: boolean; hydrated: boolean };
-    empleados: { loading: boolean; hydrated: boolean };
-    usuarios: { loading: boolean; hydrated: boolean };
+    personas: { loading: boolean; hydrated: boolean };
+    ofertas: { loading: boolean; hydrated: boolean };
     herramientas: { loading: boolean; hydrated: boolean };
   };
 }
@@ -119,21 +119,39 @@ export interface CategoriesPanelProps {
     display_order?: number;
     is_active?: boolean;
   }) => void;
-  onUpdate: (id: string, payload: {
-    name?: string;
-    slug?: string;
-    description?: string;
-    image_path?: string;
-    display_order?: number;
-    is_active?: boolean;
-  }) => void;
+  onUpdate: (
+    id: string,
+    payload: {
+      name?: string;
+      slug?: string;
+      description?: string;
+      image_path?: string;
+      display_order?: number;
+      is_active?: boolean;
+    },
+  ) => void;
   onDelete: (id: string) => void;
 }
 
 export interface EmployeesPanelProps {
   employees: ApiEmployee[];
-  onCreate: (payload: { email: string; password: string; name?: string; phone?: string; role?: 'employee' | 'admin' }) => void;
-  onUpdate: (id: string, payload: { email?: string; password?: string; name?: string; phone?: string; role?: 'employee' | 'admin' }) => void;
+  onCreate: (payload: {
+    email: string;
+    password: string;
+    name?: string;
+    phone?: string;
+    role?: "employee" | "admin";
+  }) => void;
+  onUpdate: (
+    id: string,
+    payload: {
+      email?: string;
+      password?: string;
+      name?: string;
+      phone?: string;
+      role?: "employee" | "admin";
+    },
+  ) => void;
   onDelete: (id: string) => void;
 }
 
@@ -143,18 +161,21 @@ export interface UsersPanelProps {
   usersHistoryBusy: boolean;
   onCreate: (payload: {
     name: string;
-    user_type: 'user' | 'company';
+    user_type: "user" | "company";
     phone: string;
     email?: string;
-    status: 'active' | 'inactive';
+    status: "active" | "inactive";
   }) => void;
-  onUpdate: (id: string, payload: {
-    name?: string;
-    user_type?: 'user' | 'company';
-    phone?: string;
-    email?: string;
-    status?: 'active' | 'inactive';
-  }) => void;
+  onUpdate: (
+    id: string,
+    payload: {
+      name?: string;
+      user_type?: "user" | "company";
+      phone?: string;
+      email?: string;
+      status?: "active" | "inactive";
+    },
+  ) => void;
   onDelete: (id: string) => void;
   onLoadUserOrders: (userId: string) => void;
 }

@@ -1,6 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { COLOR_THEME, DARK_THEME, type ThemeMode } from "../../../lib/theme/constants";
+  import {
+    COLOR_THEME,
+    DARK_THEME,
+    type ThemeMode,
+  } from "../../../lib/theme/constants";
   let theme = $state<ThemeMode>(COLOR_THEME);
 
   function syncTheme() {
@@ -17,10 +21,26 @@
   });
 </script>
 
-<a href="/" class="btn btn-ghost normal-case text-xl font-bold group" aria-label="Inicio">
+<a
+  href="/"
+  class="btn btn-ghost normal-case text-xl font-bold group"
+  aria-label="Inicio"
+>
   {#if theme === COLOR_THEME}
-    <img src="/images/blackicon.png" alt="Isho's" width="86" height="86" class="group-hover:scale-110 transition-transform duration-200" />
+    <img
+      src="/images/blackicon.png"
+      alt="Isho's"
+      width="86"
+      height="86"
+      class="group-hover:scale-110 transition-transform duration-200"
+    />
   {:else}
-    <img src="/images/whiteicon.png" alt="Isho's" width="86" height="86" class="group-hover:scale-110 transition-transform duration-200" />
+    <img
+      src="/images/whiteicon.png"
+      alt="Isho's"
+      width="86"
+      height="86"
+      class="group-hover:scale-110 transition-transform duration-200"
+    />
   {/if}
 </a>

@@ -1,7 +1,10 @@
 <script lang="ts">
-  import Icon from "@iconify/svelte";
+  import Icon from "../../shared/AppIcon.svelte";
   import type { Employee, Order, Product } from "../../../../lib/api/admin";
-  import { groupAddonsByGroup, normalizeAddonGroupName } from "../../../../lib/admin/addon-groups";
+  import {
+    groupAddonsByGroup,
+    normalizeAddonGroupName,
+  } from "../../../../lib/admin/addon-groups";
   import { printOrderReceipt } from "../../../../lib/admin/orders/receipt-renderer";
   import {
     statusLabels,
@@ -23,7 +26,11 @@
   import ReactivateOrderDialog from "../orders/ReactivateOrderDialog.svelte";
   import PrintPromptDialog from "../orders/PrintPromptDialog.svelte";
   import ConfirmDialog from "../shared/ConfirmDialog.svelte";
-  import type { CreateOrderPayload, OrdersTabProps, ManualOrderItemDraft } from "./types/orders-tab";
+  import type {
+    CreateOrderPayload,
+    OrdersTabProps,
+    ManualOrderItemDraft,
+  } from "./types/orders-tab";
   import { normalizeIdList } from "./utils/list";
 
   let {
@@ -62,7 +69,10 @@
     }
   });
 
-  async function copyToClipboard(text: string, kind: "token" | "both" | "link") {
+  async function copyToClipboard(
+    text: string,
+    kind: "token" | "both" | "link",
+  ) {
     tokenCopied = await TokenHelpers.copyToClipboard(text, kind);
     if (tokenCopied) {
       TokenHelpers.clearClipboardFeedback(tokenCopied, () => {
@@ -75,10 +85,18 @@
   let confirmMessage = $state("");
   let confirmAction = $state<null | (() => void)>(null);
 
-  let rejectState = $state<DialogState.RejectDialogState>(DialogState.closeReject());
-  let reactivateState = $state<DialogState.ReactivateDialogState>(DialogState.closeReactivate());
-  let printPromptState = $state<DialogState.PrintPromptDialogState>(DialogState.closePrintPrompt());
-  let saveUserState = $state<DialogState.SaveUserDialogState>(DialogState.closeSaveUserDialog());
+  let rejectState = $state<DialogState.RejectDialogState>(
+    DialogState.closeReject(),
+  );
+  let reactivateState = $state<DialogState.ReactivateDialogState>(
+    DialogState.closeReactivate(),
+  );
+  let printPromptState = $state<DialogState.PrintPromptDialogState>(
+    DialogState.closePrintPrompt(),
+  );
+  let saveUserState = $state<DialogState.SaveUserDialogState>(
+    DialogState.closeSaveUserDialog(),
+  );
   let editOrderId = $state<string | null>(null);
   let editError = $state("");
   let editNotice = $state("");
@@ -96,7 +114,11 @@
     customer_name: "",
     customer_phone: "",
     customer_email: "",
-    payment_method: "efectivo" as "efectivo" | "tarjeta" | "transferencia" | "otro",
+    payment_method: "efectivo" as
+      | "efectivo"
+      | "tarjeta"
+      | "transferencia"
+      | "otro",
     order_type: "para_llevar" as "en_local" | "para_llevar",
     table_number: "" as "" | number,
     notes: "",
@@ -124,7 +146,11 @@
     (selectedProduct?.flavors ?? [])
       .filter((flavor) => flavor.is_active)
       .slice()
-      .sort((left, right) => left.display_order - right.display_order || left.name.localeCompare(right.name)),
+      .sort(
+        (left, right) =>
+          left.display_order - right.display_order ||
+          left.name.localeCompare(right.name),
+      ),
   );
   const selectedProductAddons = $derived(
     (selectedProduct?.addons ?? [])
@@ -140,15 +166,23 @@
         );
       }),
   );
-  const selectedProductAddonGroups = $derived(groupAddonsByGroup(selectedProductAddons));
+  const selectedProductAddonGroups = $derived(
+    groupAddonsByGroup(selectedProductAddons),
+  );
   const toppingAddons = $derived(
-    selectedProductAddons.filter((addon) => normalizeAddonGroupName(addon.group_name) === "toppings"),
+    selectedProductAddons.filter(
+      (addon) => normalizeAddonGroupName(addon.group_name) === "toppings",
+    ),
   );
   const jaleaAddons = $derived(
-    selectedProductAddons.filter((addon) => normalizeAddonGroupName(addon.group_name) === "jalea"),
+    selectedProductAddons.filter(
+      (addon) => normalizeAddonGroupName(addon.group_name) === "jalea",
+    ),
   );
   const paidAddonGroups = $derived(
-    selectedProductAddonGroups.filter((group) => group.key !== "toppings" && group.key !== "jalea"),
+    selectedProductAddonGroups.filter(
+      (group) => group.key !== "toppings" && group.key !== "jalea",
+    ),
   );
   const hasCustomizationOptions = $derived(
     selectedProductFlavors.length > 0 || selectedProductAddons.length > 0,
@@ -163,25 +197,33 @@
   const filteredOrders = $derived(
     !normalizedOrderSearch
       ? orders
-      : orders.filter((order) => order.order_number.toLowerCase().includes(normalizedOrderSearch)),
+      : orders.filter((order) =>
+          order.order_number.toLowerCase().includes(normalizedOrderSearch),
+        ),
   );
 
   const pricePreview = $derived(selectedProduct ? selectedProduct.price : 0);
   const addonsPreviewTotal = $derived(
     selectedExtraAddonIds.reduce((sum, addonId) => {
-      const addon = selectedProductAddons.find((candidate) => candidate.id === addonId);
+      const addon = selectedProductAddons.find(
+        (candidate) => candidate.id === addonId,
+      );
       return sum + (addon?.price ?? 0);
     }, 0),
   );
   const totalPreview = $derived(
-    ((selectedProduct ? selectedProduct.price : 0) + addonsPreviewTotal) * Number(orderForm.quantity || 0),
+    ((selectedProduct ? selectedProduct.price : 0) + addonsPreviewTotal) *
+      Number(orderForm.quantity || 0),
   );
   const isEditing = $derived(!!editOrderId);
   const employeeById = $derived(
-    employees.reduce((acc, employee) => {
-      acc[employee.id] = employee.name || employee.email;
-      return acc;
-    }, {} as Record<string, string>),
+    employees.reduce(
+      (acc, employee) => {
+        acc[employee.id] = employee.name || employee.email;
+        return acc;
+      },
+      {} as Record<string, string>,
+    ),
   );
   const manualOrderTotal = $derived(
     ManualItemHelpers.manualOrderTotal(manualItems, products),
@@ -195,10 +237,17 @@
     return (product?.flavors ?? [])
       .filter((flavor) => flavor.is_active)
       .slice()
-      .sort((left, right) => left.display_order - right.display_order || left.name.localeCompare(right.name));
+      .sort(
+        (left, right) =>
+          left.display_order - right.display_order ||
+          left.name.localeCompare(right.name),
+      );
   }
 
-  function resolveFlavorName(productId: string, flavorId: string | undefined): string | null {
+  function resolveFlavorName(
+    productId: string,
+    flavorId: string | undefined,
+  ): string | null {
     return ManualItemHelpers.resolveFlavorName(productId, flavorId, products);
   }
 
@@ -214,7 +263,9 @@
     return ManualItemHelpers.manualItemSubtotal(item, products);
   }
 
-  function buildCustomizationsFromDraft(item: ManualOrderItemDraft): Record<string, unknown> | undefined {
+  function buildCustomizationsFromDraft(
+    item: ManualOrderItemDraft,
+  ): Record<string, unknown> | undefined {
     return ManualItemHelpers.buildCustomizationsFromDraft(item);
   }
 
@@ -258,8 +309,15 @@
     manualItems = DraftHelpers.removeDraftItem(manualItems, indexToRemove);
   }
 
-  function updateDraftItemQuantity(indexToUpdate: number, nextQuantity: number) {
-    manualItems = DraftHelpers.updateDraftItemQuantity(manualItems, indexToUpdate, nextQuantity);
+  function updateDraftItemQuantity(
+    indexToUpdate: number,
+    nextQuantity: number,
+  ) {
+    manualItems = DraftHelpers.updateDraftItemQuantity(
+      manualItems,
+      indexToUpdate,
+      nextQuantity,
+    );
   }
 
   function draftItemKey(item: ManualOrderItemDraft, index: number): string {
@@ -277,7 +335,10 @@
       return;
     }
 
-    if (selectedFlavorId && !selectedProductFlavors.some((flavor) => flavor.id === selectedFlavorId)) {
+    if (
+      selectedFlavorId &&
+      !selectedProductFlavors.some((flavor) => flavor.id === selectedFlavorId)
+    ) {
       selectedFlavorId = "";
     }
 
@@ -288,18 +349,28 @@
       selectedExtraAddonIds = normalizedAddonIds;
     }
 
-    if (includedToppingId && !toppingAddons.some((addon) => addon.id === includedToppingId)) {
+    if (
+      includedToppingId &&
+      !toppingAddons.some((addon) => addon.id === includedToppingId)
+    ) {
       includedToppingId = "";
     }
-    if (includedJaleaId && !jaleaAddons.some((addon) => addon.id === includedJaleaId)) {
+    if (
+      includedJaleaId &&
+      !jaleaAddons.some((addon) => addon.id === includedJaleaId)
+    ) {
       includedJaleaId = "";
     }
 
     if (includedToppingId) {
-      selectedExtraAddonIds = selectedExtraAddonIds.filter((addonId) => addonId !== includedToppingId);
+      selectedExtraAddonIds = selectedExtraAddonIds.filter(
+        (addonId) => addonId !== includedToppingId,
+      );
     }
     if (includedJaleaId) {
-      selectedExtraAddonIds = selectedExtraAddonIds.filter((addonId) => addonId !== includedJaleaId);
+      selectedExtraAddonIds = selectedExtraAddonIds.filter(
+        (addonId) => addonId !== includedJaleaId,
+      );
     }
   });
 
@@ -387,20 +458,26 @@
       return;
     }
 
-    selectedExtraAddonIds = selectedExtraAddonIds.filter((currentAddonId) => currentAddonId !== addonId);
+    selectedExtraAddonIds = selectedExtraAddonIds.filter(
+      (currentAddonId) => currentAddonId !== addonId,
+    );
   }
 
   function changeIncludedTopping(addonId: string) {
     includedToppingId = addonId;
     if (addonId) {
-      selectedExtraAddonIds = selectedExtraAddonIds.filter((currentAddonId) => currentAddonId !== addonId);
+      selectedExtraAddonIds = selectedExtraAddonIds.filter(
+        (currentAddonId) => currentAddonId !== addonId,
+      );
     }
   }
 
   function changeIncludedJalea(addonId: string) {
     includedJaleaId = addonId;
     if (addonId) {
-      selectedExtraAddonIds = selectedExtraAddonIds.filter((currentAddonId) => currentAddonId !== addonId);
+      selectedExtraAddonIds = selectedExtraAddonIds.filter(
+        (currentAddonId) => currentAddonId !== addonId,
+      );
     }
   }
 
@@ -482,7 +559,8 @@
       return;
     }
 
-    const fallbackItem = manualItems.length === 0 ? buildCurrentDraftItem() : null;
+    const fallbackItem =
+      manualItems.length === 0 ? buildCurrentDraftItem() : null;
     const items = OrderSubmission.prepareOrderItems(manualItems, fallbackItem);
 
     if (!items) {
@@ -518,7 +596,12 @@
   }
 
   function confirmNow() {
-    const result = DialogState.confirmNow({ open: confirmOpen, title: confirmTitle, message: confirmMessage, action: confirmAction });
+    const result = DialogState.confirmNow({
+      open: confirmOpen,
+      title: confirmTitle,
+      message: confirmMessage,
+      action: confirmAction,
+    });
     const action = result.action;
     confirmTitle = result.newState.title;
     confirmMessage = result.newState.message;
@@ -599,7 +682,10 @@
     printPromptState = DialogState.openPrintPrompt(order);
   }
 
-  async function handleStatusChangeFromList(orderId: string, status: "recibida" | "en_proceso" | "lista" | "entregada") {
+  async function handleStatusChangeFromList(
+    orderId: string,
+    status: "recibida" | "en_proceso" | "lista" | "entregada",
+  ) {
     const updated = await onStatusChange(orderId, status);
     if (!updated) return;
     await onOpenOrder(orderId);
@@ -611,7 +697,8 @@
       openPrintPrompt(order);
       return;
     }
-    const nextStatus = stepStatus === "pendiente_revision" ? "en_proceso" : stepStatus;
+    const nextStatus =
+      stepStatus === "pendiente_revision" ? "en_proceso" : stepStatus;
     void handleStatusChangeFromList(order.id, nextStatus);
   }
 
@@ -628,7 +715,6 @@
     if (!updated) return;
     await onOpenOrder(id);
   }
-
 </script>
 
 <section class="space-y-4">
@@ -648,8 +734,8 @@
     onSearchChange={(value) => {
       orderSearch = value;
     }}
-    onFilterChange={onFilterChange}
-    onReload={onReload}
+    {onFilterChange}
+    {onReload}
     onCreateOrder={openCreateOrderModal}
     onOpenOrder={(orderId) => {
       void onOpenOrder(orderId);
@@ -687,7 +773,7 @@
 
 <OrderEditor
   open={orderEditorOpen}
-  isEditing={isEditing}
+  {isEditing}
   {selectedOrder}
   {busy}
   {products}
@@ -746,7 +832,7 @@
   open={confirmOpen}
   title={confirmTitle}
   message={confirmMessage}
-  busy={busy}
+  {busy}
   onConfirm={confirmNow}
   onCancel={closeConfirm}
 />

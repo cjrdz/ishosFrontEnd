@@ -6,28 +6,28 @@
  * Requires: auth_token HttpOnly cookie
  */
 
-import type { APIRoute } from 'astro';
-import { requireUuidParam } from '../../../../../../lib/bff/params';
-import { proxyToBackend } from '../../../../../../lib/bff/proxy';
+import type { APIRoute } from "astro";
+import { requireUuidParam } from "../../../../../../lib/bff/params";
+import { proxyToBackend } from "../../../../../../lib/bff/proxy";
 
 export const prerender = false;
 
 export const POST: APIRoute = async (context) => {
-  const id = requireUuidParam(context, 'id');
+  const id = requireUuidParam(context, "id");
   if (id instanceof Response) return id;
-  const flavorId = requireUuidParam(context, 'flavorId');
+  const flavorId = requireUuidParam(context, "flavorId");
   if (flavorId instanceof Response) return flavorId;
   return proxyToBackend(context, `/products/${id}/flavors/${flavorId}`, {
-    method: 'POST',
+    method: "POST",
   });
 };
 
 export const DELETE: APIRoute = async (context) => {
-  const id = requireUuidParam(context, 'id');
+  const id = requireUuidParam(context, "id");
   if (id instanceof Response) return id;
-  const flavorId = requireUuidParam(context, 'flavorId');
+  const flavorId = requireUuidParam(context, "flavorId");
   if (flavorId instanceof Response) return flavorId;
   return proxyToBackend(context, `/products/${id}/flavors/${flavorId}`, {
-    method: 'DELETE',
+    method: "DELETE",
   });
 };

@@ -31,13 +31,26 @@
   });
 </script>
 
-<dialog class="modal" bind:this={dialogRef} onclose={() => { if (open) onCancel(); }}>
+<dialog
+  class="modal"
+  bind:this={dialogRef}
+  onclose={() => {
+    if (open) onCancel();
+  }}
+>
   <div class="modal-box">
     <h3 class="font-bold text-lg">{title}</h3>
     <p class="py-2 text-sm text-base-content/70">{message}</p>
     <div class="modal-action">
-      <button class="btn btn-ghost" type="button" onclick={onCancel}>Cancelar</button>
-      <button class={`btn btn-${variant}`} type="button" onclick={onConfirm} disabled={busy}>Confirmar</button>
+      <button class="btn btn-ghost" type="button" onclick={onCancel}
+        >Cancelar</button
+      >
+      <button
+        class={`btn btn-${variant}`}
+        type="button"
+        onclick={onConfirm}
+        disabled={busy}>Confirmar</button
+      >
     </div>
   </div>
   <form method="dialog" class="modal-backdrop">

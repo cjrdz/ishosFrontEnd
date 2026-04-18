@@ -30,7 +30,11 @@ interface CrudHandlerDeps {
   loadUsers: () => Promise<void>;
   setNotice: (message: string) => void;
   trackAction: (action: string, metadata?: Record<string, unknown>) => void;
-  trackError: (error: unknown, context: string, metadata?: Record<string, unknown>) => void;
+  trackError: (
+    error: unknown,
+    context: string,
+    metadata?: Record<string, unknown>,
+  ) => void;
 }
 
 export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
@@ -47,7 +51,9 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     trackError,
   } = deps;
 
-  async function handleCreateCategory(payload: Parameters<typeof createCategory>[0]) {
+  async function handleCreateCategory(
+    payload: Parameters<typeof createCategory>[0],
+  ) {
     await runModuleAction<void>({
       module: "categorias",
       requireAdmin: true,
@@ -63,7 +69,10 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
-  async function handleUpdateCategory(id: string, payload: Parameters<typeof updateCategory>[1]) {
+  async function handleUpdateCategory(
+    id: string,
+    payload: Parameters<typeof updateCategory>[1],
+  ) {
     await runModuleAction<void>({
       module: "categorias",
       requireAdmin: true,
@@ -95,7 +104,9 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
-  async function handleCreateProduct(payload: Parameters<typeof createProduct>[0]) {
+  async function handleCreateProduct(
+    payload: Parameters<typeof createProduct>[0],
+  ) {
     await runModuleAction<void>({
       module: "productos",
       requireAdmin: true,
@@ -110,12 +121,17 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
         await loadProducts();
       },
       onError: (requestError) => {
-        trackError(requestError, "AdminDashboard.handleCreateProduct", { name: payload.name });
+        trackError(requestError, "AdminDashboard.handleCreateProduct", {
+          name: payload.name,
+        });
       },
     });
   }
 
-  async function handleUpdateProduct(id: string, payload: Parameters<typeof updateProduct>[1]) {
+  async function handleUpdateProduct(
+    id: string,
+    payload: Parameters<typeof updateProduct>[1],
+  ) {
     await runModuleAction<void>({
       module: "productos",
       requireAdmin: true,
@@ -155,7 +171,9 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
-  async function handleCreateFlavor(payload: Parameters<typeof createFlavor>[0]) {
+  async function handleCreateFlavor(
+    payload: Parameters<typeof createFlavor>[0],
+  ) {
     await runModuleAction<void>({
       module: "sabores",
       requireAdmin: true,
@@ -171,7 +189,10 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
-  async function handleUpdateFlavor(id: string, payload: Parameters<typeof updateFlavor>[1]) {
+  async function handleUpdateFlavor(
+    id: string,
+    payload: Parameters<typeof updateFlavor>[1],
+  ) {
     await runModuleAction<void>({
       module: "sabores",
       requireAdmin: true,
@@ -219,7 +240,10 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
-  async function handleUpdateAddon(id: string, payload: Parameters<typeof updateAddon>[1]) {
+  async function handleUpdateAddon(
+    id: string,
+    payload: Parameters<typeof updateAddon>[1],
+  ) {
     await runModuleAction<void>({
       module: "complementos",
       requireAdmin: true,
@@ -251,7 +275,9 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
-  async function handleCreateEmployee(payload: Parameters<typeof createEmployee>[0]) {
+  async function handleCreateEmployee(
+    payload: Parameters<typeof createEmployee>[0],
+  ) {
     await runModuleAction<void>({
       module: "empleados",
       requireAdmin: true,
@@ -267,7 +293,10 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
-  async function handleUpdateEmployee(id: string, payload: Parameters<typeof updateEmployee>[1]) {
+  async function handleUpdateEmployee(
+    id: string,
+    payload: Parameters<typeof updateEmployee>[1],
+  ) {
     await runModuleAction<void>({
       module: "empleados",
       requireAdmin: true,
@@ -315,7 +344,10 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
-  async function handleUpdateUser(id: string, payload: Parameters<typeof updateUser>[1]) {
+  async function handleUpdateUser(
+    id: string,
+    payload: Parameters<typeof updateUser>[1],
+  ) {
     await runModuleAction<void>({
       module: "usuarios",
       requireAdmin: true,
@@ -347,7 +379,9 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
-  async function handleSaveUserFromOrder(payload: Parameters<typeof createUser>[0]) {
+  async function handleSaveUserFromOrder(
+    payload: Parameters<typeof createUser>[0],
+  ) {
     return runModuleAction<boolean>({
       module: "usuarios",
       requireAdmin: true,

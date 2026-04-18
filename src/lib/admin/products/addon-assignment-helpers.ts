@@ -1,6 +1,9 @@
 import type { Addon } from "../../api/admin";
 
-export function splitAddonAssignments(allAddons: Addon[], assignedAddonIds: string[]): {
+export function splitAddonAssignments(
+  allAddons: Addon[],
+  assignedAddonIds: string[],
+): {
   available: Addon[];
   assigned: Addon[];
 } {

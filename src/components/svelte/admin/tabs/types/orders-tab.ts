@@ -49,16 +49,22 @@ export interface OrdersTabProps {
   onOpenOrder: (id: string) => Promise<Order | null>;
   onApprove: (id: string, reason?: string) => void;
   onReject: (id: string, reason: string) => void;
-  onStatusChange: (id: string, status: "recibida" | "en_proceso" | "lista" | "entregada") => Promise<Order | null>;
-  onUpdateOrder: (id: string, payload: {
-    customer_name: string;
-    customer_phone: string;
-    customer_email?: string;
-    payment_method: "efectivo" | "tarjeta" | "transferencia" | "otro";
-    order_type: "en_local" | "para_llevar";
-    table_number?: number;
-    notes?: string;
-  }) => Promise<Order | null>;
+  onStatusChange: (
+    id: string,
+    status: "recibida" | "en_proceso" | "lista" | "entregada",
+  ) => Promise<Order | null>;
+  onUpdateOrder: (
+    id: string,
+    payload: {
+      customer_name: string;
+      customer_phone: string;
+      customer_email?: string;
+      payment_method: "efectivo" | "tarjeta" | "transferencia" | "otro";
+      order_type: "en_local" | "para_llevar";
+      table_number?: number;
+      notes?: string;
+    },
+  ) => Promise<Order | null>;
   onDelete: (id: string) => void;
   onCreate: (payload: CreateOrderPayload) => Promise<boolean>;
   saveUserFromOrder: (payload: {

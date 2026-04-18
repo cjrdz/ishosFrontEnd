@@ -1,2 +1,5 @@
-export { arraysEqualUnordered, normalizeIdList, toggleSelection } from "../../../../../lib/utils/collections";
-
+export {
+  arraysEqualUnordered,
+  normalizeIdList,
+  toggleSelection,
+} from "../../../../../lib/utils/collections";

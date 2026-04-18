@@ -55,11 +55,18 @@ export function addonGroupLabel(value: string): string {
     .join(" ");
 }
 
-export function sortByDisplayOrderAndName<T extends { display_order: number; name: string }>(left: T, right: T): number {
-  return left.display_order - right.display_order || left.name.localeCompare(right.name);
+export function sortByDisplayOrderAndName<
+  T extends { display_order: number; name: string },
+>(left: T, right: T): number {
+  return (
+    left.display_order - right.display_order ||
+    left.name.localeCompare(right.name)
+  );
 }
 
-export function groupAddonsByGroup<T extends AddonGroupItem>(source: T[]): Array<{ key: string; label: string; items: T[] }> {
+export function groupAddonsByGroup<T extends AddonGroupItem>(
+  source: T[],
+): Array<{ key: string; label: string; items: T[] }> {
   const grouped = new Map<string, T[]>();
 
   for (const addon of source) {
@@ -74,6 +81,8 @@ export function groupAddonsByGroup<T extends AddonGroupItem>(source: T[]): Array
     .map(([key, items]) => ({
       key,
       label: addonGroupLabel(key),
-      items: items.slice().sort((left, right) => sortByDisplayOrderAndName(left, right)),
+      items: items
+        .slice()
+        .sort((left, right) => sortByDisplayOrderAndName(left, right)),
     }));
 }

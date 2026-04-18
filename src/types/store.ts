@@ -41,7 +41,13 @@ export interface CartItem {
 /**
  * Order status
  */
-export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "completed"
+  | "cancelled";
 
 /**
  * Order item (product in order)

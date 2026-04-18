@@ -11,7 +11,10 @@ export interface PendingStatusChange {
 export async function handleStatusChangeFromList(
   orderId: string,
   status: "recibida" | "en_proceso" | "lista" | "entregada",
-  onStatusChange: (id: string, status: "recibida" | "en_proceso" | "lista" | "entregada") => Promise<boolean | Order | null>,
+  onStatusChange: (
+    id: string,
+    status: "recibida" | "en_proceso" | "lista" | "entregada",
+  ) => Promise<boolean | Order | null>,
   onOpenOrder: (id: string) => Promise<Order | null>,
 ): Promise<void> {
   const updated = await onStatusChange(orderId, status);
@@ -27,7 +30,10 @@ export function handleStepClick(
   order: Order,
   stepStatus: LinearOrderStatus,
   onPrintPrompt: (order: Order) => void,
-  onStatusChange: (orderId: string, status: "recibida" | "en_proceso" | "lista" | "entregada") => Promise<boolean | Order | null>,
+  onStatusChange: (
+    orderId: string,
+    status: "recibida" | "en_proceso" | "lista" | "entregada",
+  ) => Promise<boolean | Order | null>,
   canChangeToStep: (fromStatus: string, toStatus: LinearOrderStatus) => boolean,
 ): void {
   if (order.status === "cancelada" || order.status === stepStatus) return;
@@ -37,8 +43,14 @@ export function handleStepClick(
     return;
   }
 
-  const nextStatus = stepStatus === "pendiente_revision" ? "en_proceso" : stepStatus;
-  void handleStatusChangeFromList(order.id, nextStatus as "recibida" | "en_proceso" | "lista" | "entregada", onStatusChange, async () => order);
+  const nextStatus =
+    stepStatus === "pendiente_revision" ? "en_proceso" : stepStatus;
+  void handleStatusChangeFromList(
+    order.id,
+    nextStatus as "recibida" | "en_proceso" | "lista" | "entregada",
+    onStatusChange,
+    async () => order,
+  );
 }
 
 /**
@@ -47,7 +59,10 @@ export function handleStepClick(
  */
 export async function applyStatusChange(
   pendingStatusChange: PendingStatusChange | null,
-  onStatusChange: (id: string, status: "recibida" | "en_proceso" | "lista" | "entregada") => Promise<boolean | Order | null>,
+  onStatusChange: (
+    id: string,
+    status: "recibida" | "en_proceso" | "lista" | "entregada",
+  ) => Promise<boolean | Order | null>,
   onOpenOrder: (id: string) => Promise<Order | null>,
   onClosePrintPrompt: () => void,
 ): Promise<void> {

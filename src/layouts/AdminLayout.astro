@@ -19,13 +19,18 @@ const { title } = Astro.props as Props;
     <title>{title}</title>
     <script is:inline>
       (() => {
-        const savedTheme = localStorage.getItem("theme");
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const resolvedTheme = savedTheme === "fantasy" || savedTheme === "night"
-          ? savedTheme
-          : prefersDark
-            ? "night"
-            : "fantasy";
+        const savedTheme =
+          localStorage.getItem("ishos_theme_admin") ??
+          localStorage.getItem("theme");
+        const prefersDark = window.matchMedia(
+          "(prefers-color-scheme: dark)",
+        ).matches;
+        const resolvedTheme =
+          savedTheme === "fantasy" || savedTheme === "night"
+            ? savedTheme
+            : prefersDark
+              ? "night"
+              : "fantasy";
 
         document.documentElement.setAttribute("data-theme", resolvedTheme);
       })();

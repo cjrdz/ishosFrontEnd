@@ -11,7 +11,15 @@ const isVercelBuild = process.env.VERCEL === '1' || deployTarget === 'vercel';
 
 // https://astro.build/config
 export default defineConfig({
-  adapter: isVercelBuild ? vercel() : cloudflare(),
+  adapter: isVercelBuild
+    ? vercel()
+    : cloudflare({
+        // Images are served directly from R2 CDN URLs — no Cloudflare Images
+        // service needed. Using 'compile' avoids activating the IMAGES binding.
+        imageService: 'compile',
+        // KV binding name from wrangler.jsonc
+        sessionKVBindingName: 'ishosfactory-session',
+      }),
   output: 'server',
   server: {
     host: true,
@@ -27,7 +35,19 @@ export default defineConfig({
     },
     plugins: [tailwindcss()],
     optimizeDeps: {
-      exclude: ['zod'],
+      // Exclude packages that export raw .svelte files — esbuild has no Svelte
+      // loader and will throw "No loader configured for .svelte files".
+      exclude: ['zod', '@iconify/svelte', 'svelte-echarts'],
+    },
+    // Immutable cache for hashed assets, short TTL for HTML
+    build: {
+      rollupOptions: {
+        output: {
+          // Keep chunk names stable for better CDN cache hit rates
+          chunkFileNames: '_astro/[name].[hash].js',
+          assetFileNames: '_astro/[name].[hash][extname]',
+        },
+      },
     },
   },
 });

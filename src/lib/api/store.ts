@@ -5,15 +5,17 @@ async function bffRequest<T>(path: string, options?: RequestInit): Promise<T> {
   try {
     response = await fetch(path, options);
   } catch {
-    throw new ApiError('Network request failed', 0, 'NETWORK_ERROR');
+    throw new ApiError("Network request failed", 0, "NETWORK_ERROR");
   }
   if (!response.ok) {
-    let message = 'Request failed';
+    let message = "Request failed";
     try {
-      const data = await response.json() as Record<string, unknown>;
-      if (typeof data?.error === 'string') message = data.error;
-    } catch { /* ignore */ }
-    throw new ApiError(message, response.status, 'API_ERROR');
+      const data = (await response.json()) as Record<string, unknown>;
+      if (typeof data?.error === "string") message = data.error;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(message, response.status, "API_ERROR");
   }
   return response.json() as Promise<T>;
 }
@@ -105,19 +107,19 @@ export interface PublicOrderTrackingHistoryResponse {
 }
 
 export async function listPublicCategories(): Promise<PublicCategory[]> {
-  return bffRequest<PublicCategory[]>('/api/store/categories');
+  return bffRequest<PublicCategory[]>("/api/store/categories");
 }
 
 export async function listPublicProducts(): Promise<PublicProduct[]> {
-  return bffRequest<PublicProduct[]>('/api/store/products');
+  return bffRequest<PublicProduct[]>("/api/store/products");
 }
 
 export async function createPublicOrder(
   payload: PublicOrderCreatePayload,
 ): Promise<PublicOrderCreateResponse> {
-  return bffRequest<PublicOrderCreateResponse>('/api/store/orders', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  return bffRequest<PublicOrderCreateResponse>("/api/store/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 }
@@ -129,4 +131,23 @@ export async function trackPublicOrder(
   return bffRequest<PublicOrderTrackingResponse>(
     `/api/store/tracking/${encodeURIComponent(orderNumber)}?tracking_token=${encodeURIComponent(trackingToken)}`,
   );
+}
+
+// ── Public Store Settings ────────────────────────────────────────────
+
+export interface StoreOfferItem {
+  product_id: string;
+  label: string;
+  note?: string;
+  discount_price?: number;
+  expires_at: string;
+}
+
+export interface StorePublicSettings {
+  orders_enabled: boolean;
+  offers: StoreOfferItem[];
+}
+
+export async function fetchStoreSettings(): Promise<StorePublicSettings> {
+  return bffRequest<StorePublicSettings>("/api/store/settings");
 }

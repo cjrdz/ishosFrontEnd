@@ -1,12 +1,31 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { formatCurrency } from "../../../lib/utils/formatters";
-  import { listPublicProducts, type PublicProduct } from "../../../lib/api/store";
+  import {
+    fetchStoreSettings,
+    listPublicProducts,
+    type PublicProduct,
+    type StoreOfferItem,
+  } from "../../../lib/api/store";
+  import StoreOffers from "./StoreOffers.svelte";
 
   let loading = $state(true);
   let error = $state("");
   let featured = $state<PublicProduct[]>([]);
+  let allProducts = $state<PublicProduct[]>([]);
+  let ordersEnabled = $state(true);
+  let offers = $state<StoreOfferItem[]>([]);
   const featuredSkeletonCards = Array.from({ length: 4 }, (_, index) => index);
+  const activeOfferMap = $derived.by(() => {
+    const now = Date.now();
+    const map = new Map<string, StoreOfferItem>();
+    for (const offer of offers) {
+      if (new Date(offer.expires_at).getTime() > now) {
+        map.set(offer.product_id, offer);
+      }
+    }
+    return map;
+  });
 
   onMount(() => {
     void loadFeatured();
@@ -17,113 +36,155 @@
     error = "";
 
     try {
-      const products = await listPublicProducts();
-      featured = products
-        .filter((product) => product.is_available)
-        .slice(0, 4);
+      const [featuredRes, catalogRes, settings] = await Promise.all([
+        fetch("/api/store/featured").then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return (await res.json()) as PublicProduct[];
+        }),
+        listPublicProducts(),
+        fetchStoreSettings().catch(() => ({
+          orders_enabled: true,
+          offers: [] as StoreOfferItem[],
+        })),
+      ]);
+      featured = featuredRes;
+      allProducts = catalogRes.filter((item) => item.is_available);
+      ordersEnabled = settings.orders_enabled;
+      offers = settings.offers ?? [];
     } catch (requestError) {
-      error = requestError instanceof Error ? requestError.message : "No se pudo cargar el menú.";
+      error =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo cargar el menú.";
     } finally {
       loading = false;
     }
   }
+
+  function getSafeImageUrl(url: string | null | undefined): string | undefined {
+    if (!url) return undefined;
+    if (
+      url.startsWith("/") ||
+      url.startsWith("http://") ||
+      url.startsWith("https://")
+    )
+      return url;
+    return undefined;
+  }
 </script>
 
-<div class="container mx-auto px-4 py-6 md:py-10 space-y-12 md:space-y-16">
-  <!-- Hero Section -->
-  <section class="max-w-5xl mx-auto px-2">
-    <div class="card bg-base-100/50 backdrop-blur-sm shadow-xl border border-base-200/50 rounded-3xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-primary/20">
-      <div class="card-body py-10 md:py-16 px-6 md:px-12 text-center items-center">
-        <div class="max-w-2xl">
-          <h1 class="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight leading-tight">
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
-              IshosFactory
-            </span>
-            <br class="hidden md:block"/> <span class="md:hidden">—</span> Gelatos & Sorbetes
-          </h1>
-          <p class="py-2 mb-4 text-base md:text-lg text-base-content/80 font-medium leading-relaxed">
-            Helados artesanales hechos con amor en El Salvador.
-          </p>
-          <div class="mt-4">
-            <a href="/menu" class="btn btn-primary btn-lg rounded-full px-8 shadow-sm hover:shadow-md transition-all">Ver todo el menú</a>
-          </div>
-        </div>
-      </div>
+<div class="space-y-2 md:space-y-4">
+  <section class="max-w-7xl mx-auto px-4 pt-6 pb-4 md:pt-8 md:pb-6 text-center">
+    <div
+      class="mx-auto max-w-3xl rounded-3xl border border-base-200/70 bg-base-100/70 px-4 py-6 shadow-sm backdrop-blur-sm md:px-8 md:py-8"
+    >
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight">
+        <span
+          class="text-transparent bg-clip-text bg-linear-to-r from-primary to-secondary"
+        >
+          Isho's Factory
+        </span>
+      </h1>
+      <p
+        class="mt-3 text-sm font-medium uppercase tracking-[0.16em] text-base-content/55 md:text-base"
+      >
+        Tradicion desde 2021
+      </p>
+      <p class="mt-2 text-sm text-base-content/65 md:text-base">
+        Sabores artesanales listos para pedir en minutos.
+      </p>
     </div>
   </section>
 
+  <!-- Special Offers (only if offers exist) -->
+  {#if !loading && offers.length > 0}
+    <StoreOffers
+      {offers}
+      products={allProducts.length > 0 ? allProducts : featured}
+      {ordersEnabled}
+    />
+  {/if}
+
   <!-- Featured Products Section -->
-  <section class="max-w-7xl mx-auto px-2 pb-12">
-    <div class="text-center mb-10 md:mb-14">
-      <h2 class="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-base-content to-base-content/70 inline-block mb-3">
+  <section class="max-w-7xl mx-auto px-4 pt-4 pb-8 md:pt-6 md:pb-10">
+    <div class="text-center mb-5 md:mb-8">
+      <h2 class="text-2xl md:text-3xl font-bold inline-block mb-1">
         Productos Destacados
       </h2>
-      <p class="text-base-content/60 font-medium text-lg">Nuestros sabores más queridos.</p>
+      <p class="text-base-content/60 font-medium text-sm md:text-base">
+        Nuestros sabores más queridos.
+      </p>
     </div>
 
     {#if loading}
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {#each featuredSkeletonCards as cardIndex (cardIndex)}
-          <article class="card bg-base-100 w-full shadow-md border border-base-200/50 overflow-hidden h-full rounded-2xl" aria-hidden="true">
-            <div class="skeleton w-full aspect-[4/3]"></div>
-            <div class="card-body p-6 space-y-4">
-              <div class="skeleton h-6 w-3/4"></div>
-              <div class="space-y-2">
-                <div class="skeleton h-4 w-full"></div>
-                <div class="skeleton h-4 w-5/6"></div>
-              </div>
-              <div class="card-actions justify-between items-center mt-auto pt-4">
-                <div class="skeleton h-8 w-20"></div>
-                <div class="skeleton h-6 w-24 rounded-full"></div>
-              </div>
+          <article
+            class="card bg-base-100 w-full shadow-sm border border-base-200/50 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
+            aria-hidden="true"
+          >
+            <div class="skeleton w-full aspect-4/3"></div>
+            <div class="card-body p-3 sm:p-4 md:p-5 space-y-2">
+              <div class="skeleton h-4 w-3/4"></div>
+              <div class="skeleton h-5 w-16"></div>
             </div>
           </article>
         {/each}
       </div>
     {:else if error}
-      <div class="alert alert-error max-w-xl mx-auto rounded-xl shadow-sm">{error}</div>
+      <div class="alert alert-error max-w-xl mx-auto rounded-xl shadow-sm">
+        {error}
+      </div>
     {:else}
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {#each featured as product (product.id)}
-          <div class="h-full group">
-            <article class="card bg-base-100 w-full border border-base-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden h-full rounded-2xl">
-              {#if product.image_url}
-                <figure class="bg-base-200/50 w-full aspect-[4/3] overflow-hidden relative">
+          {@const offer = activeOfferMap.get(product.id)}
+          <a href="/menu" class="h-full group block">
+            <article
+              class="card bg-base-100 w-full border border-base-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
+            >
+              {#if getSafeImageUrl(product.image_url)}
+                <figure
+                  class="bg-base-200/50 w-full aspect-4/3 overflow-hidden relative"
+                >
                   <img
-                    src={product.image_url}
+                    src={getSafeImageUrl(product.image_url)}
                     alt={product.name}
                     class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     loading="lazy"
                   />
-                  <div class="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                  {#if offer}
+                    <span
+                      class="absolute top-2 left-2 badge badge-warning badge-sm font-semibold shadow-sm"
+                    >
+                      {offer.label || "Oferta"}
+                    </span>
+                  {/if}
                 </figure>
               {/if}
-              <div class="card-body p-5 md:p-6 flex flex-col">
-                <h3 class="card-title text-xl font-bold leading-tight mb-1">{product.name}</h3>
-                <p class="text-sm text-base-content/70 line-clamp-2 leading-relaxed mb-4">{product.description}</p>
-                
-                {#if product.flavors && product.flavors.length > 0}
-                  <div class="flex flex-wrap gap-2 mb-4 mt-auto">
-                    {#each product.flavors.slice(0, 2) as flavor (flavor.id)}
-                      <div class="flex items-center gap-1">
-                        <span class="badge badge-sm badge-outline text-base-content/70">{flavor.name}</span>
-                        {#if flavor.is_seasonal}
-                          <span class="badge badge-sm badge-warning badge-outline">Temporada</span>
-                        {/if}
-                      </div>
-                    {/each}
+              <div class="p-3 sm:p-4 md:p-5">
+                <h3
+                  class="text-sm md:text-base font-semibold leading-tight mb-1.5"
+                >
+                  {product.name}
+                </h3>
+                {#if offer?.discount_price}
+                  <div class="flex items-baseline gap-2">
+                    <span class="text-xs line-through text-base-content/40"
+                      >{formatCurrency(product.price)}</span
+                    >
+                    <span class="text-base md:text-lg font-bold text-primary"
+                      >{formatCurrency(offer.discount_price)}</span
+                    >
                   </div>
                 {:else}
-                  <div class="mt-auto"></div>
+                  <span class="text-base md:text-lg font-bold text-primary"
+                    >{formatCurrency(product.price)}</span
+                  >
                 {/if}
-                
-                <div class="card-actions justify-between items-center pt-4 border-t border-base-200/50 mt-1">
-                  <span class="text-2xl font-bold text-primary">{formatCurrency(product.price)}</span>
-                  <span class="badge badge-success badge-outline font-medium px-3 py-3">Disponible</span>
-                </div>
               </div>
             </article>
-          </div>
+          </a>
         {/each}
       </div>
     {/if}

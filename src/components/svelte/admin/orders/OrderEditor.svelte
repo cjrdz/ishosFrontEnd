@@ -1,9 +1,17 @@
 <script lang="ts">
-  import Icon from "@iconify/svelte";
-  import type { Product, Order, Flavor, Addon } from "../../../../lib/api/admin";
+  import Icon from "../../shared/AppIcon.svelte";
+  import type {
+    Product,
+    Order,
+    Flavor,
+    Addon,
+  } from "../../../../lib/api/admin";
   import { formatCurrency } from "../../../../lib/utils/formatters";
   import OrderItemBuilder from "./OrderItemBuilder.svelte";
-  import type { ManualOrderItemDraft, OrderFormState } from "../tabs/types/orders-tab";
+  import type {
+    ManualOrderItemDraft,
+    OrderFormState,
+  } from "../tabs/types/orders-tab";
 
   interface AddonGroup {
     key: string;
@@ -47,7 +55,10 @@
     onRemoveDraftItem: (index: number) => void;
     onUpdateDraftItemQuantity: (index: number, quantity: number) => void;
     onProductById: (productId: string) => Product | undefined;
-    onResolveFlavorName: (productId: string, flavorId: string | undefined) => string | null;
+    onResolveFlavorName: (
+      productId: string,
+      flavorId: string | undefined,
+    ) => string | null;
     onResolveAddonNames: (productId: string, addonIds: string[]) => string[];
     onManualItemSubtotal: (item: ManualOrderItemDraft) => number;
     onDraftItemKey: (item: ManualOrderItemDraft, index: number) => string;
@@ -117,18 +128,21 @@
   }
 
   const displayTotal = $derived(
-    manualItems.length > 0 ? manualOrderTotal : totalPreview
+    manualItems.length > 0 ? manualOrderTotal : totalPreview,
   );
 </script>
 
 <!-- Main order editor dialog -->
 <dialog class="modal" bind:this={dialogRef} onclose={onClose}>
   <div class="modal-box w-11/12 max-w-4xl max-h-[92vh] overflow-y-auto p-0">
-
     <!-- Sticky header -->
-    <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4">
+    <div
+      class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4"
+    >
       <div class="flex flex-wrap items-center gap-2.5">
-        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+        <div
+          class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"
+        >
           <Icon
             icon={isEditing ? "lucide:pencil" : "lucide:clipboard-list"}
             class="text-primary"
@@ -141,7 +155,9 @@
             {isEditing ? "Editar orden" : "Crear orden manual"}
           </h3>
           {#if isEditing && selectedOrder}
-            <p class="text-xs text-base-content/50 leading-tight">{selectedOrder.order_number}</p>
+            <p class="text-xs text-base-content/50 leading-tight">
+              {selectedOrder.order_number}
+            </p>
           {/if}
         </div>
       </div>
@@ -157,17 +173,27 @@
 
     <!-- Form body -->
     <form class="p-5 space-y-5" onsubmit={onSubmit}>
-
       <!-- Customer info section -->
       <section class="space-y-4">
         <div class="flex items-center gap-2">
-          <Icon icon="lucide:user" width="14" height="14" class="text-base-content/50" />
-          <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Informacion del cliente</p>
+          <Icon
+            icon="lucide:user"
+            width="14"
+            height="14"
+            class="text-base-content/50"
+          />
+          <p
+            class="text-xs font-semibold uppercase tracking-wide text-base-content/50"
+          >
+            Informacion del cliente
+          </p>
         </div>
 
         <div class="grid md:grid-cols-2 gap-4">
           <div class="form-control">
-            <span id="order-customer-name-label" class="label-text mb-1.5">Nombre del cliente</span>
+            <span id="order-customer-name-label" class="label-text mb-1.5"
+              >Nombre del cliente</span
+            >
             <input
               id="order-customer-name"
               class="input input-bordered w-full"
@@ -178,7 +204,9 @@
             />
           </div>
           <div class="form-control">
-            <span id="order-customer-phone-label" class="label-text mb-1.5">Telefono</span>
+            <span id="order-customer-phone-label" class="label-text mb-1.5"
+              >Telefono</span
+            >
             <input
               id="order-customer-phone"
               class="input input-bordered w-full"
@@ -210,13 +238,24 @@
       <!-- Order details section -->
       <section class="space-y-4">
         <div class="flex items-center gap-2">
-          <Icon icon="lucide:receipt" width="14" height="14" class="text-base-content/50" />
-          <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Detalles de la orden</p>
+          <Icon
+            icon="lucide:receipt"
+            width="14"
+            height="14"
+            class="text-base-content/50"
+          />
+          <p
+            class="text-xs font-semibold uppercase tracking-wide text-base-content/50"
+          >
+            Detalles de la orden
+          </p>
         </div>
 
         <div class="grid md:grid-cols-3 gap-4">
           <div class="form-control">
-            <span id="order-payment-method-label" class="label-text mb-1.5">Metodo de pago</span>
+            <span id="order-payment-method-label" class="label-text mb-1.5"
+              >Metodo de pago</span
+            >
             <select
               id="order-payment-method"
               class="select select-bordered w-full"
@@ -230,7 +269,9 @@
             </select>
           </div>
           <div class="form-control">
-            <span id="order-type-label" class="label-text mb-1.5">Tipo de orden</span>
+            <span id="order-type-label" class="label-text mb-1.5"
+              >Tipo de orden</span
+            >
             <select
               id="order-type"
               class="select select-bordered w-full"
@@ -242,13 +283,17 @@
             </select>
           </div>
           <div class="form-control">
-            <span id="order-table-number-label" class="label-text mb-1.5">Mesa</span>
+            <span id="order-table-number-label" class="label-text mb-1.5"
+              >Mesa</span
+            >
             <input
               id="order-table-number"
               class="input input-bordered w-full"
               type="number"
               min="1"
-              placeholder={orderForm.order_type === "en_local" ? "Numero de mesa" : "No aplica"}
+              placeholder={orderForm.order_type === "en_local"
+                ? "Numero de mesa"
+                : "No aplica"}
               bind:value={orderForm.table_number}
               required={orderForm.order_type === "en_local"}
               disabled={orderForm.order_type !== "en_local"}
@@ -283,29 +328,40 @@
           {onProductChange}
           {onQuantityChange}
           {onFlavorChange}
-          onChangeIncludedTopping={onChangeIncludedTopping}
-          onChangeIncludedJalea={onChangeIncludedJalea}
-          onToggleExtraAddonSelection={onToggleExtraAddonSelection}
-          onAddDraftItem={onAddDraftItem}
-          onRemoveDraftItem={onRemoveDraftItem}
-          onUpdateDraftItemQuantity={onUpdateDraftItemQuantity}
-          onProductById={onProductById}
-          onResolveFlavorName={onResolveFlavorName}
-          onResolveAddonNames={onResolveAddonNames}
-          onManualItemSubtotal={onManualItemSubtotal}
-          onDraftItemKey={onDraftItemKey}
+          {onChangeIncludedTopping}
+          {onChangeIncludedJalea}
+          {onToggleExtraAddonSelection}
+          {onAddDraftItem}
+          {onRemoveDraftItem}
+          {onUpdateDraftItemQuantity}
+          {onProductById}
+          {onResolveFlavorName}
+          {onResolveAddonNames}
+          {onManualItemSubtotal}
+          {onDraftItemKey}
         />
       {:else}
         <!-- Edit mode: read-only product info -->
         <section class="space-y-4">
           <div class="flex items-center gap-2">
-            <Icon icon="lucide:package" width="14" height="14" class="text-base-content/50" />
-            <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Producto de la orden</p>
+            <Icon
+              icon="lucide:package"
+              width="14"
+              height="14"
+              class="text-base-content/50"
+            />
+            <p
+              class="text-xs font-semibold uppercase tracking-wide text-base-content/50"
+            >
+              Producto de la orden
+            </p>
           </div>
           <div class="rounded-xl border border-base-300/70 bg-base-200/40 p-4">
             <div class="grid md:grid-cols-2 gap-4">
               <div class="form-control">
-                <span id="order-product-label" class="label-text mb-1.5">Producto</span>
+                <span id="order-product-label" class="label-text mb-1.5"
+                  >Producto</span
+                >
                 <select
                   id="order-product"
                   class="select select-bordered w-full"
@@ -324,7 +380,9 @@
                 </select>
               </div>
               <div class="form-control">
-                <span id="order-quantity-label" class="label-text mb-1.5">Cantidad</span>
+                <span id="order-quantity-label" class="label-text mb-1.5"
+                  >Cantidad</span
+                >
                 <input
                   id="order-quantity"
                   class="input input-bordered w-full"
@@ -337,9 +395,12 @@
                 />
               </div>
             </div>
-            <p class="mt-3 text-xs text-base-content/50 flex items-center gap-1.5">
+            <p
+              class="mt-3 text-xs text-base-content/50 flex items-center gap-1.5"
+            >
               <Icon icon="lucide:lock" width="12" height="12" />
-              El producto no puede modificarse en modo edicion. Solo se actualizan los datos del cliente y la nota.
+              El producto no puede modificarse en modo edicion. Solo se actualizan
+              los datos del cliente y la nota.
             </p>
           </div>
         </section>
@@ -351,13 +412,24 @@
         <div class="rounded-xl border border-base-300 bg-base-100 p-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-start gap-3">
-              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-base-200 mt-0.5">
-                <Icon icon="lucide:sticky-note" width="14" height="14" class="text-base-content/60" />
+              <div
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-base-200 mt-0.5"
+              >
+                <Icon
+                  icon="lucide:sticky-note"
+                  width="14"
+                  height="14"
+                  class="text-base-content/60"
+                />
               </div>
               <div class="min-w-0">
-                <p class="font-medium text-sm leading-tight">Nota de la orden</p>
+                <p class="font-medium text-sm leading-tight">
+                  Nota de la orden
+                </p>
                 <p class="text-sm text-base-content/60 mt-0.5 line-clamp-2">
-                  {orderForm.notes.trim() ? orderForm.notes : "Sin nota agregada"}
+                  {orderForm.notes.trim()
+                    ? orderForm.notes
+                    : "Sin nota agregada"}
                 </p>
               </div>
             </div>
@@ -366,7 +438,11 @@
               type="button"
               onclick={openNotesDialog}
             >
-              <Icon icon={orderForm.notes.trim() ? "lucide:pencil" : "lucide:plus"} width="13" height="13" />
+              <Icon
+                icon={orderForm.notes.trim() ? "lucide:pencil" : "lucide:plus"}
+                width="13"
+                height="13"
+              />
               {orderForm.notes.trim() ? "Editar nota" : "Agregar nota"}
             </button>
           </div>
@@ -374,11 +450,20 @@
       </section>
 
       <!-- Total preview -->
-      <div class="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div
+        class="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex flex-wrap items-center justify-between gap-2"
+      >
         <div class="flex items-center gap-2">
-          <Icon icon="lucide:calculator" width="15" height="15" class="text-primary/70" />
+          <Icon
+            icon="lucide:calculator"
+            width="15"
+            height="15"
+            class="text-primary/70"
+          />
           <span class="text-sm font-medium text-base-content/80">
-            {isEditing ? "Total actual de la orden" : "Total estimado de la orden"}
+            {isEditing
+              ? "Total actual de la orden"
+              : "Total estimado de la orden"}
           </span>
         </div>
         <span class="text-base font-bold text-primary">
@@ -416,7 +501,6 @@
           {isEditing ? "Cancelar edicion" : "Cancelar"}
         </button>
       </div>
-
     </form>
   </div>
   <form method="dialog" class="modal-backdrop">
@@ -427,11 +511,19 @@
 <!-- Notes sub-dialog -->
 <dialog class="modal" bind:this={noteDialogRef}>
   <div class="modal-box max-w-lg p-0">
-
-    <div class="flex items-center justify-between gap-3 border-b border-base-200 px-5 py-4">
+    <div
+      class="flex items-center justify-between gap-3 border-b border-base-200 px-5 py-4"
+    >
       <div class="flex items-center gap-2.5">
-        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-base-200">
-          <Icon icon="lucide:sticky-note" width="14" height="14" class="text-base-content/60" />
+        <div
+          class="flex h-7 w-7 items-center justify-center rounded-lg bg-base-200"
+        >
+          <Icon
+            icon="lucide:sticky-note"
+            width="14"
+            height="14"
+            class="text-base-content/60"
+          />
         </div>
         <h3 class="font-bold text-base">Nota de la orden</h3>
       </div>
@@ -459,7 +551,8 @@
 
     <div class="p-5 space-y-3">
       <p class="text-sm text-base-content/60">
-        Agrega una observacion general para esta orden. El cliente puede verla en su seguimiento.
+        Agrega una observacion general para esta orden. El cliente puede verla
+        en su seguimiento.
       </p>
       <textarea
         id="order-notes"
@@ -472,13 +565,20 @@
     </div>
 
     <div class="flex justify-end gap-2 border-t border-base-200 px-5 py-4">
-      <button class="btn btn-ghost btn-sm" type="button" onclick={closeNotesDialog}>Cancelar</button>
-      <button class="btn btn-primary btn-sm" type="button" onclick={closeNotesDialog}>
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={closeNotesDialog}>Cancelar</button
+      >
+      <button
+        class="btn btn-primary btn-sm"
+        type="button"
+        onclick={closeNotesDialog}
+      >
         <Icon icon="lucide:check" width="14" height="14" />
         Guardar nota
       </button>
     </div>
-
   </div>
   <form method="dialog" class="modal-backdrop">
     <button type="button" onclick={closeNotesDialog}>close</button>

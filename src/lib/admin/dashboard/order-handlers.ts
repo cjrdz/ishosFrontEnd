@@ -20,7 +20,11 @@ interface OrderHandlerDeps {
   setSelectedOrder: (value: Order | null) => void;
 }
 
-function mergeSelectedOrder(deps: OrderHandlerDeps, orderId: string, updated: Order) {
+function mergeSelectedOrder(
+  deps: OrderHandlerDeps,
+  orderId: string,
+  updated: Order,
+) {
   const selected = deps.getSelectedOrder();
   if (selected?.id === orderId) {
     deps.setSelectedOrder({ ...selected, ...updated });
@@ -111,7 +115,9 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
       },
       defaultValue: undefined,
       onSuccess: async () => {
-        setNotice(reactivationReason?.trim() ? "Orden reactivada" : "Orden aprobada");
+        setNotice(
+          reactivationReason?.trim() ? "Orden reactivada" : "Orden aprobada",
+        );
         await loadOrders();
       },
     });
@@ -139,7 +145,10 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
     });
   }
 
-  async function handleStatusChange(orderId: string, status: "recibida" | "en_proceso" | "lista" | "entregada") {
+  async function handleStatusChange(
+    orderId: string,
+    status: "recibida" | "en_proceso" | "lista" | "entregada",
+  ) {
     return runModuleAction<Order | null>({
       module: "ordenes",
       analyticsAction: "admin_order_status_change",
@@ -157,7 +166,10 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
     });
   }
 
-  async function handleUpdateOrder(orderId: string, payload: Parameters<typeof updateOrder>[1]) {
+  async function handleUpdateOrder(
+    orderId: string,
+    payload: Parameters<typeof updateOrder>[1],
+  ) {
     return runModuleAction<Order | null>({
       module: "ordenes",
       analyticsAction: "admin_order_update",

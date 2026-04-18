@@ -1,13 +1,34 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import Icon from "@iconify/svelte";
-  import { COLOR_THEME, DARK_THEME, type ThemeMode } from "../../../lib/theme/constants";
+  import Icon from "./AppIcon.svelte";
+  import {
+    ADMIN_THEME_STORAGE_KEY,
+    COLOR_THEME,
+    DARK_THEME,
+    STORE_THEME_STORAGE_KEY,
+    type ThemeMode,
+  } from "../../../lib/theme/constants";
+
+  function getStorageKey(): string {
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/admin")
+    ) {
+      return ADMIN_THEME_STORAGE_KEY;
+    }
+    return STORE_THEME_STORAGE_KEY;
+  }
 
   // Initialize theme from localStorage or system preference immediately
   function getInitialTheme(): ThemeMode {
-    if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.localStorage !== "undefined"
+    ) {
       try {
-        const savedTheme = window.localStorage.getItem("theme");
+        const savedTheme =
+          window.localStorage.getItem(getStorageKey()) ??
+          window.localStorage.getItem("theme");
         if (savedTheme === COLOR_THEME || savedTheme === DARK_THEME) {
           return savedTheme;
         }
@@ -15,7 +36,10 @@
         // localStorage might be blocked
       }
     }
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    ) {
       return DARK_THEME;
     }
     return COLOR_THEME;
@@ -31,12 +55,17 @@
   function toggleTheme() {
     theme = theme === COLOR_THEME ? DARK_THEME : COLOR_THEME;
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
+    localStorage.setItem(getStorageKey(), theme);
     window.dispatchEvent(new Event("themechange"));
   }
 </script>
 
-<button class="btn btn-ghost btn-circle" type="button" onclick={toggleTheme} aria-label="Cambiar tema">
+<button
+  class="btn btn-ghost btn-circle"
+  type="button"
+  onclick={toggleTheme}
+  aria-label="Cambiar tema"
+>
   {#if theme === COLOR_THEME}
     <Icon icon="lucide:sun" class="h-6 w-6 text-base-content" />
   {:else}

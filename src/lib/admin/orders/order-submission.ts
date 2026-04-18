@@ -1,5 +1,8 @@
 import type { Order } from "../../../lib/api/admin";
-import type { CreateOrderPayload, ManualOrderItemDraft } from "../../../components/svelte/admin/tabs/types/orders-tab";
+import type {
+  CreateOrderPayload,
+  ManualOrderItemDraft,
+} from "../../../components/svelte/admin/tabs/types/orders-tab";
 import { buildCustomizationsFromDraft } from "./manual-item-helpers";
 
 /** Prepares items for order creation by converting draft items */
@@ -7,11 +10,8 @@ export function prepareOrderItems(
   manualItems: ManualOrderItemDraft[],
   fallbackItem: ManualOrderItemDraft | null,
 ): CreateOrderPayload["items"] | null {
-  const itemsToCreate = manualItems.length > 0
-    ? manualItems
-    : fallbackItem
-      ? [fallbackItem]
-      : [];
+  const itemsToCreate =
+    manualItems.length > 0 ? manualItems : fallbackItem ? [fallbackItem] : [];
 
   if (itemsToCreate.length === 0) {
     return null;
@@ -55,7 +55,9 @@ export function buildOrderUpdatePayload(
     customer_email: customerEmail.trim() || undefined,
     payment_method: paymentMethod,
     order_type: orderType,
-    table_number: Number.isFinite(normalizedTableNumber) ? normalizedTableNumber : undefined,
+    table_number: Number.isFinite(normalizedTableNumber)
+      ? normalizedTableNumber
+      : undefined,
     notes: notes.trim() || undefined,
   };
 }
@@ -77,9 +79,10 @@ export function buildCreateOrderPayload(
     customer_email: customerEmail.trim() || undefined,
     payment_method: paymentMethod,
     order_type: orderType,
-    table_number: orderType === "en_local" && tableNumber !== ""
-      ? Number(tableNumber)
-      : undefined,
+    table_number:
+      orderType === "en_local" && tableNumber !== ""
+        ? Number(tableNumber)
+        : undefined,
     notes: notes.trim() || undefined,
     items,
   };
