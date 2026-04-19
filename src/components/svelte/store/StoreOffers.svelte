@@ -98,11 +98,13 @@
 
 {#if activeOffers.length > 0}
   <section class="max-w-7xl mx-auto px-4 py-6 md:py-10">
-    <div class="flex items-center gap-3 mb-5">
-      <span class="badge badge-warning gap-1 font-semibold px-3 py-3">
-        <Icon icon="lucide:sparkles" class="size-4" />
-        Especiales
-      </span>
+    <div class="text-center mb-5 md:mb-8">
+      <h2 class="text-2xl md:text-3xl font-bold inline-block mb-1">
+        Productos Especiales
+      </h2>
+      <p class="text-base-content/60 font-medium text-sm md:text-base">
+        Aprovecha nuestros productos por tiempo limitado.
+      </p>
     </div>
 
     <div
@@ -148,11 +150,6 @@
                           class="absolute left-3 top-3 badge badge-warning badge-sm font-semibold shadow-sm"
                         >
                           {offer.label}
-                        </span>
-                        <span
-                          class="absolute right-3 top-3 rounded-full bg-base-100/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-base-content shadow-sm"
-                        >
-                          Tocar para mas
                         </span>
                       </figure>
                     {:else}

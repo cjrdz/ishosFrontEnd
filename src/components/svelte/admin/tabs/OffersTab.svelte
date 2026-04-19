@@ -6,6 +6,7 @@
     updateAdminStoreSettings,
     type StoreOfferItem,
   } from "../../../../lib/bff/admin";
+  import { ApiError } from "../../../../lib/errors/api";
   import type { Product } from "../../../../lib/api/admin";
   import { formatCurrency } from "../../../../lib/utils/formatters";
 
@@ -52,9 +53,11 @@
       offers = response.offers ?? [];
     } catch (requestError) {
       moduleError =
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo cargar configuracion de ofertas";
+        requestError instanceof ApiError && requestError.status === 404
+          ? "No se pudo conectar con la configuracion de ofertas. Verifica que el backend este actualizado."
+          : requestError instanceof Error
+            ? requestError.message
+            : "No se pudo cargar configuracion de ofertas";
     } finally {
       localBusy = false;
     }
@@ -316,7 +319,7 @@
             <tr class="bg-base-200/50">
               <td>
                 <select
-                  class="select select-bordered select-sm w-full min-w-48"
+                  class="select select-bordered select-sm w-full min-w-36"
                   bind:value={newOfferProductId}
                   disabled={localBusy || isEditing}
                 >
@@ -328,7 +331,7 @@
               </td>
               <td>
                 <input
-                  class="input input-bordered input-sm w-full min-w-44"
+                  class="input input-bordered input-sm w-full min-w-32"
                   type="text"
                   placeholder="Ej: 2x1 Fresa"
                   bind:value={newOfferLabel}
@@ -344,7 +347,7 @@
               </td>
               <td>
                 <input
-                  class="input input-bordered input-sm w-full min-w-32"
+                  class="input input-bordered input-sm w-full min-w-24"
                   type="number"
                   min="0"
                   step="0.01"
@@ -355,7 +358,7 @@
               </td>
               <td>
                 <input
-                  class="input input-bordered input-sm w-full min-w-40"
+                  class="input input-bordered input-sm w-full min-w-28"
                   type="text"
                   placeholder="Nota publica"
                   bind:value={newOfferNote}
@@ -364,7 +367,7 @@
               </td>
               <td>
                 <input
-                  class="input input-bordered input-sm w-full min-w-46"
+                  class="input input-bordered input-sm w-full min-w-40"
                   type="datetime-local"
                   bind:value={newOfferExpiry}
                   disabled={localBusy}

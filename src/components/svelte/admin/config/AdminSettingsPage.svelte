@@ -15,6 +15,7 @@
   import type { PanelConfigValues } from "../tabs/SettingsTab.svelte";
   import { DEFAULT_TAB_ORDER, normalizeTabOrder, type TabKey } from "./tabs";
   import type { StoreOfferItem } from "../../../../lib/bff/admin";
+  import { ApiError } from "../../../../lib/errors/api";
 
   type Session = {
     id: string;
@@ -263,10 +264,13 @@
         "AdminSettingsPage.loadSettings.storeSettings",
       );
       if (!moduleError) {
+        const reason = storeSettingsResult.reason;
         moduleError =
-          storeSettingsResult.reason instanceof Error
-            ? storeSettingsResult.reason.message
-            : "No se pudo cargar la operacion de tienda";
+          reason instanceof ApiError && reason.status === 404
+            ? "No se pudo conectar con la configuracion de tienda. Verifica que el backend este actualizado."
+            : reason instanceof Error
+              ? reason.message
+              : "No se pudo cargar la operacion de tienda";
       }
       storeOrdersEnabled = true;
       storeOffers = [];
