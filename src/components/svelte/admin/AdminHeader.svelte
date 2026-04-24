@@ -78,7 +78,10 @@
         />
       </p>
       <p class="flex items-center gap-2">
-        <span class="loading loading-ring loading-sm text-success"></span>
+        <span class="inline-grid *:[grid-area:1/1]" aria-hidden="true">
+          <span class="status status-success animate-ping"></span>
+          <span class="status status-success"></span>
+        </span>
         <span>Sesion activa</span>
       </p>
     </div>

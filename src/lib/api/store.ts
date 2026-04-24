@@ -100,6 +100,19 @@ export interface PublicOrderTrackingResponse {
   created_at: string;
   total_amount: number;
   order_type: "en_local" | "para_llevar";
+  items: Array<{
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    subtotal: number;
+    customizations?: {
+      flavor_name?: string;
+      addon_names?: string[];
+      included_addon_names?: string[];
+      extra_addon_names?: string[];
+      notes?: string;
+    };
+  }>;
 }
 
 export interface PublicOrderTrackingHistoryResponse {
@@ -128,9 +141,27 @@ export async function trackPublicOrder(
   orderNumber: string,
   trackingToken: string,
 ): Promise<PublicOrderTrackingResponse> {
-  return bffRequest<PublicOrderTrackingResponse>(
+  const response = await bffRequest<PublicOrderTrackingResponse>(
     `/api/store/tracking/${encodeURIComponent(orderNumber)}?tracking_token=${encodeURIComponent(trackingToken)}`,
   );
+
+  return {
+    ...response,
+    items: Array.isArray(response.items)
+      ? response.items.map((item) => ({
+          ...item,
+          customizations: item.customizations
+            ? {
+                ...item.customizations,
+                addon_names: item.customizations.addon_names ?? [],
+                included_addon_names:
+                  item.customizations.included_addon_names ?? [],
+                extra_addon_names: item.customizations.extra_addon_names ?? [],
+              }
+            : undefined,
+        }))
+      : [],
+  };
 }
 
 // ── Public Store Settings ────────────────────────────────────────────

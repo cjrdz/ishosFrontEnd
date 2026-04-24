@@ -215,6 +215,8 @@
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+  padding-top: 0.35rem;
+  margin-top: -0.35rem;
   padding-bottom: 0.5rem;
 }
 

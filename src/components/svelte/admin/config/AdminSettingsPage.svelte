@@ -26,6 +26,7 @@
     active?: boolean;
   };
 
+  // IMPORTANT: Keep this in sync with backend defaults (see TokenTTLConfig in Go backend)
   const DEFAULT_PANEL_CONFIG: PanelConfigValues = {
     auth_cookie_ttl_hours: 24,
     auth_token_ttl_hours: 168,
@@ -168,6 +169,8 @@
     }, 3000);
   }
 
+  // Note: This client-side session validation is for UX only.
+  // Real security is enforced by server-side middleware.
   async function loadPage() {
     loading = true;
     sessionError = "";
@@ -221,11 +224,15 @@
         getAdminStoreSettings(),
       ]);
 
+    let tabsError = "";
+    let panelConfigError = "";
+    let storeSettingsError = "";
+
     if (tabsResult.status === "fulfilled") {
       tabOrder = normalizeTabOrder(tabsResult.value.tab_order);
     } else {
       trackError(tabsResult.reason, "AdminSettingsPage.loadSettings.tabs");
-      moduleError =
+      tabsError =
         tabsResult.reason instanceof Error
           ? tabsResult.reason.message
           : "No se pudo cargar la configuracion de pestanas";
@@ -246,12 +253,10 @@
         panelConfigResult.reason,
         "AdminSettingsPage.loadSettings.panelConfig",
       );
-      if (!moduleError) {
-        moduleError =
-          panelConfigResult.reason instanceof Error
-            ? panelConfigResult.reason.message
-            : "No se pudo cargar la configuracion de seguridad";
-      }
+      panelConfigError =
+        panelConfigResult.reason instanceof Error
+          ? panelConfigResult.reason.message
+          : "No se pudo cargar la configuracion de seguridad";
       panelConfig = { ...DEFAULT_PANEL_CONFIG };
     }
 
@@ -263,19 +268,21 @@
         storeSettingsResult.reason,
         "AdminSettingsPage.loadSettings.storeSettings",
       );
-      if (!moduleError) {
-        const reason = storeSettingsResult.reason;
-        moduleError =
-          reason instanceof ApiError && reason.status === 404
-            ? "No se pudo conectar con la configuracion de tienda. Verifica que el backend este actualizado."
-            : reason instanceof Error
-              ? reason.message
-              : "No se pudo cargar la operacion de tienda";
-      }
+      storeSettingsError =
+        storeSettingsResult.reason instanceof ApiError &&
+        storeSettingsResult.reason.status === 404
+          ? "No se pudo conectar con la configuracion de tienda. Verifica que el backend este actualizado."
+          : storeSettingsResult.reason instanceof Error
+            ? storeSettingsResult.reason.message
+            : "No se pudo cargar la operacion de tienda";
       storeOrdersEnabled = true;
       storeOffers = [];
     }
 
+    // Combine errors for display
+    moduleError = [tabsError, panelConfigError, storeSettingsError]
+      .filter(Boolean)
+      .join(" | ");
     busy = false;
   }
 
@@ -362,10 +369,17 @@
   }
 
   async function handleLogout() {
+    let logoutFailed = false;
     try {
-      await fetch("/api/admin/logout", { method: "POST" });
-    } catch {}
-
+      const res = await fetch("/api/admin/logout", { method: "POST" });
+      if (!res.ok) logoutFailed = true;
+    } catch {
+      logoutFailed = true;
+    }
+    if (logoutFailed) {
+      setNotice("No se pudo cerrar sesión correctamente. Intenta de nuevo.");
+      return;
+    }
     window.location.href = "/admin/login";
   }
 </script>

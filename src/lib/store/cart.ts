@@ -39,6 +39,18 @@ function syncCartCount(items: StoreCartItem[]) {
   );
 }
 
+function notifyCartAdded(item: StoreCartItem) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent("storefront-cart-added", {
+      detail: {
+        name: item.name,
+        quantity: item.quantity,
+      },
+    }),
+  );
+}
+
 export function getCartItems(): StoreCartItem[] {
   if (typeof window === "undefined") return [];
   const raw = localStorage.getItem(CART_KEY);
@@ -69,10 +81,12 @@ export function addCartItem(item: StoreCartItem) {
         : entry,
     );
     setCartItems(updated);
+    notifyCartAdded(item);
     return;
   }
 
   setCartItems([...items, item]);
+  notifyCartAdded(item);
 }
 
 export function updateCartItemQuantity(
