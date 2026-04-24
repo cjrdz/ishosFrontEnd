@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { formatCurrency } from "../../../lib/utils/formatters";
+  import { addCartItem } from "../../../lib/store/cart";
   import {
     fetchStoreSettings,
     listPublicProducts,
@@ -73,10 +74,10 @@
   }
 </script>
 
-<div class="space-y-2 md:space-y-4">
-  <section class="max-w-7xl mx-auto px-4 pt-6 pb-4 md:pt-8 md:pb-6 text-center">
+<div class="home-featured space-y-1 md:space-y-3">
+  <section class="max-w-7xl mx-auto px-4 pt-4 pb-2 md:pt-6 md:pb-4 text-center">
     <div
-      class="mx-auto max-w-3xl rounded-3xl border border-base-200/70 bg-base-100/70 px-4 py-6 shadow-sm backdrop-blur-sm md:px-8 md:py-8"
+      class="hero-surface mx-auto max-w-3xl rounded-3xl border border-base-200/70 bg-base-100/70 px-4 py-5 shadow-sm backdrop-blur-sm md:px-8 md:py-7"
     >
       <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight">
         <span
@@ -86,11 +87,11 @@
         </span>
       </h1>
       <p
-        class="mt-3 text-sm font-medium uppercase tracking-[0.16em] text-base-content/55 md:text-base"
+        class="hero-kicker mt-3 text-sm font-medium uppercase tracking-[0.16em] text-base-content/55 md:text-base"
       >
         Tradicion desde 2021
       </p>
-      <p class="mt-2 text-sm text-base-content/65 md:text-base">
+      <p class="hero-copy mt-2 text-sm text-base-content/65 md:text-base">
         Sabores artesanales listos para pedir en minutos.
       </p>
     </div>
@@ -106,12 +107,14 @@
   {/if}
 
   <!-- Featured Products Section -->
-  <section class="max-w-7xl mx-auto px-4 pt-4 pb-8 md:pt-6 md:pb-10">
-    <div class="text-center mb-5 md:mb-8">
+  <section class="max-w-7xl mx-auto px-4 pt-2 pb-8 md:pt-3 md:pb-10">
+    <div class="text-center mb-4 md:mb-6">
       <h2 class="text-2xl md:text-3xl font-bold inline-block mb-1">
         Productos Destacados
       </h2>
-      <p class="text-base-content/60 font-medium text-sm md:text-base">
+      <p
+        class="featured-subtitle text-base-content/60 font-medium text-sm md:text-base"
+      >
         Nuestros sabores más queridos.
       </p>
     </div>
@@ -123,7 +126,7 @@
             class="card bg-base-100 w-full shadow-sm border border-base-200/50 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
             aria-hidden="true"
           >
-            <div class="skeleton w-full aspect-4/3"></div>
+            <div class="skeleton w-full aspect-square"></div>
             <div class="card-body p-3 sm:p-4 md:p-5 space-y-2">
               <div class="skeleton h-4 w-3/4"></div>
               <div class="skeleton h-5 w-16"></div>
@@ -141,11 +144,11 @@
           {@const offer = activeOfferMap.get(product.id)}
           <a href="/menu" class="h-full group block">
             <article
-              class="card bg-base-100 w-full border border-base-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
+              class="featured-card card bg-base-100 w-full border border-base-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
             >
               {#if getSafeImageUrl(product.image_url)}
                 <figure
-                  class="bg-base-200/50 w-full aspect-4/3 overflow-hidden relative"
+                  class="bg-base-200/50 w-full aspect-square overflow-hidden relative"
                 >
                   <img
                     src={getSafeImageUrl(product.image_url)}
@@ -160,6 +163,26 @@
                       {offer.label || "Oferta"}
                     </span>
                   {/if}
+                  {#if ordersEnabled}
+                    <button
+                      type="button"
+                      class="absolute bottom-2.5 right-2.5 z-10 size-8 rounded-full bg-primary text-primary-content shadow-md flex items-center justify-center opacity-100 md:opacity-0 scale-90 md:group-hover:opacity-100 md:group-hover:scale-100 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      aria-label={`Agregar ${product.name} al pedido`}
+                      onclick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        addCartItem({
+                          product_id: product.id,
+                          name: product.name,
+                          image_url: getSafeImageUrl(product.image_url),
+                          unit_price: product.price,
+                          quantity: 1,
+                        });
+                      }}
+                    >
+                      +
+                    </button>
+                  {/if}
                 </figure>
               {/if}
               <div class="p-3 sm:p-4 md:p-5">
@@ -170,7 +193,8 @@
                 </h3>
                 {#if offer?.discount_price}
                   <div class="flex items-baseline gap-2">
-                    <span class="text-xs line-through text-base-content/40"
+                    <span
+                      class="price-before text-xs line-through text-base-content/40"
                       >{formatCurrency(product.price)}</span
                     >
                     <span class="text-base md:text-lg font-bold text-primary"
@@ -190,3 +214,29 @@
     {/if}
   </section>
 </div>
+
+<style>
+  :global([data-theme="night"]) .home-featured .hero-surface {
+    background-color: oklch(var(--b1) / 0.92);
+    border-color: oklch(var(--bc) / 0.22);
+    box-shadow: 0 14px 30px oklch(0 0 0 / 0.26);
+  }
+
+  :global([data-theme="night"]) .home-featured .hero-kicker {
+    color: oklch(var(--bc) / 0.78);
+  }
+
+  :global([data-theme="night"]) .home-featured .hero-copy,
+  :global([data-theme="night"]) .home-featured .featured-subtitle {
+    color: oklch(var(--bc) / 0.82);
+  }
+
+  :global([data-theme="night"]) .home-featured .featured-card {
+    background-color: oklch(var(--b1) / 0.95);
+    border-color: oklch(var(--bc) / 0.2);
+  }
+
+  :global([data-theme="night"]) .home-featured .price-before {
+    color: oklch(var(--bc) / 0.62);
+  }
+</style>

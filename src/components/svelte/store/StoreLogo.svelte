@@ -14,9 +14,23 @@
 
   onMount(() => {
     syncTheme();
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+
     window.addEventListener("themechange", syncTheme);
+    document.addEventListener("astro:after-swap", syncTheme as EventListener);
+
     return () => {
+      observer.disconnect();
       window.removeEventListener("themechange", syncTheme);
+      document.removeEventListener(
+        "astro:after-swap",
+        syncTheme as EventListener,
+      );
     };
   });
 </script>

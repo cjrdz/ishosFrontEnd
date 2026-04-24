@@ -46,9 +46,14 @@
   let trackingOrderNumber = $state("");
   let trackingToken = $state("");
   let trackingBusy = $state(false);
+  let trackingRefreshing = $state(false);
   let trackingError = $state("");
   let trackedOrder = $state<PublicOrderTrackingResponse | null>(null);
   let pollTimer: ReturnType<typeof setInterval> | undefined;
+  let productsExpanded = $state(false);
+
+  const trackedOrderItems = $derived(trackedOrder?.items ?? []);
+  const trackingLookupActive = $derived(trackingBusy || trackingRefreshing);
 
   onMount(() => {
     const url = new URL(window.location.href);
@@ -66,13 +71,13 @@
       trackingToken = tokenFromUrl;
       saveTracking(orderFromUrl, tokenFromUrl);
       window.history.replaceState({}, "", url.pathname);
-      void runTrackingLookup();
+      void runTrackingLookup({ silent: true });
     } else {
       const persisted = getTracking();
       if (persisted) {
         trackingOrderNumber = persisted.orderNumber;
         trackingToken = persisted.token;
-        void runTrackingLookup();
+        void runTrackingLookup({ silent: true });
       }
     }
 
@@ -81,9 +86,10 @@
     };
   });
 
-  async function runTrackingLookup() {
+  async function runTrackingLookup(options?: { silent?: boolean }) {
     const orderNumber = trackingOrderNumber.trim();
     const token = trackingToken.trim();
+    const silent = options?.silent ?? false;
 
     if (!orderNumber) {
       trackingError = "Ingresa tu número de orden.";
@@ -97,7 +103,11 @@
     }
 
     trackingError = "";
-    trackingBusy = true;
+    if (silent) {
+      trackingRefreshing = true;
+    } else {
+      trackingBusy = true;
+    }
 
     try {
       const order = await trackPublicOrder(orderNumber, token);
@@ -128,7 +138,11 @@
           : "No se pudo consultar la orden.";
       stopTrackingPolling();
     } finally {
-      trackingBusy = false;
+      if (silent) {
+        trackingRefreshing = false;
+      } else {
+        trackingBusy = false;
+      }
     }
   }
 
@@ -154,7 +168,7 @@
   function startTrackingPolling() {
     stopTrackingPolling();
     pollTimer = setInterval(() => {
-      void runTrackingLookup();
+      void runTrackingLookup({ silent: true });
     }, 20000);
   }
 
@@ -162,6 +176,21 @@
     if (!pollTimer) return;
     clearInterval(pollTimer);
     pollTimer = undefined;
+  }
+
+  function itemAddonSummary(
+    item: PublicOrderTrackingResponse["items"][number],
+  ): string[] {
+    const customizations = item.customizations;
+    if (!customizations) return [];
+
+    const groups = [
+      ...(customizations.addon_names ?? []),
+      ...(customizations.included_addon_names ?? []),
+      ...(customizations.extra_addon_names ?? []),
+    ];
+
+    return Array.from(new Set(groups));
   }
 </script>
 
@@ -211,11 +240,27 @@
       <button
         class="btn btn-primary btn-lg rounded-2xl min-w-32 shadow-lg hover:shadow-xl transition-all"
         type="button"
-        onclick={runTrackingLookup}
+        onclick={() => runTrackingLookup()}
         disabled={trackingBusy}
       >
         {trackingBusy ? "Buscando..." : "Consultar"}
       </button>
+    </div>
+
+    <div class="mt-3 min-h-6 flex items-center justify-end">
+      {#if trackingLookupActive}
+        <p class="flex items-center gap-2 text-sm text-base-content/65">
+          <span class="inline-grid *:[grid-area:1/1]" aria-hidden="true">
+            <span class="status status-primary tracking-status-ping"></span>
+            <span class="status status-primary"></span>
+          </span>
+          <span
+            >{trackingBusy
+              ? "Consultando pedido..."
+              : "Actualizando estado..."}</span
+          >
+        </p>
+      {/if}
     </div>
 
     {#if trackingError}
@@ -266,36 +311,130 @@
           </div>
 
           <div
-            class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 bg-base-200/40 rounded-2xl p-4 relative z-10"
+            class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)] gap-4 mb-6 relative z-10"
           >
-            <div class="flex flex-col">
-              <span class="text-xs font-bold text-base-content/50 uppercase"
-                >Total</span
-              >
-              <span class="font-bold text-lg text-primary"
-                >{formatMoney(trackedOrder.total_amount)}</span
-              >
+            <div
+              class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-base-200/40 rounded-2xl p-4"
+            >
+              <div class="flex flex-col gap-1">
+                <span class="text-xs font-bold text-base-content/50 uppercase"
+                  >Total</span
+                >
+                <span class="font-bold text-lg text-primary"
+                  >{formatMoney(trackedOrder.total_amount)}</span
+                >
+              </div>
+              <div class="flex flex-col gap-1">
+                <span class="text-xs font-bold text-base-content/50 uppercase"
+                  >Tipo</span
+                >
+                <span
+                  class="font-bold border border-base-300 rounded-full px-3 py-1 bg-base-100 w-fit"
+                  >{trackedOrder.order_type === "para_llevar"
+                    ? "Para llevar"
+                    : "En local"}</span
+                >
+              </div>
             </div>
-            <div class="flex flex-col sm:items-center">
-              <span class="text-xs font-bold text-base-content/50 uppercase"
-                >Tipo</span
-              >
-              <span
-                class="font-bold border border-base-300 rounded-full px-3 py-1 bg-base-100"
-                >{trackedOrder.order_type === "para_llevar"
-                  ? "Para llevar"
-                  : "En local"}</span
-              >
-            </div>
-            <div class="flex flex-col sm:items-end">
-              <span class="text-xs font-bold text-base-content/50 uppercase"
-                >Actualizado</span
-              >
-              <span class="font-medium text-sm mt-1"
+
+            <div
+              class="bg-base-200/40 rounded-2xl p-4 flex flex-col justify-between gap-3"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-xs font-bold text-base-content/50 uppercase"
+                  >Actualizado</span
+                >
+                {#if trackingRefreshing}
+                  <span
+                    class="flex items-center gap-2 text-xs text-base-content/60"
+                  >
+                    <span
+                      class="inline-grid *:[grid-area:1/1]"
+                      aria-hidden="true"
+                    >
+                      <span
+                        class="status status-primary status-sm tracking-status-ping"
+                      ></span>
+                      <span class="status status-primary status-sm"></span>
+                    </span>
+                    <span>Actualizando</span>
+                  </span>
+                {/if}
+              </div>
+              <span class="font-semibold leading-snug"
                 >{formatDate(trackedOrder.updated_at)}</span
               >
             </div>
           </div>
+
+          {#if trackedOrderItems.length > 0}
+            <details
+              class="collapse collapse-arrow bg-base-200/35 border border-base-200/70 rounded-2xl mb-6 relative z-10"
+              open={productsExpanded}
+              ontoggle={(event) => {
+                productsExpanded = (event.currentTarget as HTMLDetailsElement)
+                  .open;
+              }}
+            >
+              <summary
+                class="collapse-title flex items-center justify-between gap-4 pe-10"
+              >
+                <div>
+                  <p
+                    class="text-sm font-bold uppercase tracking-wider text-base-content/55"
+                  >
+                    Productos del pedido
+                  </p>
+                  <p class="text-sm text-base-content/70">
+                    {trackedOrderItems.length}
+                    {trackedOrderItems.length === 1 ? "producto" : "productos"}
+                  </p>
+                </div>
+                <span class="badge badge-primary badge-outline rounded-full">
+                  {formatMoney(trackedOrder.total_amount)}
+                </span>
+              </summary>
+              <div class="collapse-content pt-0 space-y-3">
+                {#each trackedOrderItems as item}
+                  {@const addonSummary = itemAddonSummary(item)}
+                  <div
+                    class="rounded-2xl border border-base-200/80 bg-base-100 px-4 py-3 shadow-sm"
+                  >
+                    <div class="flex items-start justify-between gap-4">
+                      <div class="min-w-0">
+                        <p class="font-bold text-base-content">
+                          {item.quantity}x {item.product_name}
+                        </p>
+                        {#if item.customizations?.flavor_name}
+                          <p class="text-sm text-base-content/70 mt-1">
+                            Sabor: {item.customizations.flavor_name}
+                          </p>
+                        {/if}
+                        {#if addonSummary.length > 0}
+                          <p class="text-sm text-base-content/65 mt-1">
+                            Extras: {addonSummary.join(", ")}
+                          </p>
+                        {/if}
+                        {#if item.customizations?.notes}
+                          <p class="text-sm text-base-content/65 mt-1 italic">
+                            Nota: {item.customizations.notes}
+                          </p>
+                        {/if}
+                      </div>
+                      <div class="text-right shrink-0">
+                        <p class="font-bold text-primary">
+                          {formatMoney(item.subtotal)}
+                        </p>
+                        <p class="text-xs text-base-content/50 mt-1">
+                          {formatMoney(item.unit_price)} c/u
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </details>
+          {/if}
 
           {#if trackedOrder.status === "cancelada"}
             <div
@@ -307,7 +446,7 @@
               >
             </div>
           {:else}
-            <div class="w-full relative z-10 overflow-hidden py-4 sm:py-6">
+            <div class="w-full relative z-10 overflow-hidden py-2 sm:py-4">
               <ul
                 class="steps steps-vertical sm:steps-horizontal w-full sm:min-w-0"
               >
@@ -362,3 +501,27 @@
     {/if}
   </section>
 </div>
+
+<style>
+  .tracking-status-ping {
+    animation: trackingStatusPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes trackingStatusPing {
+    0% {
+      transform: scale(1);
+      opacity: 0.9;
+    }
+    70%,
+    100% {
+      transform: scale(1.9);
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tracking-status-ping {
+      animation: none;
+    }
+  }
+</style>

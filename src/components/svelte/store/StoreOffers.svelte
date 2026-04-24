@@ -97,12 +97,14 @@
 </script>
 
 {#if activeOffers.length > 0}
-  <section class="max-w-7xl mx-auto px-4 py-6 md:py-10">
+  <section class="store-offers max-w-7xl mx-auto px-4 py-6 md:py-10">
     <div class="text-center mb-5 md:mb-8">
       <h2 class="text-2xl md:text-3xl font-bold inline-block mb-1">
         Productos Especiales
       </h2>
-      <p class="text-base-content/60 font-medium text-sm md:text-base">
+      <p
+        class="offers-subtitle text-base-content/60 font-medium text-sm md:text-base"
+      >
         Aprovecha nuestros productos por tiempo limitado.
       </p>
     </div>
@@ -134,7 +136,7 @@
               >
                 <div class="flip-3d-inner h-full min-h-104 rounded-3xl">
                   <article
-                    class="flip-3d-face overflow-hidden rounded-3xl border border-warning/30 bg-base-100 shadow-sm transition-shadow duration-300 hover:shadow-lg"
+                    class="offer-face flip-3d-face group overflow-hidden rounded-3xl border border-warning/30 bg-base-100 shadow-sm transition-shadow duration-300 hover:shadow-lg"
                   >
                     {#if getSafeImageUrl(product.image_url)}
                       <figure
@@ -143,7 +145,7 @@
                         <img
                           src={getSafeImageUrl(product.image_url)}
                           alt={product.name}
-                          class="h-full w-full object-cover object-center"
+                          class="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                           loading="lazy"
                         />
                         <span
@@ -315,16 +317,15 @@
                             >{formatCountdown(offer.expiresMs)}</span
                           >
                         </div>
-                        <button
-                          type="button"
+                        <a
+                          href="/menu"
                           class="btn btn-outline btn-sm rounded-full w-full"
                           onclick={(event) => {
                             event.stopPropagation();
-                            toggleOfferDetails(offer.product_id);
                           }}
                         >
-                          Volver a la tarjeta
-                        </button>
+                          Ir al menu
+                        </a>
                       </div>
                     </div>
                   </article>
@@ -334,7 +335,7 @@
               <div class="flip-3d-toggle h-full rounded-3xl cursor-default">
                 <div class="flip-3d-inner h-full min-h-104 rounded-3xl">
                   <article
-                    class="flip-3d-face overflow-hidden rounded-3xl border border-warning/30 bg-base-100 shadow-sm transition-shadow duration-300 hover:shadow-lg"
+                    class="offer-face flip-3d-face group overflow-hidden rounded-3xl border border-warning/30 bg-base-100 shadow-sm transition-shadow duration-300 hover:shadow-lg"
                   >
                     {#if getSafeImageUrl(product.image_url)}
                       <figure
@@ -343,7 +344,7 @@
                         <img
                           src={getSafeImageUrl(product.image_url)}
                           alt={product.name}
-                          class="h-full w-full object-cover object-center"
+                          class="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                           loading="lazy"
                         />
                         <span
@@ -442,3 +443,27 @@
     </div>
   </section>
 {/if}
+
+<style>
+  :global([data-theme="night"]) .store-offers .offers-subtitle {
+    color: oklch(var(--bc) / 0.82);
+  }
+
+  :global([data-theme="night"]) .store-offers .offer-face {
+    background-color: oklch(var(--b1) / 0.95);
+    border-color: oklch(var(--bc) / 0.2);
+  }
+
+  :global([data-theme="night"]) .store-offers .offer-face p,
+  :global([data-theme="night"]) .store-offers .offer-face span {
+    color: color-mix(in oklab, oklch(var(--bc)) 85%, white 15%);
+  }
+
+  :global([data-theme="night"]) .store-offers .offer-face .text-primary {
+    color: color-mix(in oklab, oklch(var(--p)) 82%, white 18%);
+  }
+
+  :global([data-theme="night"]) .store-offers .offer-face .line-through {
+    color: oklch(var(--bc) / 0.62);
+  }
+</style>

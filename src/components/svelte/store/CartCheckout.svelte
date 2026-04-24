@@ -72,6 +72,30 @@
     }, 0),
   );
 
+  const customerStepComplete = $derived(
+    !!form.customer_name.trim() && !!form.customer_phone.trim(),
+  );
+
+  const deliveryStepComplete = $derived(
+    form.order_type === "en_local"
+      ? !!form.table_number.trim() && !!form.payment_method
+      : !!form.payment_method,
+  );
+
+  const customizationsStepComplete = $derived(
+    !items.some((item) => requiresFlavorSelection(item)),
+  );
+
+  const activeCheckoutStep = $derived(
+    !customerStepComplete
+      ? 1
+      : !deliveryStepComplete
+        ? 2
+        : !customizationsStepComplete
+          ? 3
+          : 4,
+  );
+
   function itemEffectivePrice(item: StoreCartItem): number {
     let price = item.unit_price;
     const payableAddonIds =
@@ -932,6 +956,34 @@
         <div
           class="lg:sticky lg:top-8 bg-base-100/50 backdrop-blur-md rounded-[2.5rem] shadow-2xl border border-base-200/60 p-6 md:p-8 flex flex-col pt-10"
         >
+          <div class="mb-8 pb-6 border-b border-base-200/80">
+            <h3 class="font-extrabold text-xl tracking-tight px-1 mb-4">
+              Progreso de checkout
+            </h3>
+            <ul class="steps steps-vertical md:steps-horizontal w-full">
+              <li
+                class={`step ${customerStepComplete || activeCheckoutStep >= 1 ? "step-primary" : ""} ${activeCheckoutStep === 1 ? "checkout-step-live" : ""}`}
+              >
+                Datos
+              </li>
+              <li
+                class={`step ${deliveryStepComplete || activeCheckoutStep >= 2 ? "step-primary" : ""} ${activeCheckoutStep === 2 ? "checkout-step-live" : ""}`}
+              >
+                Entrega
+              </li>
+              <li
+                class={`step ${customizationsStepComplete || activeCheckoutStep >= 3 ? "step-primary" : ""} ${activeCheckoutStep === 3 ? "checkout-step-live" : ""}`}
+              >
+                Opciones
+              </li>
+              <li
+                class={`step ${activeCheckoutStep === 4 ? "step-primary checkout-step-live" : ""}`}
+              >
+                Confirmar
+              </li>
+            </ul>
+          </div>
+
           <div class="flex items-center justify-between text-xl mb-2 px-2">
             <span class="font-bold text-base-content/80">Total del pedido</span>
           </div>
@@ -1097,3 +1149,25 @@
     {/if}
   </section>
 </div>
+
+<style>
+  .checkout-step-live {
+    animation: checkoutStepGlow 1.6s ease-in-out infinite;
+  }
+
+  @keyframes checkoutStepGlow {
+    0%,
+    100% {
+      filter: brightness(1);
+    }
+    50% {
+      filter: brightness(1.08);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .checkout-step-live {
+      animation: none;
+    }
+  }
+</style>
