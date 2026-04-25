@@ -153,6 +153,10 @@ export interface EmployeesPanelProps {
     },
   ) => void;
   onDelete: (id: string) => void;
+  resetLoginLockout: (payload: {
+    employee_id?: string;
+    email?: string;
+  }) => void;
 }
 
 export interface UsersPanelProps {

@@ -141,7 +141,7 @@
           class="input input-bordered h-12 bg-base-100 focus:bg-base-200 w-full rounded-2xl transition-all"
           type="email"
           bind:value={email}
-          placeholder="admin@ishos.com"
+          placeholder="Email o usuario"
           required
           aria-labelledby="admin-login-email-label"
         />

@@ -381,6 +381,16 @@ export async function deactivateEmployee(id: string) {
   });
 }
 
+export async function resetLoginLockout(payload: {
+  employee_id?: string;
+  email?: string;
+}) {
+  return bffRequest<any>("/api/admin/auth/lockout/reset", {
+    method: "POST",
+    body: payload,
+  });
+}
+
 // Users (customer directory)
 export async function listUsers(status?: string, search?: string) {
   const query: Record<string, string> = {};

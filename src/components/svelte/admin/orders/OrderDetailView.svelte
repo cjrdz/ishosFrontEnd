@@ -49,17 +49,53 @@
     onCanChangeToStep,
   }: Props = $props();
 
+  function resolveTrackingUrl(rawUrl: string): string {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return "";
+
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+
+    if (trimmed.startsWith("//")) {
+      const protocol =
+        typeof window !== "undefined" ? window.location.protocol : "https:";
+      return `${protocol}${trimmed}`;
+    }
+
+    const looksLikeHostPath = /^[a-z0-9.-]+\.[a-z]{2,}(?::\d+)?(\/|$)/i.test(
+      trimmed,
+    );
+    if (looksLikeHostPath) {
+      const protocol =
+        typeof window !== "undefined" ? window.location.protocol : "https:";
+      return `${protocol}//${trimmed}`;
+    }
+
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    if (!origin) {
+      return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    }
+
+    const separator = trimmed.startsWith("/") ? "" : "/";
+    return `${origin}${separator}${trimmed}`;
+  }
+
   const trackingLink = $derived.by(() => {
     if (!selectedOrder) return "";
     if (selectedOrder.tracking_url) {
-      if (selectedOrder.tracking_url.startsWith("http")) {
-        return selectedOrder.tracking_url;
-      }
-      const separator = selectedOrder.tracking_url.startsWith("/") ? "" : "/";
-      return `${window.location.origin}${separator}${selectedOrder.tracking_url}`;
+      return resolveTrackingUrl(selectedOrder.tracking_url);
     }
     if (selectedOrder.tracking_token) {
-      return `${window.location.origin}/order/tracking?token=${selectedOrder.tracking_token}`;
+      const search = new URLSearchParams({
+        order: selectedOrder.order_number,
+        token: selectedOrder.tracking_token,
+      });
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      return origin
+        ? `${origin}/order/tracking?${search.toString()}`
+        : `/order/tracking?${search.toString()}`;
     }
     return "";
   });

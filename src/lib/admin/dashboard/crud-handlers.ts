@@ -11,6 +11,7 @@ import {
   deleteFlavor,
   deleteProduct,
   deleteUser,
+  resetLoginLockout,
   updateAddon,
   updateCategory,
   updateEmployee,
@@ -328,6 +329,32 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     });
   }
 
+  async function handleResetLoginLockout(payload: {
+    employee_id?: string;
+    email?: string;
+  }) {
+    const employeeID = payload.employee_id?.trim();
+    const email = payload.email?.trim().toLowerCase();
+    const body = employeeID
+      ? { employee_id: employeeID }
+      : email
+        ? { email }
+        : {};
+
+    await runModuleAction<void>({
+      module: "empleados",
+      requireAdmin: true,
+      errorMessage: "No se pudo restablecer bloqueo de login",
+      action: async () => {
+        await resetLoginLockout(body);
+      },
+      defaultValue: undefined,
+      onSuccess: async () => {
+        setNotice("Bloqueo de login reiniciado para empleado");
+      },
+    });
+  }
+
   async function handleCreateUser(payload: Parameters<typeof createUser>[0]) {
     await runModuleAction<void>({
       module: "usuarios",
@@ -414,6 +441,7 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     handleCreateEmployee,
     handleUpdateEmployee,
     handleDeleteEmployee,
+    handleResetLoginLockout,
     handleCreateUser,
     handleUpdateUser,
     handleDeleteUser,

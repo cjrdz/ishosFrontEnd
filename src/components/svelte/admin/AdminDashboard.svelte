@@ -979,6 +979,7 @@
     handleCreateEmployee,
     handleUpdateEmployee,
     handleDeleteEmployee,
+    handleResetLoginLockout,
     handleCreateUser,
     handleUpdateUser,
     handleDeleteUser,
@@ -1078,6 +1079,7 @@
     onCreate: handleCreateEmployee,
     onUpdate: handleUpdateEmployee,
     onDelete: handleDeleteEmployee,
+    resetLoginLockout: handleResetLoginLockout,
   });
   const usersPanelProps = $derived({
     users,
