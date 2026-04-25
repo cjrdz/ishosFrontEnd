@@ -27,12 +27,24 @@
       },
     ) => void;
     onDelete: (id: string) => void;
+    resetLoginLockout: (payload: {
+      employee_id?: string;
+      email?: string;
+    }) => void;
   }
 
-  let { employees, busy, moduleError, onCreate, onUpdate, onDelete }: Props =
-    $props();
+  let {
+    employees,
+    busy,
+    moduleError,
+    onCreate,
+    onUpdate,
+    onDelete,
+    resetLoginLockout,
+  }: Props = $props();
 
   let employeeEditorDialog: HTMLDialogElement | null = null;
+  let lockoutResetDialog: HTMLDialogElement | null = null;
   let confirmOpen = $state(false);
   let confirmTitle = $state("Confirmar accion");
   let confirmMessage = $state("");
@@ -84,6 +96,19 @@
   });
 
   const isEditing = $derived(!!editingEmployeeId);
+  let lockoutResetForm = $state({
+    employeeID: "",
+  });
+
+  const lockoutCandidateEmployees = $derived(
+    [...employees].sort((a, b) => a.email.localeCompare(b.email)),
+  );
+
+  const selectedLockoutEmployee = $derived(
+    lockoutCandidateEmployees.find(
+      (employee) => employee.id === lockoutResetForm.employeeID,
+    ) || null,
+  );
 
   function resetForm() {
     editingEmployeeId = null;
@@ -192,6 +217,37 @@
       () => onDelete(employee.id),
     );
   }
+
+  function openLockoutResetModal() {
+    const firstEmployeeID = lockoutCandidateEmployees[0]?.id || "";
+    lockoutResetForm = { employeeID: firstEmployeeID };
+    lockoutResetDialog?.showModal();
+  }
+
+  function closeLockoutResetModal() {
+    lockoutResetDialog?.close();
+    lockoutResetForm = { employeeID: "" };
+  }
+
+  function submitLockoutReset(event: SubmitEvent) {
+    event.preventDefault();
+
+    if (!selectedLockoutEmployee) {
+      return;
+    }
+
+    openConfirm(
+      "Confirmar desbloqueo",
+      "Vas a restablecer el bloqueo de login del empleado seleccionado. Deseas continuar?",
+      () => {
+        resetLoginLockout({
+          employee_id: selectedLockoutEmployee.id,
+          email: selectedLockoutEmployee.email,
+        });
+        closeLockoutResetModal();
+      },
+    );
+  }
 </script>
 
 <section class="space-y-4">
@@ -279,6 +335,15 @@
           >
           <span>empleados</span>
         </div>
+
+        <button
+          class="btn btn-sm btn-soft btn-warning shrink-0"
+          type="button"
+          onclick={openLockoutResetModal}
+          disabled={busy}
+        >
+          Desbloquear usuario
+        </button>
 
         <button
           class="btn btn-sm btn-primary shrink-0 ml-auto"
@@ -498,6 +563,60 @@
   </div>
   <form method="dialog" class="modal-backdrop">
     <button type="button" onclick={closeEmployeeEditor}>close</button>
+  </form>
+</dialog>
+
+<dialog class="modal" bind:this={lockoutResetDialog}>
+  <div class="modal-box max-w-lg p-0">
+    <div class="border-b border-base-200 px-5 py-4">
+      <h3 class="font-bold text-base">Restablecer bloqueo de usuario</h3>
+      <p class="mt-1 text-sm text-base-content/70">
+        Selecciona el empleado que quieres desbloquear.
+      </p>
+    </div>
+
+    <form class="grid gap-4 px-5 py-5" onsubmit={submitLockoutReset}>
+      <div class="form-control">
+        <span class="label-text mb-1">Empleado</span>
+        <select
+          class="select select-bordered"
+          bind:value={lockoutResetForm.employeeID}
+          required
+        >
+          {#if lockoutCandidateEmployees.length === 0}
+            <option value="" disabled selected>No hay empleados</option>
+          {:else}
+            {#each lockoutCandidateEmployees as employee}
+              <option value={employee.id}>
+                {employee.email} ({employee.role})
+              </option>
+            {/each}
+          {/if}
+        </select>
+      </div>
+
+      <p class="text-xs text-base-content/60">
+        Por seguridad, los identificadores sensibles del empleado no se muestran
+        aqui.
+      </p>
+
+      <div class="flex justify-end gap-2 pt-1">
+        <button
+          class="btn btn-ghost"
+          type="button"
+          onclick={closeLockoutResetModal}>Cancelar</button
+        >
+        <button
+          class="btn btn-warning"
+          type="submit"
+          disabled={busy || !selectedLockoutEmployee}>Restablecer</button
+        >
+      </div>
+    </form>
+  </div>
+
+  <form method="dialog" class="modal-backdrop">
+    <button type="button" onclick={closeLockoutResetModal}>close</button>
   </form>
 </dialog>
 

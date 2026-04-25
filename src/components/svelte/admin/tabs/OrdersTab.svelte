@@ -30,8 +30,20 @@
     CreateOrderPayload,
     OrdersTabProps,
     ManualOrderItemDraft,
+    OrderFormState,
   } from "./types/orders-tab";
   import { normalizeIdList } from "./utils/list";
+
+  const MANUAL_ORDER_DRAFT_STORAGE_KEY = "ishos.manual-order-draft.v1";
+
+  interface ManualOrderDraftSnapshot {
+    orderForm: OrderFormState;
+    manualItems: ManualOrderItemDraft[];
+    selectedFlavorId: string;
+    includedToppingId: string;
+    includedJaleaId: string;
+    selectedExtraAddonIds: string[];
+  }
 
   let {
     isAdmin,
@@ -127,6 +139,102 @@
   });
   let manualItems = $state<ManualOrderItemDraft[]>([]);
 
+  function hasManualDraftContent(snapshot: ManualOrderDraftSnapshot): boolean {
+    return (
+      snapshot.orderForm.customer_name.trim().length > 0 ||
+      snapshot.orderForm.customer_phone.trim().length > 0 ||
+      snapshot.orderForm.customer_email.trim().length > 0 ||
+      snapshot.orderForm.notes.trim().length > 0 ||
+      snapshot.orderForm.table_number !== "" ||
+      snapshot.manualItems.length > 0 ||
+      snapshot.orderForm.quantity !== 1 ||
+      snapshot.selectedFlavorId.length > 0 ||
+      snapshot.includedToppingId.length > 0 ||
+      snapshot.includedJaleaId.length > 0 ||
+      snapshot.selectedExtraAddonIds.length > 0
+    );
+  }
+
+  function buildManualDraftSnapshot(): ManualOrderDraftSnapshot {
+    return {
+      orderForm: {
+        ...orderForm,
+      },
+      manualItems: manualItems.map((item) => ({
+        ...item,
+        included_addon_ids: [...item.included_addon_ids],
+        extra_addon_ids: [...item.extra_addon_ids],
+      })),
+      selectedFlavorId,
+      includedToppingId,
+      includedJaleaId,
+      selectedExtraAddonIds: [...selectedExtraAddonIds],
+    };
+  }
+
+  function clearManualDraftStorage() {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.removeItem(MANUAL_ORDER_DRAFT_STORAGE_KEY);
+  }
+
+  function persistManualDraft() {
+    if (typeof window === "undefined" || isEditing || !orderEditorOpen) return;
+
+    const snapshot = buildManualDraftSnapshot();
+    if (!hasManualDraftContent(snapshot)) {
+      clearManualDraftStorage();
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      MANUAL_ORDER_DRAFT_STORAGE_KEY,
+      JSON.stringify(snapshot),
+    );
+  }
+
+  function restoreManualDraft(): boolean {
+    if (typeof window === "undefined") return false;
+
+    const rawSnapshot = window.sessionStorage.getItem(
+      MANUAL_ORDER_DRAFT_STORAGE_KEY,
+    );
+    if (!rawSnapshot) return false;
+
+    try {
+      const snapshot = JSON.parse(rawSnapshot) as ManualOrderDraftSnapshot;
+      orderForm = {
+        customer_name: snapshot.orderForm.customer_name ?? "",
+        customer_phone: snapshot.orderForm.customer_phone ?? "",
+        customer_email: snapshot.orderForm.customer_email ?? "",
+        payment_method: snapshot.orderForm.payment_method ?? "efectivo",
+        order_type: snapshot.orderForm.order_type ?? "para_llevar",
+        table_number: snapshot.orderForm.table_number ?? "",
+        notes: snapshot.orderForm.notes ?? "",
+        product_id: snapshot.orderForm.product_id ?? products[0]?.id ?? "",
+        quantity: snapshot.orderForm.quantity ?? 1,
+      };
+      manualItems = Array.isArray(snapshot.manualItems)
+        ? snapshot.manualItems.map((item) => ({
+            product_id: item.product_id,
+            quantity: Number(item.quantity) || 1,
+            flavor_id: item.flavor_id,
+            included_addon_ids: normalizeIdList(item.included_addon_ids ?? []),
+            extra_addon_ids: normalizeIdList(item.extra_addon_ids ?? []),
+          }))
+        : [];
+      selectedFlavorId = snapshot.selectedFlavorId ?? "";
+      includedToppingId = snapshot.includedToppingId ?? "";
+      includedJaleaId = snapshot.includedJaleaId ?? "";
+      selectedExtraAddonIds = normalizeIdList(
+        snapshot.selectedExtraAddonIds ?? [],
+      );
+      return true;
+    } catch {
+      clearManualDraftStorage();
+      return false;
+    }
+  }
+
   $effect(() => {
     if (!orderForm.product_id && products.length > 0) {
       orderForm.product_id = products[0].id;
@@ -134,9 +242,23 @@
   });
 
   $effect(() => {
+    if (
+      !isEditing &&
+      selectedProductFlavors.length === 1 &&
+      !selectedFlavorId
+    ) {
+      selectedFlavorId = selectedProductFlavors[0].id;
+    }
+  });
+
+  $effect(() => {
     if (orderForm.order_type === "para_llevar") {
       orderForm.table_number = "";
     }
+  });
+
+  $effect(() => {
+    persistManualDraft();
   });
 
   const selectedProduct = $derived(
@@ -482,14 +604,33 @@
   }
 
   function openCreateOrderModal() {
-    resetOrderForm();
+    if (!restoreManualDraft()) {
+      resetOrderForm();
+    }
     orderEditorOpen = true;
+  }
+
+  function clearManualOrderForm(options?: { close?: boolean }) {
+    clearManualDraftStorage();
+    resetOrderForm();
+    saveUserOpen = false;
+
+    if (options?.close ?? false) {
+      orderEditorOpen = false;
+    }
   }
 
   function closeOrderEditor() {
     saveUserOpen = false;
     orderEditorOpen = false;
-    resetOrderForm();
+    if (editOrderId) {
+      resetOrderForm();
+      return;
+    }
+
+    editError = "";
+    editNotice = "";
+    addItemError = "";
   }
 
   function openSaveUserDialog() {
@@ -581,6 +722,7 @@
 
     const created = await onCreate(createPayload);
     if (created) {
+      clearManualDraftStorage();
       closeOrderEditor();
     } else {
       editError = "No se pudo crear la orden";
@@ -675,6 +817,11 @@
   }
 
   function cancelEdit() {
+    if (!editOrderId) {
+      clearManualOrderForm({ close: true });
+      return;
+    }
+
     closeOrderEditor();
   }
 
@@ -797,6 +944,9 @@
   onSubmit={handleSubmit}
   onClose={closeOrderEditor}
   onCancelEdit={cancelEdit}
+  onClearForm={() => {
+    clearManualOrderForm();
+  }}
   onProductChange={(value) => {
     orderForm.product_id = value;
   }}

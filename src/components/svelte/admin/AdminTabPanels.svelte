@@ -176,6 +176,7 @@
         onCreate={employees.onCreate}
         onUpdate={employees.onUpdate}
         onDelete={employees.onDelete}
+        resetLoginLockout={employees.resetLoginLockout}
       />
 
       <UsersTab

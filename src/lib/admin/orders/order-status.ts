@@ -117,7 +117,21 @@ export function createdByLabel(
   employeeById: Record<string, string>,
 ): string {
   const explicitName = order.created_by_name?.trim();
+  const creatorRole = order.created_by_role ?? null;
+  const creatorId = order.created_by_user_id?.trim() || "";
+
+  if (creatorRole === "customer") {
+    return order.customer_name;
+  }
+
+  if (creatorRole === "admin" || creatorRole === "employee") {
+    if (creatorId && employeeById[creatorId]) return employeeById[creatorId];
+    if (explicitName && explicitName !== order.customer_name)
+      return explicitName;
+    return "Personal";
+  }
+
   if (explicitName) return explicitName;
-  if (!order.created_by_user_id) return order.customer_name;
-  return employeeById[order.created_by_user_id] || "Personal";
+  if (!creatorId) return order.customer_name;
+  return employeeById[creatorId] || explicitName || "Personal";
 }

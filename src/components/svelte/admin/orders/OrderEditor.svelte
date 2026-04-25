@@ -45,6 +45,7 @@
     onSubmit: (event: SubmitEvent) => void;
     onClose: () => void;
     onCancelEdit: () => void;
+    onClearForm: () => void;
     onProductChange: (value: string) => void;
     onQuantityChange: (value: number) => void;
     onFlavorChange: (value: string) => void;
@@ -90,6 +91,7 @@
     onSubmit,
     onClose,
     onCancelEdit,
+    onClearForm,
     onProductChange,
     onQuantityChange,
     onFlavorChange,
@@ -497,6 +499,11 @@
           {/if}
           {isEditing ? "Guardar cambios" : "Crear orden"}
         </button>
+        {#if !isEditing}
+          <button class="btn btn-outline" type="button" onclick={onClearForm}>
+            Limpiar
+          </button>
+        {/if}
         <button class="btn btn-ghost" type="button" onclick={onCancelEdit}>
           {isEditing ? "Cancelar edicion" : "Cancelar"}
         </button>
