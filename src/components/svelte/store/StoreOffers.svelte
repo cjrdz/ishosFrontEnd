@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import Icon from "../shared/AppIcon.svelte";
-  import { formatCurrency } from "../../../lib/utils/formatters";
+  import ProductCard from "./shared/ProductCard.svelte";
+  import { toSafeImageUrl } from "../../../lib/utils/formatters";
   import { addCartItem } from "../../../lib/store/cart";
-  import type { StoreOfferItem } from "../../../lib/api/store";
-  import type { PublicProduct } from "../../../lib/api/store";
+  import { resolveActiveOffers } from "../../../lib/store/offers";
+  import type { StoreOfferItem, PublicProduct } from "../../../lib/api/store";
 
   interface Props {
     offers: StoreOfferItem[];
@@ -14,456 +15,305 @@
 
   let { offers, products, ordersEnabled }: Props = $props();
 
+  // ── State ──────────────────────────────────────────────────────────
   let now = $state(Date.now());
-  let timer: ReturnType<typeof setInterval> | null = null;
-  let flippedOfferId = $state<string | null>(null);
+  let activeIndex = $state(0);
+  let trackEl = $state<HTMLDivElement | null>(null);
+  let viewportEl = $state<HTMLDivElement | null>(null);
+  let cardsPerView = $state(1);
 
-  const activeOffers = $derived(
-    offers
-      .map((offer) => {
-        const product = products.find((p) => p.id === offer.product_id);
-        const expiresMs = new Date(offer.expires_at).getTime();
-        return { ...offer, product, expiresMs };
-      })
-      .filter((o) => o.product && o.expiresMs > now),
-  );
+  // Drag state
+  let isDragging = $state(false);
+  let dragStartX = 0;
+  let dragCurrentX = 0;
+  let dragOffset = $state(0); // live pixel offset while dragging
+
+  // Timers
+  let clockTimer: ReturnType<typeof setInterval> | null = null;
+  let slideTimer: ReturnType<typeof setInterval> | null = null;
+  let isPaused = false;
+
+  const AUTO_SLIDE_MS = 4500;
+  const DRAG_THRESHOLD = 40; // px to commit a slide
+
+  const activeOffers = $derived(resolveActiveOffers(offers, products, now));
+  // How many "pages" are available given the current viewport width
+  const maxIndex = $derived(Math.max(0, activeOffers.length - cardsPerView));
+  const slideWidthPct = $derived(100 / cardsPerView);
+
+  // ── Lifecycle ──────────────────────────────────────────────────────
+  let resizeObserver: ResizeObserver | null = null;
+
+  // Min card width (px) used to compute how many cards fit in the container.
+  const MIN_CARD_WIDTH = 260;
+
+  function computeCardsPerView(containerWidth: number): number {
+    return Math.max(
+      1,
+      Math.min(2, Math.floor(containerWidth / MIN_CARD_WIDTH)),
+    );
+  }
 
   onMount(() => {
-    timer = setInterval(() => {
+    if (viewportEl) {
+      cardsPerView = computeCardsPerView(viewportEl.clientWidth);
+    }
+    resizeObserver = new ResizeObserver((entries) => {
+      const width = entries[0].contentRect.width;
+      const next = computeCardsPerView(width);
+      if (next !== cardsPerView) {
+        cardsPerView = next;
+        if (activeIndex > maxIndex) activeIndex = maxIndex;
+        startAutoSlide();
+      }
+    });
+    if (viewportEl) resizeObserver.observe(viewportEl);
+    clockTimer = setInterval(() => {
       now = Date.now();
     }, 1000);
+    startAutoSlide();
   });
 
   onDestroy(() => {
-    if (timer) clearInterval(timer);
+    resizeObserver?.disconnect();
+    if (clockTimer) clearInterval(clockTimer);
+    stopAutoSlide();
   });
 
-  function formatCountdown(expiresMs: number): string {
-    const diff = Math.max(0, expiresMs - now);
-    const totalSec = Math.floor(diff / 1000);
-    const days = Math.floor(totalSec / 86400);
-    const hours = Math.floor((totalSec % 86400) / 3600);
-    const mins = Math.floor((totalSec % 3600) / 60);
-    const secs = totalSec % 60;
-    const pad = (n: number) => String(n).padStart(2, "0");
-    if (days > 0) return `${days}d ${pad(hours)}:${pad(mins)}:${pad(secs)}`;
-    return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+  // ── Auto-slide ─────────────────────────────────────────────────────
+  function startAutoSlide() {
+    stopAutoSlide();
+    if (maxIndex < 1) return;
+    slideTimer = setInterval(() => {
+      if (!isPaused) goTo(activeIndex < maxIndex ? activeIndex + 1 : 0);
+    }, AUTO_SLIDE_MS);
   }
 
-  function getSafeImageUrl(url: string | null | undefined): string | undefined {
-    if (!url) return undefined;
-    if (
-      url.startsWith("/") ||
-      url.startsWith("http://") ||
-      url.startsWith("https://")
-    )
-      return url;
-    return undefined;
+  function stopAutoSlide() {
+    if (slideTimer) {
+      clearInterval(slideTimer);
+      slideTimer = null;
+    }
+  }
+
+  // ── Navigation ─────────────────────────────────────────────────────
+  function goTo(index: number) {
+    activeIndex = Math.max(0, Math.min(index, maxIndex));
+  }
+
+  function prev() {
+    goTo(activeIndex > 0 ? activeIndex - 1 : maxIndex);
+    startAutoSlide();
+  }
+
+  function next() {
+    goTo(activeIndex < maxIndex ? activeIndex + 1 : 0);
+    startAutoSlide();
+  }
+
+  // ── Drag / swipe ───────────────────────────────────────────────────
+  function onDragStart(clientX: number) {
+    isDragging = true;
+    isPaused = true;
+    dragStartX = clientX;
+    dragCurrentX = clientX;
+    dragOffset = 0;
+  }
+
+  function onDragMove(clientX: number) {
+    if (!isDragging) return;
+    dragCurrentX = clientX;
+    dragOffset = dragCurrentX - dragStartX;
+  }
+
+  function onDragEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    const delta = dragCurrentX - dragStartX;
+    if (delta < -DRAG_THRESHOLD) next();
+    else if (delta > DRAG_THRESHOLD) prev();
+    dragOffset = 0;
+    isPaused = false;
+    startAutoSlide();
+  }
+
+  // Mouse events
+  function handleMouseDown(e: MouseEvent) {
+    onDragStart(e.clientX);
+  }
+  function handleMouseMove(e: MouseEvent) {
+    if (isDragging) {
+      e.preventDefault();
+      onDragMove(e.clientX);
+    }
+  }
+  function handleMouseUp() {
+    onDragEnd();
+  }
+  function handleMouseLeave() {
+    if (isDragging) onDragEnd();
+  }
+
+  // Touch events
+  function handleTouchStart(e: TouchEvent) {
+    onDragStart(e.touches[0].clientX);
+  }
+  function handleTouchMove(e: TouchEvent) {
+    onDragMove(e.touches[0].clientX);
+  }
+  function handleTouchEnd() {
+    onDragEnd();
+  }
+
+  // Pause on hover (desktop)
+  function handleMouseEnter() {
+    isPaused = true;
+  }
+  function handleMouseExitArea() {
+    if (!isDragging) isPaused = false;
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────
+  function formatCountdown(expiresMs: number): string {
+    const diff = Math.max(0, expiresMs - now);
+    const s = Math.floor(diff / 1000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(Math.floor((s % 86400) / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
   }
 
   function addOfferToCart(product: PublicProduct) {
     addCartItem({
       product_id: product.id,
       name: product.name,
-      image_url: getSafeImageUrl(product.image_url),
+      image_url: toSafeImageUrl(product.image_url),
       unit_price: product.price,
       quantity: 1,
     });
   }
 
-  function addOfferAndGoToCart(product: PublicProduct) {
-    addOfferToCart(product);
-    window.location.href = "/order/cart#checkout";
-  }
-
-  function toggleOfferDetails(productId: string) {
-    flippedOfferId = flippedOfferId === productId ? null : productId;
-  }
-
-  function handleOfferCardKeydown(event: KeyboardEvent, productId: string) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      toggleOfferDetails(productId);
-    }
-  }
-
-  function hasDiscount(offer: StoreOfferItem): boolean {
-    return typeof offer.discount_price === "number" && offer.discount_price > 0;
-  }
-
-  function hasOfferNote(offer: StoreOfferItem): boolean {
-    return typeof offer.note === "string" && offer.note.trim().length > 0;
-  }
+  // Translate percentage including live drag offset
+  const translateX = $derived(
+    `calc(${-activeIndex * slideWidthPct}% + ${dragOffset}px)`,
+  );
 </script>
 
 {#if activeOffers.length > 0}
-  <section class="store-offers max-w-7xl mx-auto px-4 py-6 md:py-10">
-    <div class="text-center mb-5 md:mb-8">
-      <h2 class="text-2xl md:text-3xl font-bold inline-block mb-1">
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <section
+    class="w-full max-w-2xl mx-auto px-4 py-4 select-none"
+    onmouseenter={handleMouseEnter}
+    onmouseleave={handleMouseExitArea}
+    aria-label="Productos Especiales"
+  >
+    <!-- Header -->
+    <div class="text-center mb-4">
+      <h2 class="text-2xl font-extrabold tracking-tight">
         Productos Especiales
       </h2>
-      <p
-        class="offers-subtitle text-base-content/60 font-medium text-sm md:text-base"
-      >
-        Aprovecha nuestros productos por tiempo limitado.
+      <p class="text-sm text-base-content/60 mt-1">
+        Ofertas activas con precio especial por tiempo limitado.
       </p>
     </div>
 
+    <!-- Viewport — clips the track -->
     <div
-      class={`offers-scroll ${activeOffers.length <= 2 ? "md:justify-center" : ""}`}
+      class="relative w-full overflow-hidden rounded-2xl"
+      bind:this={viewportEl}
     >
-      {#each activeOffers as offer (offer.product_id)}
-        {@const product = offer.product!}
-        {@const canFlip = hasOfferNote(offer)}
-        <div class="min-w-64 max-w-80 shrink-0">
+      <!-- Track — slides horizontally -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        bind:this={trackEl}
+        class="flex w-full"
+        class:transition-transform={!isDragging}
+        class:duration-300={!isDragging}
+        class:ease-out={!isDragging}
+        class:cursor-grabbing={isDragging}
+        class:cursor-grab={!isDragging}
+        style="transform: translateX({translateX});"
+        role="list"
+        onmousedown={handleMouseDown}
+        onmousemove={handleMouseMove}
+        onmouseup={handleMouseUp}
+        onmouseleave={handleMouseLeave}
+        ontouchstart={handleTouchStart}
+        ontouchmove={handleTouchMove}
+        ontouchend={handleTouchEnd}
+      >
+        {#each activeOffers as offer, index (offer.product_id)}
+          {@const product = offer.product!}
+
+          <!-- Each slide occupies 1/cardsPerView of the track width -->
           <div
-            class="flip-3d-card h-full"
-            data-flipped={canFlip && flippedOfferId === offer.product_id
-              ? "true"
-              : "false"}
+            class="shrink-0 flex justify-center px-2"
+            style="width: {slideWidthPct}%"
+            role="listitem"
+            aria-label={product.name}
           >
-            {#if canFlip}
-              <div
-                class="flip-3d-toggle h-full rounded-3xl cursor-pointer focus:outline-none focus:ring-4 focus:ring-warning/30"
-                role="button"
-                tabindex={0}
-                aria-label={flippedOfferId === offer.product_id
-                  ? `Volver a la oferta de ${product.name}`
-                  : `Ver detalles de la oferta de ${product.name}`}
-                onclick={() => toggleOfferDetails(offer.product_id)}
-                onkeydown={(event) =>
-                  handleOfferCardKeydown(event, offer.product_id)}
-              >
-                <div class="flip-3d-inner h-full min-h-104 rounded-3xl">
-                  <article
-                    class="offer-face flip-3d-face group overflow-hidden rounded-3xl border border-warning/30 bg-base-100 shadow-sm transition-shadow duration-300 hover:shadow-lg"
-                  >
-                    {#if getSafeImageUrl(product.image_url)}
-                      <figure
-                        class="relative aspect-4/3 w-full overflow-hidden bg-base-200/50"
-                      >
-                        <img
-                          src={getSafeImageUrl(product.image_url)}
-                          alt={product.name}
-                          class="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                        <span
-                          class="absolute left-3 top-3 badge badge-warning badge-sm font-semibold shadow-sm"
-                        >
-                          {offer.label}
-                        </span>
-                      </figure>
-                    {:else}
-                      <div
-                        class="grid aspect-4/3 place-items-center bg-base-200/60 text-base-content/45"
-                      >
-                        <Icon icon="lucide:image-off" class="size-10" />
-                      </div>
-                    {/if}
-                    <div class="flex h-full flex-col p-4 md:p-5">
-                      <div
-                        class="mb-3 flex items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2"
-                      >
-                        <span
-                          class="text-[11px] font-semibold uppercase tracking-[0.14em] text-warning-content/80"
-                          >Expira en</span
-                        >
-                        <span
-                          class="countdown-badge text-sm font-bold text-warning-content"
-                          >{formatCountdown(offer.expiresMs)}</span
-                        >
-                      </div>
-                      <h3
-                        class="text-base font-semibold leading-tight md:text-lg"
-                      >
-                        {product.name}
-                      </h3>
-                      <p class="mt-2 line-clamp-2 text-sm text-base-content/65">
-                        {offer.note ||
-                          product.description ||
-                          "Descubre esta oferta especial disponible por tiempo limitado."}
-                      </p>
-
-                      <div class="mt-auto space-y-3 pt-4">
-                        <div class="flex items-end justify-between gap-3">
-                          {#if hasDiscount(offer)}
-                            <div class="flex items-baseline gap-2">
-                              <span
-                                class="text-xs md:text-sm line-through text-base-content/40"
-                                >{formatCurrency(product.price)}</span
-                              >
-                              <span
-                                class="text-lg font-bold text-primary md:text-2xl"
-                                >{formatCurrency(
-                                  offer.discount_price ?? 0,
-                                )}</span
-                              >
-                            </div>
-                          {:else}
-                            <span
-                              class="text-lg font-bold text-primary md:text-2xl"
-                              >{formatCurrency(product.price)}</span
-                            >
-                          {/if}
-                        </div>
-
-                        {#if ordersEnabled}
-                          <div class="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              class="btn btn-primary btn-sm rounded-full w-full"
-                              onclick={(event) => {
-                                event.stopPropagation();
-                                addOfferToCart(product);
-                              }}
-                            >
-                              Agregar
-                            </button>
-                            <button
-                              type="button"
-                              class="btn btn-outline btn-sm rounded-full w-full"
-                              onclick={(event) => {
-                                event.stopPropagation();
-                                addOfferAndGoToCart(product);
-                              }}
-                            >
-                              Pedir
-                            </button>
-                          </div>
-                        {/if}
-                      </div>
-                    </div>
-                  </article>
-
-                  <article
-                    class="flip-3d-face flip-3d-back overflow-hidden rounded-3xl border border-warning/20 bg-base-100 shadow-lg"
-                  >
-                    {#if getSafeImageUrl(product.image_url)}
-                      <img
-                        src={getSafeImageUrl(product.image_url)}
-                        alt={product.name}
-                        class="absolute inset-0 h-full w-full object-cover object-center opacity-[0.14] blur-sm scale-110"
-                        loading="lazy"
-                      />
-                    {/if}
-                    <div
-                      class="absolute inset-0 bg-base-100/92 backdrop-blur-md"
-                    ></div>
-                    <div
-                      class="relative z-10 flex h-full flex-col p-5 text-left"
-                    >
-                      <div class="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 class="mt-2 text-xl font-black">
-                            {product.name}
-                          </h3>
-                        </div>
-                        <span class="badge badge-warning badge-outline"
-                          >{offer.label}</span
-                        >
-                      </div>
-
-                      <p class="mt-4 text-sm leading-6 text-base-content/70">
-                        {offer.note ||
-                          "Sin descripcion adicional disponible para esta oferta."}
-                      </p>
-
-                      {#if hasDiscount(offer)}
-                        <div class="mt-5 grid grid-cols-2 gap-3 text-sm">
-                          <div class="rounded-2xl bg-base-200/65 p-3">
-                            <p
-                              class="text-[11px] font-semibold uppercase tracking-[0.18em] text-base-content/45"
-                            >
-                              Precio base
-                            </p>
-                            <p class="mt-2 text-lg font-bold text-base-content">
-                              {formatCurrency(product.price)}
-                            </p>
-                          </div>
-                          <div class="rounded-2xl bg-warning/10 p-3">
-                            <p
-                              class="text-[11px] font-semibold uppercase tracking-[0.18em] text-warning-content/70"
-                            >
-                              Oferta
-                            </p>
-                            <p class="mt-2 text-lg font-bold text-primary">
-                              {formatCurrency(offer.discount_price ?? 0)}
-                            </p>
-                          </div>
-                        </div>
-                      {:else}
-                        <div
-                          class="mt-5 rounded-2xl border border-base-300 bg-base-200/55 p-3 text-sm"
-                        >
-                          <p
-                            class="text-[11px] font-semibold uppercase tracking-[0.18em] text-base-content/45"
-                          >
-                            Precio
-                          </p>
-                          <p class="mt-2 text-lg font-bold text-primary">
-                            {formatCurrency(product.price)}
-                          </p>
-                        </div>
-                      {/if}
-
-                      <div class="mt-auto space-y-3 pt-5">
-                        <div
-                          class="flex items-center justify-between gap-2 rounded-2xl border border-base-300 bg-base-100/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-base-content/60"
-                        >
-                          <span>Expira en</span>
-                          <span
-                            class="countdown-badge text-sm text-base-content"
-                            >{formatCountdown(offer.expiresMs)}</span
-                          >
-                        </div>
-                        <a
-                          href="/menu"
-                          class="btn btn-outline btn-sm rounded-full w-full"
-                          onclick={(event) => {
-                            event.stopPropagation();
-                          }}
-                        >
-                          Ir al menu
-                        </a>
-                      </div>
-                    </div>
-                  </article>
-                </div>
-              </div>
-            {:else}
-              <div class="flip-3d-toggle h-full rounded-3xl cursor-default">
-                <div class="flip-3d-inner h-full min-h-104 rounded-3xl">
-                  <article
-                    class="offer-face flip-3d-face group overflow-hidden rounded-3xl border border-warning/30 bg-base-100 shadow-sm transition-shadow duration-300 hover:shadow-lg"
-                  >
-                    {#if getSafeImageUrl(product.image_url)}
-                      <figure
-                        class="relative aspect-4/3 w-full overflow-hidden bg-base-200/50"
-                      >
-                        <img
-                          src={getSafeImageUrl(product.image_url)}
-                          alt={product.name}
-                          class="h-full w-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                        <span
-                          class="absolute left-3 top-3 badge badge-warning badge-sm font-semibold shadow-sm"
-                        >
-                          {offer.label}
-                        </span>
-                      </figure>
-                    {:else}
-                      <div
-                        class="grid aspect-4/3 place-items-center bg-base-200/60 text-base-content/45"
-                      >
-                        <Icon icon="lucide:image-off" class="size-10" />
-                      </div>
-                    {/if}
-                    <div class="flex h-full flex-col p-4 md:p-5">
-                      <div
-                        class="mb-3 flex items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2"
-                      >
-                        <span
-                          class="text-[11px] font-semibold uppercase tracking-[0.14em] text-warning-content/80"
-                          >Expira en</span
-                        >
-                        <span
-                          class="countdown-badge text-sm font-bold text-warning-content"
-                          >{formatCountdown(offer.expiresMs)}</span
-                        >
-                      </div>
-                      <h3
-                        class="text-base font-semibold leading-tight md:text-lg"
-                      >
-                        {product.name}
-                      </h3>
-                      <p class="mt-2 line-clamp-2 text-sm text-base-content/65">
-                        {offer.note ||
-                          product.description ||
-                          "Descubre esta oferta especial disponible por tiempo limitado."}
-                      </p>
-
-                      <div class="mt-auto space-y-3 pt-4">
-                        <div class="flex items-end justify-between gap-3">
-                          {#if hasDiscount(offer)}
-                            <div class="flex items-baseline gap-2">
-                              <span
-                                class="text-xs md:text-sm line-through text-base-content/40"
-                                >{formatCurrency(product.price)}</span
-                              >
-                              <span
-                                class="text-lg font-bold text-primary md:text-2xl"
-                                >{formatCurrency(
-                                  offer.discount_price ?? 0,
-                                )}</span
-                              >
-                            </div>
-                          {:else}
-                            <span
-                              class="text-lg font-bold text-primary md:text-2xl"
-                              >{formatCurrency(product.price)}</span
-                            >
-                          {/if}
-                        </div>
-
-                        {#if ordersEnabled}
-                          <div class="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              class="btn btn-primary btn-sm rounded-full w-full"
-                              onclick={(event) => {
-                                event.stopPropagation();
-                                addOfferToCart(product);
-                              }}
-                            >
-                              Agregar
-                            </button>
-                            <button
-                              type="button"
-                              class="btn btn-outline btn-sm rounded-full w-full"
-                              onclick={(event) => {
-                                event.stopPropagation();
-                                addOfferAndGoToCart(product);
-                              }}
-                            >
-                              Pedir
-                            </button>
-                          </div>
-                        {/if}
-                      </div>
-                    </div>
-                  </article>
-                </div>
-              </div>
-            {/if}
+            <!-- Inner cap: on single-card view prevent the card from stretching beyond a readable width -->
+            <div
+              class="w-full"
+              style="max-width: {cardsPerView === 1 ? '20rem' : '100%'}"
+            >
+              <!-- Product card — badge, countdown and note render inside the card -->
+              <ProductCard
+                {product}
+                {offer}
+                imageUrl={toSafeImageUrl(product.image_url)}
+                href="/menu"
+                {ordersEnabled}
+                variant="featured"
+                countdown={formatCountdown(offer.expiresMs)}
+                note={offer.note}
+                onAdd={() => addOfferToCart(product)}
+              />
+            </div>
           </div>
-        </div>
-      {/each}
+        {/each}
+      </div>
+
+      <!-- Edge nav arrows (desktop only) -->
+      {#if maxIndex > 0}
+        <button
+          class="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30
+               btn btn-circle btn-sm bg-base-100/80 border-base-300/60
+               backdrop-blur-sm shadow-md hover:bg-base-100"
+          aria-label="Anterior"
+          onclick={prev}
+        >
+          <Icon icon="lucide:chevron-left" class="size-4" />
+        </button>
+        <button
+          class="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30
+               btn btn-circle btn-sm bg-base-100/80 border-base-300/60
+               backdrop-blur-sm shadow-md hover:bg-base-100"
+          aria-label="Siguiente"
+          onclick={next}
+        >
+          <Icon icon="lucide:chevron-right" class="size-4" />
+        </button>
+      {/if}
     </div>
+
+    <!-- Dot indicators — one dot per page, not per offer -->
+    {#if maxIndex > 0}
+      <div class="flex items-center justify-center gap-2 mt-3" role="tablist">
+        {#each { length: maxIndex + 1 } as _, i}
+          <button
+            class="h-1.75 rounded-full border-none p-0 cursor-pointer transition-all duration-200
+                 {activeIndex === i
+              ? 'w-[1.1rem] bg-primary'
+              : 'w-1.75 bg-base-content/20 hover:bg-base-content/40'}"
+            role="tab"
+            aria-selected={activeIndex === i}
+            aria-label={`Página ${i + 1}`}
+            onclick={() => {
+              goTo(i);
+              startAutoSlide();
+            }}
+          ></button>
+        {/each}
+      </div>
+    {/if}
   </section>
 {/if}
-
-<style>
-  :global([data-theme="night"]) .store-offers .offers-subtitle {
-    color: oklch(var(--bc) / 0.82);
-  }
-
-  :global([data-theme="night"]) .store-offers .offer-face {
-    background-color: oklch(var(--b1) / 0.95);
-    border-color: oklch(var(--bc) / 0.2);
-  }
-
-  :global([data-theme="night"]) .store-offers .offer-face p,
-  :global([data-theme="night"]) .store-offers .offer-face span {
-    color: color-mix(in oklab, oklch(var(--bc)) 85%, white 15%);
-  }
-
-  :global([data-theme="night"]) .store-offers .offer-face .text-primary {
-    color: color-mix(in oklab, oklch(var(--p)) 82%, white 18%);
-  }
-
-  :global([data-theme="night"]) .store-offers .offer-face .line-through {
-    color: oklch(var(--bc) / 0.62);
-  }
-</style>

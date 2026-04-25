@@ -15,3 +15,17 @@ export function toSlug(value: string): string {
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
 }
+
+export function toSafeImageUrl(
+  value: string | null | undefined,
+): string | undefined {
+  if (!value) return undefined;
+  if (
+    value.startsWith("/") ||
+    value.startsWith("http://") ||
+    value.startsWith("https://")
+  ) {
+    return value;
+  }
+  return undefined;
+}

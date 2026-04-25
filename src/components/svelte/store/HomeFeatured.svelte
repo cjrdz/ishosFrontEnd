@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { formatCurrency } from "../../../lib/utils/formatters";
+  import { toSafeImageUrl } from "../../../lib/utils/formatters";
   import { addCartItem } from "../../../lib/store/cart";
+  import { buildActiveOfferMap } from "../../../lib/store/offers";
   import {
     fetchStoreSettings,
     listPublicProducts,
     type PublicProduct,
     type StoreOfferItem,
   } from "../../../lib/api/store";
+  import ProductCard from "./shared/ProductCard.svelte";
   import StoreOffers from "./StoreOffers.svelte";
 
   let loading = $state(true);
@@ -17,16 +19,7 @@
   let ordersEnabled = $state(true);
   let offers = $state<StoreOfferItem[]>([]);
   const featuredSkeletonCards = Array.from({ length: 4 }, (_, index) => index);
-  const activeOfferMap = $derived.by(() => {
-    const now = Date.now();
-    const map = new Map<string, StoreOfferItem>();
-    for (const offer of offers) {
-      if (new Date(offer.expires_at).getTime() > now) {
-        map.set(offer.product_id, offer);
-      }
-    }
-    return map;
-  });
+  const activeOfferMap = $derived(buildActiveOfferMap(offers));
 
   onMount(() => {
     void loadFeatured();
@@ -60,17 +53,6 @@
     } finally {
       loading = false;
     }
-  }
-
-  function getSafeImageUrl(url: string | null | undefined): string | undefined {
-    if (!url) return undefined;
-    if (
-      url.startsWith("/") ||
-      url.startsWith("http://") ||
-      url.startsWith("https://")
-    )
-      return url;
-    return undefined;
   }
 </script>
 
@@ -142,73 +124,23 @@
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {#each featured as product (product.id)}
           {@const offer = activeOfferMap.get(product.id)}
-          <a href="/menu" class="h-full group block">
-            <article
-              class="featured-card card bg-base-100 w-full border border-base-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
-            >
-              {#if getSafeImageUrl(product.image_url)}
-                <figure
-                  class="bg-base-200/50 w-full aspect-square overflow-hidden relative"
-                >
-                  <img
-                    src={getSafeImageUrl(product.image_url)}
-                    alt={product.name}
-                    class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                  />
-                  {#if offer}
-                    <span
-                      class="absolute top-2 left-2 badge badge-warning badge-sm font-semibold shadow-sm"
-                    >
-                      {offer.label || "Oferta"}
-                    </span>
-                  {/if}
-                  {#if ordersEnabled}
-                    <button
-                      type="button"
-                      class="absolute bottom-2.5 right-2.5 z-10 size-8 rounded-full bg-primary text-primary-content shadow-md flex items-center justify-center opacity-100 md:opacity-0 scale-90 md:group-hover:opacity-100 md:group-hover:scale-100 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                      aria-label={`Agregar ${product.name} al pedido`}
-                      onclick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        addCartItem({
-                          product_id: product.id,
-                          name: product.name,
-                          image_url: getSafeImageUrl(product.image_url),
-                          unit_price: product.price,
-                          quantity: 1,
-                        });
-                      }}
-                    >
-                      +
-                    </button>
-                  {/if}
-                </figure>
-              {/if}
-              <div class="p-3 sm:p-4 md:p-5">
-                <h3
-                  class="text-sm md:text-base font-semibold leading-tight mb-1.5"
-                >
-                  {product.name}
-                </h3>
-                {#if offer?.discount_price}
-                  <div class="flex items-baseline gap-2">
-                    <span
-                      class="price-before text-xs line-through text-base-content/40"
-                      >{formatCurrency(product.price)}</span
-                    >
-                    <span class="text-base md:text-lg font-bold text-primary"
-                      >{formatCurrency(offer.discount_price)}</span
-                    >
-                  </div>
-                {:else}
-                  <span class="text-base md:text-lg font-bold text-primary"
-                    >{formatCurrency(product.price)}</span
-                  >
-                {/if}
-              </div>
-            </article>
-          </a>
+          <ProductCard
+            {product}
+            {offer}
+            href="/menu"
+            imageUrl={toSafeImageUrl(product.image_url)}
+            {ordersEnabled}
+            variant="featured"
+            onAdd={() => {
+              addCartItem({
+                product_id: product.id,
+                name: product.name,
+                image_url: toSafeImageUrl(product.image_url),
+                unit_price: product.price,
+                quantity: 1,
+              });
+            }}
+          />
         {/each}
       </div>
     {/if}
@@ -229,14 +161,5 @@
   :global([data-theme="night"]) .home-featured .hero-copy,
   :global([data-theme="night"]) .home-featured .featured-subtitle {
     color: oklch(var(--bc) / 0.82);
-  }
-
-  :global([data-theme="night"]) .home-featured .featured-card {
-    background-color: oklch(var(--b1) / 0.95);
-    border-color: oklch(var(--bc) / 0.2);
-  }
-
-  :global([data-theme="night"]) .home-featured .price-before {
-    color: oklch(var(--bc) / 0.62);
   }
 </style>

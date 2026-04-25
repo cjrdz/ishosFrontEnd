@@ -2,7 +2,10 @@
   import { onMount, tick } from "svelte";
   import { animate } from "motion";
   import Icon from "../shared/AppIcon.svelte";
-  import { formatCurrency } from "../../../lib/utils/formatters";
+  import ProductCard from "./shared/ProductCard.svelte";
+  import ProductModal from "./shared/ProductModal.svelte";
+  import { toSafeImageUrl } from "../../../lib/utils/formatters";
+  import { isOfferActive } from "../../../lib/store/offers";
   import {
     listPublicCategories,
     listPublicProducts,
@@ -35,7 +38,6 @@
   let selectedProduct = $state<PublicProduct | null>(null);
   let modalQty = $state(1);
   let showImageDetails = $state(false);
-  let modalRef = $state<HTMLDialogElement | null>(null);
   const catalogSkeletonCards = Array.from({ length: 10 }, (_, index) => index);
   const categoryTabs = $derived([
     { id: "all", label: "Todos" },
@@ -119,14 +121,6 @@
     selectedProduct = product;
     modalQty = 1;
     showImageDetails = false;
-    modalRef?.showModal();
-  }
-
-  function handleCardKeydown(event: KeyboardEvent, product: PublicProduct) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openProductModal(product);
-    }
   }
 
   function normalizeQty(value: number): number {
@@ -142,18 +136,6 @@
     modalQty = Math.max(1, normalizeQty(modalQty) - 1);
   }
 
-  function getSafeImageUrl(url: string | null | undefined): string | undefined {
-    if (!url) return undefined;
-    if (
-      url.startsWith("/") ||
-      url.startsWith("http://") ||
-      url.startsWith("https://")
-    ) {
-      return url;
-    }
-    return undefined;
-  }
-
   function hasSeasonalFlavors(product: PublicProduct): boolean {
     return (product.flavors ?? []).some(
       (flavor) => flavor.is_active && flavor.is_seasonal,
@@ -162,9 +144,7 @@
 
   function getOffer(product: PublicProduct): StoreOfferItem | undefined {
     return offers.find(
-      (o) =>
-        o.product_id === product.id &&
-        new Date(o.expires_at).getTime() > Date.now(),
+      (offer) => offer.product_id === product.id && isOfferActive(offer),
     );
   }
 
@@ -351,12 +331,12 @@
     addCartItem({
       product_id: selectedProduct.id,
       name: selectedProduct.name,
-      image_url: getSafeImageUrl(selectedProduct.image_url),
+      image_url: toSafeImageUrl(selectedProduct.image_url),
       unit_price: selectedProduct.price,
       quantity: safeQty,
     });
 
-    modalRef?.close();
+    selectedProduct = null;
 
     if (goCheckout) {
       window.location.href = "/order/cart#checkout";
@@ -519,297 +499,54 @@
       >
         {#each visibleProducts as product (product.id)}
           {@const offer = getOffer(product)}
-          <div
-            class="h-full group"
-            role="button"
-            tabindex="0"
-            onclick={() => openProductModal(product)}
-            onkeydown={(event) => handleCardKeydown(event, product)}
-          >
-            <div
-              class="card bg-base-100 w-full border border-base-200 shadow-sm hover:shadow-lg transition-shadow duration-300 overflow-hidden h-full rounded-2xl sm:rounded-3xl flex flex-col relative cursor-pointer"
-            >
-              {#if getSafeImageUrl(product.image_url)}
-                <figure
-                  class="bg-base-200/50 w-full aspect-square overflow-hidden relative"
-                >
-                  <img
-                    src={getSafeImageUrl(product.image_url)}
-                    alt={product.name}
-                    class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                  />
-                  {#if offer}
-                    <span
-                      class="absolute top-2 left-2 badge badge-warning badge-sm font-semibold shadow-sm"
-                    >
-                      {offer.label}
-                    </span>
-                  {/if}
-                  {#if ordersEnabled}
-                    <button
-                      type="button"
-                      class="absolute bottom-2.5 right-2.5 z-10 size-8 rounded-full bg-primary text-primary-content shadow-md flex items-center justify-center opacity-100 md:opacity-0 scale-90 md:group-hover:opacity-100 md:group-hover:scale-100 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                      aria-label={`Agregar ${product.name} al pedido`}
-                      onclick={(event) => {
-                        event.stopPropagation();
-                        addCartItem({
-                          product_id: product.id,
-                          name: product.name,
-                          image_url: getSafeImageUrl(product.image_url),
-                          unit_price: product.price,
-                          quantity: 1,
-                        });
-                      }}
-                    >
-                      <Icon icon="lucide:plus" class="size-4" />
-                    </button>
-                  {/if}
-                </figure>
-              {/if}
-              <div class="card-body p-3 sm:p-4 md:p-5 flex flex-col flex-1">
-                <h3 class="text-sm md:text-base font-bold leading-tight mb-1">
-                  {product.name}
-                </h3>
-
-                {#if hasSeasonalFlavors(product)}
-                  <div class="mb-2 mt-auto">
-                    <span
-                      class="badge badge-warning badge-outline text-xs font-medium"
-                      >Temporada</span
-                    >
-                  </div>
-                {:else}
-                  <div class="mt-auto"></div>
-                {/if}
-
-                <div
-                  class="card-actions justify-between items-center pt-2 border-t border-base-200/50 mt-1"
-                >
-                  <div class="flex items-baseline gap-1">
-                    {#if offer?.discount_price}
-                      <span class="text-xs line-through text-base-content/40"
-                        >{formatCurrency(product.price)}</span
-                      >
-                      <span class="text-base md:text-2xl font-bold text-primary"
-                        >{formatCurrency(offer.discount_price)}</span
-                      >
-                    {:else}
-                      <span class="text-base md:text-2xl font-bold text-primary"
-                        >{formatCurrency(product.price)}</span
-                      >
-                    {/if}
-                  </div>
-                  {#if ordersEnabled}
-                    <button
-                      type="button"
-                      class="btn btn-primary btn-xs md:btn-sm rounded-full px-3 md:px-5 shadow-sm hover:shadow-md transition-shadow duration-300"
-                      onclick={(event) => {
-                        event.stopPropagation();
-                        openProductModal(product);
-                      }}
-                    >
-                      Seleccionar
-                    </button>
-                  {/if}
-                </div>
-              </div>
-            </div>
-          </div>
+          <ProductCard
+            {product}
+            {offer}
+            imageUrl={toSafeImageUrl(product.image_url)}
+            {ordersEnabled}
+            variant="menu"
+            clickable={true}
+            showSeasonalBadge={hasSeasonalFlavors(product)}
+            showSelectButton={true}
+            onOpen={() => openProductModal(product)}
+            onAdd={() => {
+              addCartItem({
+                product_id: product.id,
+                name: product.name,
+                image_url: toSafeImageUrl(product.image_url),
+                unit_price: product.price,
+                quantity: 1,
+              });
+            }}
+            onSelect={() => openProductModal(product)}
+          />
         {/each}
       </div>
     {/if}
   </section>
 </div>
 
-<!-- Product Details Modal -->
-<dialog class="modal" bind:this={modalRef}>
-  <div
-    class="modal-box w-[calc(100%-0.5rem)] sm:w-[min(96vw,980px)] max-w-5xl p-0 relative overflow-y-auto overflow-x-hidden max-h-[92dvh] rounded-2xl sm:rounded-3xl shadow-2xl"
-  >
-    <button
-      type="button"
-      class="btn btn-sm sm:btn-md btn-circle btn-ghost bg-base-200/20 hover:bg-base-200 backdrop-blur-md absolute right-3 top-3 sm:right-4 sm:top-4 z-99"
-      aria-label="Cerrar"
-      onclick={() => modalRef?.close()}
-    >
-      <Icon icon="lucide:x" class="size-5" aria-hidden="true" />
-    </button>
-    {#if selectedProduct}
-      <div
-        class="flex flex-col md:grid md:grid-cols-[1fr_1fr] md:h-full bg-base-100"
-      >
-        <div
-          class="bg-base-200/30 p-3 sm:p-5 md:p-8 flex flex-col items-center justify-center relative"
-        >
-          {#if getSafeImageUrl(selectedProduct.image_url)}
-            <div
-              class="flip-3d-card w-full max-w-50 sm:max-w-70 md:max-w-90 mx-auto hover:scale-[1.02] transition-transform duration-300"
-              data-flipped={showImageDetails ? "true" : "false"}
-            >
-              <button
-                type="button"
-                class="flip-3d-toggle w-full cursor-pointer focus:outline-none focus:ring-4 focus:ring-primary/20 rounded-3xl"
-                aria-label={showImageDetails
-                  ? "Ver imagen del producto"
-                  : "Ver descripcion del producto"}
-                onclick={() => {
-                  showImageDetails = !showImageDetails;
-                }}
-              >
-                <div
-                  class="flip-3d-inner aspect-square sm:aspect-4/5 rounded-2xl sm:rounded-3xl"
-                >
-                  <figure
-                    class="flip-3d-face overflow-hidden rounded-2xl sm:rounded-3xl bg-base-100 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)]"
-                  >
-                    <img
-                      src={getSafeImageUrl(selectedProduct.image_url)}
-                      alt={selectedProduct.name}
-                      class="w-full h-full object-cover object-center"
-                      loading="lazy"
-                    />
-                  </figure>
-
-                  <div
-                    class="flip-3d-face flip-3d-back rounded-2xl sm:rounded-3xl overflow-hidden border border-base-200 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] bg-base-100"
-                  >
-                    <div
-                      class="h-full w-full p-6 sm:p-8 flex items-center justify-center text-center"
-                    >
-                      <div class="space-y-3">
-                        <h4
-                          class="text-xl sm:text-2xl font-bold text-base-content"
-                        >
-                          {selectedProduct.name}
-                        </h4>
-                        <p
-                          class="text-sm sm:text-base text-base-content/70 leading-relaxed"
-                        >
-                          {selectedProduct.description ||
-                            "Sin descripcion disponible."}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            </div>
-            <div
-              class="mt-3 sm:mt-5 flex items-center gap-2 text-base-content/50 bg-base-100/50 backdrop-blur-sm py-1 px-3 sm:py-1.5 sm:px-4 rounded-full text-[11px] sm:text-sm font-medium"
-            >
-              <Icon icon="lucide:info" class="size-3.5 sm:size-4" />
-              <span>Toca la tarjeta para detalles</span>
-            </div>
-          {:else}
-            <div
-              class="w-full max-w-50 sm:max-w-70 md:max-w-90 aspect-square sm:aspect-4/5 rounded-2xl sm:rounded-3xl bg-base-200 border border-base-300 grid place-items-center text-base-content/50 shadow-inner"
-            >
-              <div class="flex flex-col items-center gap-2">
-                <Icon icon="lucide:image-off" class="size-8 opacity-50" />
-                <span class="font-medium">Sin imagen</span>
-              </div>
-            </div>
-          {/if}
-        </div>
-
-        <div
-          class="p-4 sm:p-5 md:p-8 lg:p-10 space-y-3 sm:space-y-5 md:space-y-6 flex flex-col"
-        >
-          <div class="space-y-1.5 sm:space-y-2 pr-10 sm:pr-12">
-            <h3
-              class="text-xl sm:text-2xl md:text-3xl font-bold leading-tight bg-clip-text text-transparent bg-linear-to-r from-base-content to-base-content/80"
-            >
-              {selectedProduct.name}
-            </h3>
-            <p
-              class="text-lg sm:text-xl md:text-2xl font-extrabold text-primary"
-            >
-              {formatCurrency(modalDisplayPrice)}
-            </p>
-            {#if selectedProduct.description}
-              <p class="text-sm text-base-content/70 leading-relaxed">
-                {selectedProduct.description}
-              </p>
-            {/if}
-            <p
-              class="text-xs sm:text-sm font-medium text-base-content/60 inline-flex items-center gap-1.5 mt-2 bg-base-200/50 py-1.5 px-3 rounded-lg"
-            >
-              <Icon icon="lucide:sliders-horizontal" class="size-4" />
-              Personaliza sabores en el carrito
-            </p>
-          </div>
-
-          <div
-            class="form-control bg-base-200/30 p-3 sm:p-4 rounded-2xl border border-base-200/50 space-y-2 sm:space-y-3 mt-auto"
-          >
-            <span
-              class="label-text font-bold text-base-content/80 uppercase tracking-wider text-xs px-1"
-              >Cantidad</span
-            >
-            <div
-              class="grid grid-cols-3 w-full bg-base-100 rounded-xl overflow-hidden shadow-sm border border-base-200/80"
-            >
-              <button
-                class="btn btn-ghost hover:bg-base-200 rounded-none h-12 sm:h-14"
-                type="button"
-                onclick={decreaseModalQty}
-                aria-label="Reducir cantidad"
-              >
-                <Icon icon="lucide:minus" class="size-5" />
-              </button>
-              <div
-                class="flex items-center justify-center font-bold text-lg sm:text-xl h-12 sm:h-14 border-x border-base-200/50 bg-base-50"
-              >
-                {normalizeQty(modalQty)}
-              </div>
-              <button
-                class="btn btn-ghost hover:bg-base-200 rounded-none h-12 sm:h-14"
-                type="button"
-                onclick={increaseModalQty}
-                aria-label="Aumentar cantidad"
-              >
-                <Icon icon="lucide:plus" class="size-5" />
-              </button>
-            </div>
-          </div>
-
-          <div class="grid gap-2 sm:gap-3 pt-1 sm:pt-2">
-            {#if ordersEnabled}
-              <button
-                type="button"
-                class="btn btn-primary btn-md sm:btn-lg rounded-xl font-bold shadow-md hover:shadow-lg transition-all w-full leading-none"
-                onclick={() => addSelectedToCart(false)}
-              >
-                <span class="mr-2">Agregar al pedido</span>
-                <Icon icon="lucide:plus-circle" class="size-5" />
-              </button>
-              <button
-                type="button"
-                class="btn btn-outline btn-md sm:btn-lg rounded-xl font-bold hover:bg-base-200 hover:text-base-content w-full leading-none"
-                onclick={() => addSelectedToCart(true)}
-              >
-                <Icon
-                  icon="lucide:shopping-bag"
-                  class="size-5 mr-2"
-                  aria-hidden="true"
-                />
-                Ir al Carrito
-              </button>
-            {:else}
-              <div class="store-paused-banner text-center text-sm font-medium">
-                ¡Gracias por escoger nuestros productos 🙂!
-              </div>
-            {/if}
-          </div>
-        </div>
-      </div>
-    {/if}
-  </div>
-  <form method="dialog" class="modal-backdrop bg-base-300/60 backdrop-blur-sm">
-    <button>Cerrar</button>
-  </form>
-</dialog>
+<ProductModal
+  product={selectedProduct}
+  quantity={modalQty}
+  displayPrice={modalDisplayPrice}
+  {ordersEnabled}
+  {showImageDetails}
+  imageUrl={selectedProduct
+    ? toSafeImageUrl(selectedProduct.image_url)
+    : undefined}
+  onClose={() => {
+    selectedProduct = null;
+    showImageDetails = false;
+  }}
+  onToggleImageDetails={() => {
+    showImageDetails = !showImageDetails;
+  }}
+  onDecreaseQty={decreaseModalQty}
+  onIncreaseQty={increaseModalQty}
+  onAdd={() => addSelectedToCart(false)}
+  onCheckout={() => addSelectedToCart(true)}
+/>
 
 <style>
   .category-tab-label,

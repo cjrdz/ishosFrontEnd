@@ -7,8 +7,10 @@
     type PublicProduct,
   } from "../../../lib/api/store";
   import {
+    cartItemsMatch,
     clearCartItems,
     getCartItems,
+    normalizeCartQuantity,
     setCartItems,
     type StoreCartItem,
   } from "../../../lib/store/cart";
@@ -17,11 +19,8 @@
   import {
     normalizeAddonGroupName,
     addonGroupLabel,
-  } from "../../../lib/admin/addon-groups";
-  import {
-    normalizeIdList,
-    arraysEqualUnordered,
-  } from "../../../lib/utils/collections";
+  } from "../../../lib/store/helpers";
+  import { normalizeIdList } from "../../../lib/utils/collections";
 
   type CheckoutForm = {
     customer_name: string;
@@ -112,23 +111,6 @@
       }
     }
     return price;
-  }
-
-  function cartItemsMatch(left: StoreCartItem, right: StoreCartItem): boolean {
-    return (
-      left.product_id === right.product_id &&
-      (left.flavor_id || null) === (right.flavor_id || null) &&
-      (left.notes || "") === (right.notes || "") &&
-      arraysEqualUnordered(left.addons || [], right.addons || []) &&
-      arraysEqualUnordered(
-        left.included_addon_ids || [],
-        right.included_addon_ids || [],
-      ) &&
-      arraysEqualUnordered(
-        left.extra_addon_ids || [],
-        right.extra_addon_ids || [],
-      )
-    );
   }
 
   function productById(productId: string): PublicProduct | undefined {
@@ -280,7 +262,9 @@
     if (existingIndex >= 0) {
       list[existingIndex] = {
         ...list[existingIndex],
-        quantity: list[existingIndex].quantity + candidate.quantity,
+        quantity: normalizeCartQuantity(
+          list[existingIndex].quantity + candidate.quantity,
+        ),
       };
       return list;
     }
@@ -426,7 +410,7 @@
   });
 
   function updateQty(item: StoreCartItem, nextQty: number) {
-    const safeQty = Math.max(0, Math.floor(nextQty));
+    const safeQty = normalizeCartQuantity(nextQty, 0);
     const snapshot = getCartItems();
     const updated = snapshot
       .map((entry) =>
