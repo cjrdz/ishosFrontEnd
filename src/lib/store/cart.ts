@@ -16,7 +16,12 @@ export type StoreCartItem = {
 const CART_KEY = "ishos_storefront_cart_items";
 const CART_COUNT_KEY = "ishos_storefront_cart_count";
 
-function itemsMatch(a: StoreCartItem, b: StoreCartItem): boolean {
+export function normalizeCartQuantity(value: number, minimum = 1): number {
+  if (!Number.isFinite(value)) return minimum;
+  return Math.max(minimum, Math.floor(value));
+}
+
+export function cartItemsMatch(a: StoreCartItem, b: StoreCartItem): boolean {
   return (
     a.product_id === b.product_id &&
     (a.flavor_id || null) === (b.flavor_id || null) &&
@@ -72,12 +77,15 @@ export function setCartItems(items: StoreCartItem[]) {
 
 export function addCartItem(item: StoreCartItem) {
   const items = getCartItems();
-  const existing = items.find((entry) => itemsMatch(entry, item));
+  const existing = items.find((entry) => cartItemsMatch(entry, item));
 
   if (existing) {
     const updated = items.map((entry) =>
       entry === existing
-        ? { ...entry, quantity: entry.quantity + item.quantity }
+        ? {
+            ...entry,
+            quantity: normalizeCartQuantity(entry.quantity + item.quantity),
+          }
         : entry,
     );
     setCartItems(updated);
@@ -112,7 +120,7 @@ export function updateCartItemQuantity(
         ) &&
         arraysEqualUnordered(item.extra_addon_ids || [], extraAddonIds || [])
       ) {
-        return { ...item, quantity };
+        return { ...item, quantity: normalizeCartQuantity(quantity, 0) };
       }
       return item;
     })

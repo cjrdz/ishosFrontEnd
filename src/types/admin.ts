@@ -2,11 +2,11 @@
  * Admin dashboard types
  */
 
-import type { Order } from "./store";
 import type { UserRole } from "./auth";
 import type {
   Category,
   Employee as ApiEmployee,
+  Order as ApiOrder,
   User,
   UserOrderHistoryItem,
 } from "../lib/api/admin";
@@ -51,7 +51,7 @@ export interface UpdateEmployeeRequest {
 /**
  * Admin order view (with more details)
  */
-export interface AdminOrder extends Order {
+export interface AdminOrder extends ApiOrder {
   prepared_by?: string;
   completed_at?: string;
 }

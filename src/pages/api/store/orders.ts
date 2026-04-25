@@ -10,31 +10,14 @@ import {
   forwardUpstreamJson,
   getServerApiBaseUrl,
 } from "../../../lib/bff/proxy";
-import { z } from "zod";
-
-const orderItemSchema = z.object({
-  product_id: z.string().uuid(),
-  quantity: z.number().int().positive(),
-  customizations: z.record(z.unknown()).optional(),
-});
-
-const createOrderSchema = z.object({
-  customer_name: z.string().trim().min(1).max(120),
-  customer_phone: z.string().trim().min(7).max(25),
-  customer_email: z.string().email().optional(),
-  payment_method: z.enum(["efectivo", "tarjeta", "transferencia", "otro"]),
-  order_type: z.enum(["en_local", "para_llevar"]),
-  table_number: z.number().int().positive().optional(),
-  notes: z.string().max(500).optional(),
-  items: z.array(orderItemSchema).min(1).max(50),
-});
+import { CreatePublicOrderSchema } from "../../../lib/validators/store";
 
 export const prerender = false;
 
 export const POST: APIRoute = async (context) => {
   try {
     const rawBody = await context.request.json();
-    const parsed = createOrderSchema.safeParse(rawBody);
+    const parsed = CreatePublicOrderSchema.safeParse(rawBody);
 
     if (!parsed.success) {
       return new Response(

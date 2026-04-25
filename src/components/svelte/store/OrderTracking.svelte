@@ -6,42 +6,14 @@
     type PublicOrderStatus,
     type PublicOrderTrackingResponse,
   } from "../../../lib/api/store";
-  import { getTracking, saveTracking } from "../../../lib/store/tracking";
-
-  const STATUS_FLOW: PublicOrderStatus[] = [
-    "pendiente_revision",
-    "recibida",
-    "en_proceso",
-    "lista",
-    "entregada",
-  ];
-
-  const STATUS_LABELS: Record<PublicOrderStatus, string> = {
-    pendiente_revision: "Pendiente",
-    recibida: "Aceptada",
-    en_proceso: "Preparando",
-    lista: "Lista",
-    entregada: "Entregada",
-    cancelada: "Cancelada",
-  };
-
-  const STATUS_ICONS_ACTIVE: Record<PublicOrderStatus, string> = {
-    pendiente_revision: "line-md:watch-loop",
-    recibida: "line-md:confirm-circle",
-    en_proceso: "line-md:loading-twotone-loop",
-    lista: "line-md:bell-loop",
-    entregada: "line-md:check-all",
-    cancelada: "line-md:close-circle",
-  };
-
-  const STATUS_ICONS_STATIC: Record<PublicOrderStatus, string> = {
-    pendiente_revision: "lucide:clock",
-    recibida: "lucide:check-circle",
-    en_proceso: "lucide:loader",
-    lista: "lucide:bell",
-    entregada: "lucide:check-check",
-    cancelada: "lucide:x-circle",
-  };
+  import {
+    getTracking,
+    saveTracking,
+    TRACKING_STATUS_FLOW,
+    TRACKING_STATUS_LABELS,
+    TRACKING_STATUS_ICONS_ACTIVE,
+    TRACKING_STATUS_ICONS_STATIC,
+  } from "../../../lib/store/tracking";
 
   let trackingOrderNumber = $state("");
   let trackingToken = $state("");
@@ -147,7 +119,7 @@
   }
 
   function stepIndex(status: PublicOrderStatus): number {
-    return STATUS_FLOW.findIndex((current) => current === status);
+    return TRACKING_STATUS_FLOW.findIndex((current) => current === status);
   }
 
   function formatDate(value: string): string {
@@ -306,7 +278,7 @@
             <div
               class={`badge badge-lg font-bold border-0 px-4 py-3 ${trackedOrder.status === "entregada" ? "bg-success/20 text-success-content" : "bg-primary/20 text-primary"}`}
             >
-              {STATUS_LABELS[trackedOrder.status]}
+              {TRACKING_STATUS_LABELS[trackedOrder.status]}
             </div>
           </div>
 
@@ -450,7 +422,7 @@
               <ul
                 class="steps steps-vertical sm:steps-horizontal w-full sm:min-w-0"
               >
-                {#each STATUS_FLOW as step, index}
+                {#each TRACKING_STATUS_FLOW as step, index}
                   {@const active = index <= stepIndex(trackedOrder.status)}
                   <li
                     data-content={active ? "✓" : ""}
@@ -465,13 +437,15 @@
                       >
                         <Icon
                           icon={step === trackedOrder.status
-                            ? STATUS_ICONS_ACTIVE[step]
-                            : STATUS_ICONS_STATIC[step]}
+                            ? TRACKING_STATUS_ICONS_ACTIVE[step]
+                            : TRACKING_STATUS_ICONS_STATIC[step]}
                           width="18"
                           height="18"
                         />
                       </span>
-                      <span class="text-base">{STATUS_LABELS[step]}</span>
+                      <span class="text-base"
+                        >{TRACKING_STATUS_LABELS[step]}</span
+                      >
                     </div>
 
                     <!-- Desktop view (Centered with large icon below dot) -->
@@ -483,13 +457,15 @@
                       >
                         <Icon
                           icon={step === trackedOrder.status
-                            ? STATUS_ICONS_ACTIVE[step]
-                            : STATUS_ICONS_STATIC[step]}
+                            ? TRACKING_STATUS_ICONS_ACTIVE[step]
+                            : TRACKING_STATUS_ICONS_STATIC[step]}
                           width="24"
                           height="24"
                         />
                       </span>
-                      <span class="text-sm mt-1">{STATUS_LABELS[step]}</span>
+                      <span class="text-sm mt-1"
+                        >{TRACKING_STATUS_LABELS[step]}</span
+                      >
                     </div>
                   </li>
                 {/each}

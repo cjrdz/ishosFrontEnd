@@ -44,6 +44,7 @@ function buildCSP(requestUrl: URL): string {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
+    "frame-src https://www.google.com https://maps.google.com",
   ];
 
   // Only force HTTP->HTTPS upgrades when the current request is already served

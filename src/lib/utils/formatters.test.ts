@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatCurrency, toSlug } from "./formatters";
+import { formatCurrency, toSafeImageUrl, toSlug } from "./formatters";
 
 describe("formatCurrency", () => {
   it("formats a positive number as USD currency", () => {
@@ -37,5 +37,25 @@ describe("toSlug", () => {
 
   it("collapses multiple hyphens into one", () => {
     expect(toSlug("foo---bar")).toBe("foo-bar");
+  });
+});
+
+describe("toSafeImageUrl", () => {
+  it("accepts relative root image paths", () => {
+    expect(toSafeImageUrl("/uploads/photo.webp")).toBe("/uploads/photo.webp");
+  });
+
+  it("accepts http and https URLs", () => {
+    expect(toSafeImageUrl("https://cdn.example.com/image.png")).toBe(
+      "https://cdn.example.com/image.png",
+    );
+    expect(toSafeImageUrl("http://localhost/image.png")).toBe(
+      "http://localhost/image.png",
+    );
+  });
+
+  it("rejects unsupported URL formats", () => {
+    expect(toSafeImageUrl("javascript:alert(1)")).toBeUndefined();
+    expect(toSafeImageUrl("data:image/png;base64,xyz")).toBeUndefined();
   });
 });
