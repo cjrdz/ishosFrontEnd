@@ -8,13 +8,16 @@
  */
 
 import type { APIRoute } from "astro";
-import { requireAction, requireUuidParam } from "../../../../lib/bff/params";
+import {
+  requireAction,
+  requireSafePathParam,
+} from "../../../../lib/bff/params";
 import { proxyToBackend } from "../../../../lib/bff/proxy";
 
 export const prerender = false;
 
 export const PATCH: APIRoute = async (context) => {
-  const id = requireUuidParam(context, "id");
+  const id = requireSafePathParam(context, "id");
   if (id instanceof Response) return id;
   try {
     const body = await context.request.json();
@@ -31,7 +34,7 @@ export const PATCH: APIRoute = async (context) => {
 };
 
 export const DELETE: APIRoute = async (context) => {
-  const id = requireUuidParam(context, "id");
+  const id = requireSafePathParam(context, "id");
   if (id instanceof Response) return id;
   const action = context.url.searchParams.get("action");
 
@@ -45,7 +48,7 @@ export const DELETE: APIRoute = async (context) => {
 };
 
 export const POST: APIRoute = async (context) => {
-  const id = requireUuidParam(context, "id");
+  const id = requireSafePathParam(context, "id");
   if (id instanceof Response) return id;
   const action = requireAction(context.url.searchParams.get("action"), [
     "deactivate",

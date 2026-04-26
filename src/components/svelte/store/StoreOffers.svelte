@@ -240,7 +240,7 @@
         ontouchmove={handleTouchMove}
         ontouchend={handleTouchEnd}
       >
-        {#each activeOffers as offer, index (offer.product_id)}
+        {#each activeOffers as offer, index (`${offer.product_id}:${offer.expires_at}:${offer.label}:${index}`)}
           {@const product = offer.product!}
 
           <!-- Each slide occupies 1/cardsPerView of the track width -->

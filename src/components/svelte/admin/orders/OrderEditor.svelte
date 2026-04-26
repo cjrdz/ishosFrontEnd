@@ -308,105 +308,48 @@
       <div class="divider my-0"></div>
 
       <!-- Products section -->
-      {#if !isEditing}
-        <OrderItemBuilder
-          {products}
-          {orderForm}
-          {manualItems}
-          {selectedProductFlavors}
-          {toppingAddons}
-          {jaleaAddons}
-          {selectedProductAddons}
-          {paidAddonGroups}
-          {selectedFlavorId}
-          {includedToppingId}
-          {includedJaleaId}
-          {selectedExtraAddonIds}
-          {hasCustomizationOptions}
-          {totalPreview}
-          {manualOrderTotal}
-          {addItemError}
-          {busy}
-          {onProductChange}
-          {onQuantityChange}
-          {onFlavorChange}
-          {onChangeIncludedTopping}
-          {onChangeIncludedJalea}
-          {onToggleExtraAddonSelection}
-          {onAddDraftItem}
-          {onRemoveDraftItem}
-          {onUpdateDraftItemQuantity}
-          {onProductById}
-          {onResolveFlavorName}
-          {onResolveAddonNames}
-          {onManualItemSubtotal}
-          {onDraftItemKey}
-        />
-      {:else}
-        <!-- Edit mode: read-only product info -->
-        <section class="space-y-4">
-          <div class="flex items-center gap-2">
-            <Icon
-              icon="lucide:package"
-              width="14"
-              height="14"
-              class="text-base-content/50"
-            />
-            <p
-              class="text-xs font-semibold uppercase tracking-wide text-base-content/50"
-            >
-              Producto de la orden
-            </p>
-          </div>
-          <div class="rounded-xl border border-base-300/70 bg-base-200/40 p-4">
-            <div class="grid md:grid-cols-2 gap-4">
-              <div class="form-control">
-                <span id="order-product-label" class="label-text mb-1.5"
-                  >Producto</span
-                >
-                <select
-                  id="order-product"
-                  class="select select-bordered w-full"
-                  bind:value={orderForm.product_id}
-                  required
-                  disabled
-                  aria-labelledby="order-product-label"
-                >
-                  {#if products.length === 0}
-                    <option value="" disabled>Sin productos</option>
-                  {:else}
-                    {#each products as product}
-                      <option value={product.id}>{product.name}</option>
-                    {/each}
-                  {/if}
-                </select>
-              </div>
-              <div class="form-control">
-                <span id="order-quantity-label" class="label-text mb-1.5"
-                  >Cantidad</span
-                >
-                <input
-                  id="order-quantity"
-                  class="input input-bordered w-full"
-                  type="number"
-                  min="1"
-                  bind:value={orderForm.quantity}
-                  required
-                  disabled
-                  aria-labelledby="order-quantity-label"
-                />
-              </div>
-            </div>
-            <p
-              class="mt-3 text-xs text-base-content/50 flex items-center gap-1.5"
-            >
-              <Icon icon="lucide:lock" width="12" height="12" />
-              El producto no puede modificarse en modo edicion. Solo se actualizan
-              los datos del cliente y la nota.
-            </p>
-          </div>
-        </section>
-        <div class="divider my-0"></div>
+      <OrderItemBuilder
+        {products}
+        {orderForm}
+        {manualItems}
+        {selectedProductFlavors}
+        {toppingAddons}
+        {jaleaAddons}
+        {selectedProductAddons}
+        {paidAddonGroups}
+        {selectedFlavorId}
+        {includedToppingId}
+        {includedJaleaId}
+        {selectedExtraAddonIds}
+        {hasCustomizationOptions}
+        {totalPreview}
+        {manualOrderTotal}
+        {addItemError}
+        {busy}
+        {onProductChange}
+        {onQuantityChange}
+        {onFlavorChange}
+        {onChangeIncludedTopping}
+        {onChangeIncludedJalea}
+        {onToggleExtraAddonSelection}
+        {onAddDraftItem}
+        {onRemoveDraftItem}
+        {onUpdateDraftItemQuantity}
+        {onProductById}
+        {onResolveFlavorName}
+        {onResolveAddonNames}
+        {onManualItemSubtotal}
+        {onDraftItemKey}
+      />
+
+      {#if isEditing}
+        <div class="alert alert-info py-2.5 text-sm">
+          <Icon icon="lucide:info" width="16" height="16" />
+          <span>
+            Puedes editar productos, cantidades y configuraciones. Debes agregar
+            una nota explicando los cambios antes de guardar.
+          </span>
+        </div>
       {/if}
 
       <!-- Notes section -->
@@ -462,20 +405,20 @@
             height="15"
             class="text-primary/70"
           />
-          <span class="text-sm font-medium text-base-content/80">
-            {isEditing
-              ? "Total actual de la orden"
-              : "Total estimado de la orden"}
-          </span>
+          <span class="text-sm font-medium text-base-content/80"
+            >Total estimado de la orden</span
+          >
         </div>
         <span class="text-base font-bold text-primary">
-          {#if isEditing && selectedOrder}
-            {formatCurrency(selectedOrder.total_amount)}
-          {:else}
-            {formatCurrency(displayTotal)}
-          {/if}
+          {formatCurrency(displayTotal)}
         </span>
       </div>
+
+      {#if isEditing && selectedOrder}
+        <p class="text-xs text-base-content/60 -mt-2">
+          Total previo: {formatCurrency(selectedOrder.total_amount)}
+        </p>
+      {/if}
 
       <!-- Feedback messages -->
       {#if editError}

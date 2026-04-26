@@ -22,7 +22,7 @@
   let ordersEnabled = $state(true);
   let offers = $state<StoreOfferItem[]>([]);
 
-  let editingOfferProductId = $state("");
+  let editingOfferIndex = $state<number | null>(null);
   let newOfferProductId = $state("");
   let newOfferLabel = $state("");
   let newOfferNote = $state("");
@@ -63,13 +63,18 @@
     }
   }
 
-  const isEditing = $derived(Boolean(editingOfferProductId));
+  const isEditing = $derived(editingOfferIndex !== null);
+  const editingOfferProductId = $derived(
+    editingOfferIndex !== null
+      ? (offers[editingOfferIndex]?.product_id ?? "")
+      : "",
+  );
   const formActionLabel = $derived(
     isEditing ? "Actualizar oferta" : "Agregar oferta",
   );
 
   function resetOfferForm() {
-    editingOfferProductId = "";
+    editingOfferIndex = null;
     newOfferProductId = "";
     newOfferLabel = "";
     newOfferNote = "";
@@ -105,16 +110,6 @@
       return;
     }
 
-    const duplicateIndex = offers.findIndex(
-      (offer) => offer.product_id === newOfferProductId,
-    );
-
-    if (duplicateIndex >= 0 && editingOfferProductId !== newOfferProductId) {
-      moduleError =
-        "Ese producto ya tiene una oferta activa. Editala desde Acciones.";
-      return;
-    }
-
     const nextOffer: StoreOfferItem = {
       product_id: newOfferProductId,
       label: normalizedLabel,
@@ -124,9 +119,9 @@
       expires_at: nextExpiry.toISOString(),
     };
 
-    if (duplicateIndex >= 0) {
+    if (editingOfferIndex !== null && offers[editingOfferIndex]) {
       const clone = [...offers];
-      clone[duplicateIndex] = nextOffer;
+      clone[editingOfferIndex] = nextOffer;
       offers = clone;
     } else {
       offers = [...offers, nextOffer];
@@ -135,9 +130,12 @@
     resetOfferForm();
   }
 
-  function startEditOffer(offer: StoreOfferItem) {
+  function startEditOffer(index: number) {
     moduleError = "";
-    editingOfferProductId = offer.product_id;
+    const offer = offers[index];
+    if (!offer) return;
+
+    editingOfferIndex = index;
     newOfferProductId = offer.product_id;
     newOfferLabel = offer.label;
     newOfferNote = offer.note ?? "";
@@ -145,10 +143,16 @@
     newOfferExpiry = toDatetimeLocalValue(offer.expires_at);
   }
 
-  function removeOfferRow(productId: string) {
-    offers = offers.filter((offer) => offer.product_id !== productId);
-    if (editingOfferProductId === productId) {
+  function removeOfferRow(index: number) {
+    offers = offers.filter((_, currentIndex) => currentIndex !== index);
+
+    if (editingOfferIndex === index) {
       resetOfferForm();
+      return;
+    }
+
+    if (editingOfferIndex !== null && editingOfferIndex > index) {
+      editingOfferIndex = editingOfferIndex - 1;
     }
   }
 
@@ -255,7 +259,7 @@
                 >
               </tr>
             {/if}
-            {#each offers as offer}
+            {#each offers as offer, offerIndex}
               <tr>
                 <td>
                   <div class="font-medium">
@@ -298,7 +302,7 @@
                     <button
                       type="button"
                       class="btn btn-ghost btn-sm"
-                      onclick={() => startEditOffer(offer)}
+                      onclick={() => startEditOffer(offerIndex)}
                       disabled={localBusy}
                     >
                       <Icon icon="lucide:pencil" class="h-4 w-4" />
@@ -306,7 +310,7 @@
                     <button
                       type="button"
                       class="btn btn-ghost btn-sm btn-error"
-                      onclick={() => removeOfferRow(offer.product_id)}
+                      onclick={() => removeOfferRow(offerIndex)}
                       disabled={localBusy}
                     >
                       <Icon icon="lucide:trash-2" class="h-4 w-4" />
@@ -409,7 +413,7 @@
             Aun no hay ofertas activas.
           </div>
         {/if}
-        {#each offers as offer}
+        {#each offers as offer, offerIndex}
           <div
             class="rounded-xl border border-base-300 bg-base-100 p-3 sm:p-4 space-y-2"
           >
@@ -426,7 +430,7 @@
                 <button
                   type="button"
                   class="btn btn-ghost btn-xs"
-                  onclick={() => startEditOffer(offer)}
+                  onclick={() => startEditOffer(offerIndex)}
                   disabled={localBusy}
                 >
                   <Icon icon="lucide:pencil" class="h-3.5 w-3.5" />
@@ -434,7 +438,7 @@
                 <button
                   type="button"
                   class="btn btn-ghost btn-xs btn-error"
-                  onclick={() => removeOfferRow(offer.product_id)}
+                  onclick={() => removeOfferRow(offerIndex)}
                   disabled={localBusy}
                 >
                   <Icon icon="lucide:trash-2" class="h-3.5 w-3.5" />

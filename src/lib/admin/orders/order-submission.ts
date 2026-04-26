@@ -2,6 +2,7 @@ import type { Order } from "../../../lib/api/admin";
 import type {
   CreateOrderPayload,
   ManualOrderItemDraft,
+  OrderUpdatePayload,
 } from "../../../components/svelte/admin/tabs/types/orders-tab";
 import { buildCustomizationsFromDraft } from "./manual-item-helpers";
 
@@ -25,16 +26,6 @@ export function prepareOrderItems(
 }
 
 /** Validates and normalizes order update payload */
-export interface OrderUpdatePayload {
-  customer_name: string;
-  customer_phone: string;
-  customer_email?: string;
-  payment_method: "efectivo" | "tarjeta" | "transferencia" | "otro";
-  order_type: "en_local" | "para_llevar";
-  table_number?: number;
-  notes?: string;
-}
-
 export function buildOrderUpdatePayload(
   customerName: string,
   customerPhone: string,
@@ -43,6 +34,7 @@ export function buildOrderUpdatePayload(
   orderType: "en_local" | "para_llevar",
   tableNumber: string | number,
   notes: string,
+  items: OrderUpdatePayload["items"],
 ): OrderUpdatePayload {
   const normalizedTableNumber =
     orderType === "en_local" && tableNumber !== ""
@@ -58,7 +50,8 @@ export function buildOrderUpdatePayload(
     table_number: Number.isFinite(normalizedTableNumber)
       ? normalizedTableNumber
       : undefined,
-    notes: notes.trim() || undefined,
+    notes: notes.trim(),
+    items,
   };
 }
 
