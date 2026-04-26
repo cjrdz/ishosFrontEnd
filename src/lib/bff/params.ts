@@ -10,12 +10,25 @@ function validationError(message: string): Response {
   );
 }
 
+const SAFE_PATH_PARAM_RE = /^[A-Za-z0-9_-]+$/;
+
 export function requireUuidParam(
   context: APIContext,
   name: string,
 ): string | Response {
   const value = context.params[name]?.trim() ?? "";
   if (!value || !UUID_RE.test(value)) {
+    return validationError(`Invalid ${name} parameter`);
+  }
+  return value;
+}
+
+export function requireSafePathParam(
+  context: APIContext,
+  name: string,
+): string | Response {
+  const value = context.params[name]?.trim() ?? "";
+  if (!value || !SAFE_PATH_PARAM_RE.test(value)) {
     return validationError(`Invalid ${name} parameter`);
   }
   return value;

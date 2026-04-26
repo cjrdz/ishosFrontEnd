@@ -351,6 +351,64 @@
     ManualItemHelpers.manualOrderTotal(manualItems, products),
   );
 
+  function readCustomizationStringArray(
+    customizations: Record<string, unknown> | null | undefined,
+    key: string,
+  ): string[] {
+    const rawValue = customizations?.[key];
+    if (!Array.isArray(rawValue)) {
+      return [];
+    }
+
+    return normalizeIdList(
+      rawValue.filter((value): value is string => typeof value === "string"),
+    );
+  }
+
+  function mapOrderItemsToDraft(order: Order): ManualOrderItemDraft[] {
+    const items = order.items ?? [];
+
+    return items
+      .map((item) => {
+        const customizations =
+          (item.customizations as Record<string, unknown> | null | undefined) ??
+          undefined;
+        const flavorIdRaw = customizations?.flavor_id;
+        const flavorId =
+          typeof flavorIdRaw === "string" && flavorIdRaw.trim()
+            ? flavorIdRaw.trim()
+            : undefined;
+
+        const includedAddonIDs = readCustomizationStringArray(
+          customizations,
+          "included_addon_ids",
+        );
+        const extraAddonIDs = readCustomizationStringArray(
+          customizations,
+          "extra_addon_ids",
+        );
+        const legacyAddonIDs = readCustomizationStringArray(
+          customizations,
+          "addon_ids",
+        );
+
+        const fallbackProductID =
+          products.find((product) => product.name === item.product_name)?.id ??
+          "";
+        const productID = (item.product_id || "").trim() || fallbackProductID;
+
+        return {
+          product_id: productID,
+          quantity: Math.max(1, Number(item.quantity) || 1),
+          flavor_id: flavorId,
+          included_addon_ids: includedAddonIDs,
+          extra_addon_ids:
+            extraAddonIDs.length > 0 ? extraAddonIDs : legacyAddonIDs,
+        };
+      })
+      .filter((item) => item.product_id);
+  }
+
   function productById(productId: string): Product | undefined {
     return products.find((product) => product.id === productId);
   }
@@ -681,6 +739,23 @@
     editNotice = "";
 
     if (editOrderId) {
+      const fallbackItem =
+        manualItems.length === 0 ? buildCurrentDraftItem() : null;
+      const items = OrderSubmission.prepareOrderItems(
+        manualItems,
+        fallbackItem,
+      );
+      if (!items) {
+        editError = "Agrega al menos un producto a la orden";
+        return;
+      }
+
+      if (!orderForm.notes.trim()) {
+        editError =
+          "Debes agregar una nota explicando los cambios realizados en la orden";
+        return;
+      }
+
       const updatePayload = OrderSubmission.buildOrderUpdatePayload(
         orderForm.customer_name,
         orderForm.customer_phone,
@@ -689,6 +764,7 @@
         orderForm.order_type,
         orderForm.table_number,
         orderForm.notes,
+        items,
       );
       const updated = await onUpdateOrder(editOrderId, updatePayload);
       if (updated) {
@@ -801,6 +877,17 @@
     editError = "";
     const order = await onOpenOrder(orderId);
     if (!order) return;
+    const draftItems = mapOrderItemsToDraft(order);
+    const defaultProductId =
+      draftItems[0]?.product_id || products[0]?.id || orderForm.product_id;
+
+    const reset = DraftHelpers.resetCustomizationSelections();
+    selectedFlavorId = reset.selectedFlavorId;
+    includedToppingId = reset.includedToppingId;
+    includedJaleaId = reset.includedJaleaId;
+    selectedExtraAddonIds = reset.selectedExtraAddonIds;
+
+    manualItems = draftItems;
     editOrderId = order.id;
     orderForm = {
       customer_name: order.customer_name,
@@ -810,8 +897,8 @@
       order_type: order.order_type,
       table_number: order.table_number ?? "",
       notes: order.notes ?? "",
-      product_id: orderForm.product_id,
-      quantity: orderForm.quantity,
+      product_id: defaultProductId,
+      quantity: 1,
     };
     orderEditorOpen = true;
   }
