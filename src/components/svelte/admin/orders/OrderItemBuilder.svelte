@@ -83,15 +83,74 @@
     onDraftItemKey,
   }: Props = $props();
 
+  const UNSELECTED_CUSTOMIZATION = "";
+  const NONE_CUSTOMIZATION = "none";
+
   const requiresFlavorSelection = $derived(
     selectedProductFlavors.length > 0 && !selectedFlavorId,
   );
+  const requiresToppingSelection = $derived(
+    toppingAddons.length > 0 && !includedToppingId,
+  );
+  const requiresJaleaSelection = $derived(
+    jaleaAddons.length > 0 && !includedJaleaId,
+  );
   const canAddCurrentItem = $derived(
-    !busy && products.length > 0 && !requiresFlavorSelection,
+    products.length > 0 &&
+      !requiresFlavorSelection &&
+      !requiresToppingSelection &&
+      !requiresJaleaSelection,
   );
   const hasIncludedAddonSelectors = $derived(
     toppingAddons.length > 0 || jaleaAddons.length > 0,
   );
+  const extrasSelectionCount = $derived(selectedExtraAddonIds.length);
+  const extrasSelectionTotal = $derived(
+    selectedExtraAddonIds.reduce((sum, addonId) => {
+      const addon = selectedProductAddons.find(
+        (candidate) => candidate.id === addonId,
+      );
+      return sum + Number(addon?.price ?? 0);
+    }, 0),
+  );
+
+  function isExtraSelected(addonId: string): boolean {
+    return selectedExtraAddonIds.includes(addonId);
+  }
+
+  const currentConfiguredProduct = $derived(
+    onProductById(orderForm.product_id) ?? null,
+  );
+  const currentQuantity = $derived(
+    Math.max(1, Number(orderForm.quantity || 1)),
+  );
+  const currentFlavorName = $derived(
+    selectedProductFlavors.find((flavor) => flavor.id === selectedFlavorId)
+      ?.name ?? null,
+  );
+  const currentIncludedAddonNames = $derived(
+    [includedToppingId, includedJaleaId]
+      .filter((addonId): addonId is string => Boolean(addonId))
+      .map(
+        (addonId) =>
+          selectedProductAddons.find((addon) => addon.id === addonId)?.name ??
+          null,
+      )
+      .filter((name): name is string => Boolean(name)),
+  );
+  const currentExtraAddonNames = $derived(
+    selectedExtraAddonIds
+      .map(
+        (addonId) =>
+          selectedProductAddons.find((addon) => addon.id === addonId)?.name ??
+          null,
+      )
+      .filter((name): name is string => Boolean(name)),
+  );
+  const currentUnitPrice = $derived(
+    Number(currentConfiguredProduct?.price ?? 0) + extrasSelectionTotal,
+  );
+  const currentLineTotal = $derived(currentUnitPrice * currentQuantity);
 </script>
 
 <section
@@ -184,7 +243,7 @@
           {#if toppingAddons.length > 0}
             <div class="form-control">
               <span id="order-included-topping-label" class="label-text mb-1"
-                >Topping opcional</span
+                >Topping <span class="text-error">*</span></span
               >
               <select
                 id="order-included-topping"
@@ -196,7 +255,10 @@
                   )}
                 aria-labelledby="order-included-topping-label"
               >
-                <option value="">Sin topping</option>
+                <option value={UNSELECTED_CUSTOMIZATION}>
+                  Selecciona un topping
+                </option>
+                <option value={NONE_CUSTOMIZATION}>Sin topping</option>
                 {#each toppingAddons as addon}
                   <option value={addon.id}>{addon.name}</option>
                 {/each}
@@ -207,7 +269,7 @@
           {#if jaleaAddons.length > 0}
             <div class="form-control">
               <span id="order-included-jalea-label" class="label-text mb-1"
-                >Jalea opcional</span
+                >Jalea <span class="text-error">*</span></span
               >
               <select
                 id="order-included-jalea"
@@ -219,7 +281,10 @@
                   )}
                 aria-labelledby="order-included-jalea-label"
               >
-                <option value="">Sin jalea</option>
+                <option value={UNSELECTED_CUSTOMIZATION}>
+                  Selecciona una jalea
+                </option>
+                <option value={NONE_CUSTOMIZATION}>Sin jalea</option>
                 {#each jaleaAddons as addon}
                   <option value={addon.id}>{addon.name}</option>
                 {/each}
@@ -235,103 +300,128 @@
             Usa estos toggles para agregar toppings, jaleas u otros extras
             adicionales que si deben cobrarse.
           </p>
-          <div class="space-y-3">
+          <div class="mb-2 text-xs text-base-content/70">
+            {#if extrasSelectionCount > 0}
+              {extrasSelectionCount} extra(s) seleccionado(s) · +{formatCurrency(
+                extrasSelectionTotal,
+              )}
+            {:else}
+              Sin extras seleccionados
+            {/if}
+          </div>
+          <div class="grid gap-2 md:grid-cols-2">
             {#if toppingAddons.length > 0}
-              <div class="space-y-2">
-                <p
-                  class="text-xs font-semibold uppercase tracking-wide text-base-content/60"
-                >
+              <details
+                class="w-full rounded-xl border border-base-300 bg-base-100"
+              >
+                <summary class="btn btn-outline w-full justify-between">
                   Toppings extra
-                </p>
-                <div class="grid gap-2 md:grid-cols-2">
-                  {#each toppingAddons as addon}
-                    <label
-                      class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2"
-                    >
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        checked={selectedExtraAddonIds.includes(addon.id)}
-                        disabled={addon.id === includedToppingId}
-                        onchange={(event) =>
-                          onToggleExtraAddonSelection(
-                            addon.id,
-                            (event.currentTarget as HTMLInputElement).checked,
-                          )}
-                      />
-                      <span class="label-text flex-1">{addon.name}</span>
-                      <span class="text-xs font-medium text-base-content/70"
-                        >+{formatCurrency(addon.price)}</span
+                  <span class="text-xs text-base-content/70">
+                    {toppingAddons.filter((addon) => isExtraSelected(addon.id))
+                      .length} seleccionados
+                  </span>
+                </summary>
+                <div class="p-2">
+                  <div class="space-y-1 max-h-56 overflow-auto">
+                    {#each toppingAddons as addon}
+                      <label
+                        class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2"
                       >
-                    </label>
-                  {/each}
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          checked={isExtraSelected(addon.id)}
+                          onchange={(event) =>
+                            onToggleExtraAddonSelection(
+                              addon.id,
+                              (event.currentTarget as HTMLInputElement).checked,
+                            )}
+                        />
+                        <span class="label-text flex-1">{addon.name}</span>
+                        <span class="text-xs font-medium text-base-content/70"
+                          >+{formatCurrency(addon.price)}</span
+                        >
+                      </label>
+                    {/each}
+                  </div>
                 </div>
-              </div>
+              </details>
             {/if}
 
             {#if jaleaAddons.length > 0}
-              <div class="space-y-2">
-                <p
-                  class="text-xs font-semibold uppercase tracking-wide text-base-content/60"
-                >
+              <details
+                class="w-full rounded-xl border border-base-300 bg-base-100"
+              >
+                <summary class="btn btn-outline w-full justify-between">
                   Jalea extra
-                </p>
-                <div class="grid gap-2 md:grid-cols-2">
-                  {#each jaleaAddons as addon}
-                    <label
-                      class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2"
-                    >
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        checked={selectedExtraAddonIds.includes(addon.id)}
-                        disabled={addon.id === includedJaleaId}
-                        onchange={(event) =>
-                          onToggleExtraAddonSelection(
-                            addon.id,
-                            (event.currentTarget as HTMLInputElement).checked,
-                          )}
-                      />
-                      <span class="label-text flex-1">{addon.name}</span>
-                      <span class="text-xs font-medium text-base-content/70"
-                        >+{formatCurrency(addon.price)}</span
+                  <span class="text-xs text-base-content/70">
+                    {jaleaAddons.filter((addon) => isExtraSelected(addon.id))
+                      .length} seleccionados
+                  </span>
+                </summary>
+                <div class="p-2">
+                  <div class="space-y-1 max-h-56 overflow-auto">
+                    {#each jaleaAddons as addon}
+                      <label
+                        class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2"
                       >
-                    </label>
-                  {/each}
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          checked={isExtraSelected(addon.id)}
+                          onchange={(event) =>
+                            onToggleExtraAddonSelection(
+                              addon.id,
+                              (event.currentTarget as HTMLInputElement).checked,
+                            )}
+                        />
+                        <span class="label-text flex-1">{addon.name}</span>
+                        <span class="text-xs font-medium text-base-content/70"
+                          >+{formatCurrency(addon.price)}</span
+                        >
+                      </label>
+                    {/each}
+                  </div>
                 </div>
-              </div>
+              </details>
             {/if}
 
             {#each paidAddonGroups as group}
-              <div class="space-y-2">
-                <p
-                  class="text-xs font-semibold uppercase tracking-wide text-base-content/60"
-                >
+              <details
+                class="w-full rounded-xl border border-base-300 bg-base-100"
+              >
+                <summary class="btn btn-outline w-full justify-between">
                   {group.label}
-                </p>
-                <div class="grid gap-2 md:grid-cols-2">
-                  {#each group.items as addon}
-                    <label
-                      class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2"
-                    >
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-sm"
-                        checked={selectedExtraAddonIds.includes(addon.id)}
-                        onchange={(event) =>
-                          onToggleExtraAddonSelection(
-                            addon.id,
-                            (event.currentTarget as HTMLInputElement).checked,
-                          )}
-                      />
-                      <span class="label-text flex-1">{addon.name}</span>
-                      <span class="text-xs font-medium text-base-content/70"
-                        >+{formatCurrency(addon.price)}</span
+                  <span class="text-xs text-base-content/70">
+                    {group.items.filter((addon) => isExtraSelected(addon.id))
+                      .length} seleccionados
+                  </span>
+                </summary>
+                <div class="p-2">
+                  <div class="space-y-1 max-h-56 overflow-auto">
+                    {#each group.items as addon}
+                      <label
+                        class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2"
                       >
-                    </label>
-                  {/each}
+                        <input
+                          type="checkbox"
+                          class="checkbox checkbox-sm"
+                          checked={isExtraSelected(addon.id)}
+                          onchange={(event) =>
+                            onToggleExtraAddonSelection(
+                              addon.id,
+                              (event.currentTarget as HTMLInputElement).checked,
+                            )}
+                        />
+                        <span class="label-text flex-1">{addon.name}</span>
+                        <span class="text-xs font-medium text-base-content/70"
+                          >+{formatCurrency(addon.price)}</span
+                        >
+                      </label>
+                    {/each}
+                  </div>
                 </div>
-              </div>
+              </details>
             {/each}
           </div>
         </div>
@@ -361,13 +451,21 @@
         onclick={onAddDraftItem}
         disabled={!canAddCurrentItem}
       >
-        Agregar producto
+        Confirmar producto
       </button>
       {#if addItemError}
         <p class="text-xs text-error">{addItemError}</p>
       {:else if requiresFlavorSelection}
         <p class="text-xs text-warning">
           Selecciona un sabor para habilitar la accion.
+        </p>
+      {:else if requiresToppingSelection}
+        <p class="text-xs text-warning">
+          Selecciona un topping o marca "Sin topping" para habilitar la accion.
+        </p>
+      {:else if requiresJaleaSelection}
+        <p class="text-xs text-warning">
+          Selecciona una jalea o marca "Sin jalea" para habilitar la accion.
         </p>
       {:else}
         <p class="text-xs text-base-content/60">
@@ -385,6 +483,45 @@
         >Puedes repetir el mismo producto con diferentes sabores o extras.</span
       >
     </div>
+    {#if currentConfiguredProduct}
+      <div
+        class="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p
+              class="text-xs font-semibold uppercase tracking-wide text-primary/80"
+            >
+              Vista previa actual
+            </p>
+            <p class="font-medium leading-tight">
+              {currentConfiguredProduct.name}
+            </p>
+          </div>
+          <div class="text-right">
+            <p class="text-sm text-base-content/70">
+              Cantidad: {currentQuantity}
+            </p>
+            <p class="font-semibold text-primary">
+              {formatCurrency(currentLineTotal)}
+            </p>
+          </div>
+        </div>
+        {#if currentFlavorName}
+          <p class="text-xs text-base-content/70">Sabor: {currentFlavorName}</p>
+        {/if}
+        {#if currentIncludedAddonNames.length > 0}
+          <p class="text-xs text-base-content/70">
+            Incluidos: {currentIncludedAddonNames.join(", ")}
+          </p>
+        {/if}
+        {#if currentExtraAddonNames.length > 0}
+          <p class="text-xs text-base-content/70">
+            Extras: {currentExtraAddonNames.join(", ")}
+          </p>
+        {/if}
+      </div>
+    {/if}
     {#if manualItems.length === 0}
       <div
         class="rounded-xl border border-base-300 bg-base-100 px-4 py-5 text-sm text-base-content/70"

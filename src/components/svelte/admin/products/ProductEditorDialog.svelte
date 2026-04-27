@@ -10,6 +10,8 @@
     category_id: string;
     image_path: string;
     is_available: boolean;
+    exclude_global_flavors: boolean;
+    exclude_global_addons: boolean;
   }
 
   interface Props {
@@ -25,8 +27,6 @@
     onClose: () => void;
     onOpenImageGalleryModal: () => void;
     onClearSelectedImage: () => void;
-    onOpenFlavorAssignmentForEditingProduct: () => void;
-    onOpenAddonAssignmentForEditingProduct: () => void;
   }
 
   let {
@@ -42,8 +42,6 @@
     onClose,
     onOpenImageGalleryModal,
     onClearSelectedImage,
-    onOpenFlavorAssignmentForEditingProduct,
-    onOpenAddonAssignmentForEditingProduct,
   }: Props = $props();
 
   let dialogRef = $state<HTMLDialogElement | null>(null);
@@ -79,22 +77,6 @@
         </h3>
       </div>
       <div class="flex items-center gap-2">
-        {#if isEditing}
-          <button
-            class="btn btn-sm btn-soft btn-info"
-            type="button"
-            onclick={onOpenFlavorAssignmentForEditingProduct}
-          >
-            Editar sabores
-          </button>
-          <button
-            class="btn btn-sm btn-soft btn-secondary"
-            type="button"
-            onclick={onOpenAddonAssignmentForEditingProduct}
-          >
-            Editar complementos
-          </button>
-        {/if}
         <button
           class="btn btn-ghost btn-sm btn-circle"
           type="button"
@@ -176,6 +158,32 @@
                 >Disponible</span
               >
             </label>
+          </div>
+
+          <div class="form-control w-full md:col-span-2">
+            <span class="label-text mb-1">Asignacion global</span>
+            <div class="space-y-2 rounded-lg border border-base-300/70 p-3">
+              <label class="label cursor-pointer justify-start gap-2 p-0">
+                <input
+                  class="checkbox checkbox-sm"
+                  type="checkbox"
+                  bind:checked={form.exclude_global_flavors}
+                />
+                <span class="label-text"
+                  >Excluir este producto de sabores globales</span
+                >
+              </label>
+              <label class="label cursor-pointer justify-start gap-2 p-0">
+                <input
+                  class="checkbox checkbox-sm"
+                  type="checkbox"
+                  bind:checked={form.exclude_global_addons}
+                />
+                <span class="label-text"
+                  >Excluir este producto de complementos globales</span
+                >
+              </label>
+            </div>
           </div>
 
           <div class="form-control w-full md:col-span-2">

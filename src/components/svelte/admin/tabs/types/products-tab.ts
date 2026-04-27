@@ -22,6 +22,8 @@ export interface ProductsTabProps {
     category_id: string;
     image_path?: string;
     is_available: boolean;
+    exclude_global_flavors?: boolean;
+    exclude_global_addons?: boolean;
   }) => void;
   onUpdate: (
     id: string,
@@ -32,6 +34,8 @@ export interface ProductsTabProps {
       category_id: string;
       image_path?: string;
       is_available: boolean;
+      exclude_global_flavors?: boolean;
+      exclude_global_addons?: boolean;
     },
   ) => void;
   onDelete: (id: string) => void;

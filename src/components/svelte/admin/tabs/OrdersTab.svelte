@@ -220,6 +220,18 @@
             flavor_id: item.flavor_id,
             included_addon_ids: normalizeIdList(item.included_addon_ids ?? []),
             extra_addon_ids: normalizeIdList(item.extra_addon_ids ?? []),
+            topping_selection:
+              item.topping_selection === "none"
+                ? "none"
+                : item.topping_selection === "selected"
+                  ? "selected"
+                  : undefined,
+            jalea_selection:
+              item.jalea_selection === "none"
+                ? "none"
+                : item.jalea_selection === "selected"
+                  ? "selected"
+                  : undefined,
           }))
         : [];
       selectedFlavorId = snapshot.selectedFlavorId ?? "";
@@ -330,7 +342,7 @@
       const addon = selectedProductAddons.find(
         (candidate) => candidate.id === addonId,
       );
-      return sum + (addon?.price ?? 0);
+      return sum + Number(addon?.price ?? 0);
     }, 0),
   );
   const totalPreview = $derived(
@@ -397,6 +409,18 @@
           "";
         const productID = (item.product_id || "").trim() || fallbackProductID;
 
+        const toppingSelectionRaw = customizations?.topping_selection;
+        const toppingSelection: ManualOrderItemDraft["topping_selection"] =
+          toppingSelectionRaw === "none" || toppingSelectionRaw === "selected"
+            ? toppingSelectionRaw
+            : undefined;
+
+        const jaleaSelectionRaw = customizations?.jalea_selection;
+        const jaleaSelection: ManualOrderItemDraft["jalea_selection"] =
+          jaleaSelectionRaw === "none" || jaleaSelectionRaw === "selected"
+            ? jaleaSelectionRaw
+            : undefined;
+
         return {
           product_id: productID,
           quantity: Math.max(1, Number(item.quantity) || 1),
@@ -404,6 +428,8 @@
           included_addon_ids: includedAddonIDs,
           extra_addon_ids:
             extraAddonIDs.length > 0 ? extraAddonIDs : legacyAddonIDs,
+          topping_selection: toppingSelection,
+          jalea_selection: jaleaSelection,
         };
       })
       .filter((item) => item.product_id);
@@ -531,26 +557,17 @@
 
     if (
       includedToppingId &&
+      includedToppingId !== "none" &&
       !toppingAddons.some((addon) => addon.id === includedToppingId)
     ) {
       includedToppingId = "";
     }
     if (
       includedJaleaId &&
+      includedJaleaId !== "none" &&
       !jaleaAddons.some((addon) => addon.id === includedJaleaId)
     ) {
       includedJaleaId = "";
-    }
-
-    if (includedToppingId) {
-      selectedExtraAddonIds = selectedExtraAddonIds.filter(
-        (addonId) => addonId !== includedToppingId,
-      );
-    }
-    if (includedJaleaId) {
-      selectedExtraAddonIds = selectedExtraAddonIds.filter(
-        (addonId) => addonId !== includedJaleaId,
-      );
     }
   });
 
@@ -607,6 +624,7 @@
     editOrderId = null;
     editError = "";
     editNotice = "";
+    addItemError = "";
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
     includedToppingId = reset.includedToppingId;
@@ -627,10 +645,6 @@
   }
 
   function toggleExtraAddonSelection(addonId: string, checked: boolean) {
-    if (addonId === includedToppingId || addonId === includedJaleaId) {
-      return;
-    }
-
     if (checked) {
       if (!selectedExtraAddonIds.includes(addonId)) {
         selectedExtraAddonIds = [...selectedExtraAddonIds, addonId];
@@ -645,23 +659,14 @@
 
   function changeIncludedTopping(addonId: string) {
     includedToppingId = addonId;
-    if (addonId) {
-      selectedExtraAddonIds = selectedExtraAddonIds.filter(
-        (currentAddonId) => currentAddonId !== addonId,
-      );
-    }
   }
 
   function changeIncludedJalea(addonId: string) {
     includedJaleaId = addonId;
-    if (addonId) {
-      selectedExtraAddonIds = selectedExtraAddonIds.filter(
-        (currentAddonId) => currentAddonId !== addonId,
-      );
-    }
   }
 
   function openCreateOrderModal() {
+    addItemError = "";
     if (!restoreManualDraft()) {
       resetOrderForm();
     }

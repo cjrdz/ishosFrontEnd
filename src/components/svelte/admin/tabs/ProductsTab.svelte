@@ -9,8 +9,6 @@
   import ImageGalleryPanel from "../products/ImageGalleryPanel.svelte";
   import GlobalFlavorsManager from "../products/GlobalFlavorsManager.svelte";
   import GlobalAddonsManager from "../products/GlobalAddonsManager.svelte";
-  import FlavorAssignmentPanel from "../products/FlavorAssignmentPanel.svelte";
-  import AddonAssignmentPanel from "../products/AddonAssignmentPanel.svelte";
   import ConfirmDialog from "../shared/ConfirmDialog.svelte";
   import { trackAction, trackError } from "../../../../lib/admin/analytics";
   import type { ProductsTabProps as Props } from "./types/products-tab";
@@ -50,15 +48,11 @@
   let imageGalleryOpen = $state(false);
   let globalFlavorsOpen = $state(false);
   let globalAddonsOpen = $state(false);
-  let flavorAssignmentOpen = $state(false);
-  let addonAssignmentOpen = $state(false);
   let confirmOpen = $state(false);
   let confirmTitle = $state("Confirmar accion");
   let confirmMessage = $state("");
   let confirmAction = $state<null | (() => void)>(null);
-  let flavorAddonBusy = $state(false);
   let editingProductId = $state<string | null>(null);
-  let currentProductForFlavorAddonId = $state<string | null>(null);
 
   let productVisibilityFilter = $state<"all" | "active" | "inactive">("all");
   const filteredProducts = $derived(
@@ -86,26 +80,14 @@
     category_id: "",
     image_path: "",
     is_available: true,
+    exclude_global_flavors: false,
+    exclude_global_addons: false,
   });
 
   const isEditing = $derived(!!editingProductId);
   const selectedGalleryImage = $derived(
     galleryImages.find((image) => image.name === form.image_path) ?? null,
   );
-  const currentProductForFlavorAddon = $derived(
-    currentProductForFlavorAddonId
-      ? (products.find(
-          (product) => product.id === currentProductForFlavorAddonId,
-        ) ?? null)
-      : null,
-  );
-  const currentProductFlavorIds = $derived(
-    (currentProductForFlavorAddon?.flavors ?? []).map((flavor) => flavor.id),
-  );
-  const currentProductAddonIds = $derived(
-    (currentProductForFlavorAddon?.addons ?? []).map((addon) => addon.id),
-  );
-
   $effect(() => {
     if (!form.category_id && categories.length > 0) {
       form.category_id = categories[0].id;
@@ -122,6 +104,8 @@
       category_id: categories[0]?.id || "",
       image_path: "",
       is_available: true,
+      exclude_global_flavors: false,
+      exclude_global_addons: false,
     };
   }
 
@@ -173,6 +157,8 @@
       category_id: product.category_id || categories[0]?.id || "",
       image_path: product.image_path || "",
       is_available: product.is_available,
+      exclude_global_flavors: Boolean(product.exclude_global_flavors),
+      exclude_global_addons: Boolean(product.exclude_global_addons),
     };
     productEditorOpen = true;
   }
@@ -186,6 +172,8 @@
       category_id: form.category_id,
       image_path: form.image_path.trim() || undefined,
       is_available: form.is_available,
+      exclude_global_flavors: form.exclude_global_flavors,
+      exclude_global_addons: form.exclude_global_addons,
     };
 
     if (form.id) {
@@ -224,136 +212,6 @@
       `Seguro que deseas eliminar ${product.name}?`,
       () => onDelete(product.id),
     );
-  }
-
-  function openFlavorAssignmentDialog(product: Product) {
-    currentProductForFlavorAddonId = product.id;
-    flavorAssignmentOpen = true;
-  }
-
-  function openFlavorAssignmentForEditingProduct() {
-    if (!editingProductId) return;
-    const product = products.find((item) => item.id === editingProductId);
-    if (!product) return;
-    openFlavorAssignmentDialog(product);
-  }
-
-  function closeFlavorAssignmentDialog() {
-    flavorAssignmentOpen = false;
-    if (!addonAssignmentOpen) {
-      currentProductForFlavorAddonId = null;
-    }
-  }
-
-  function openAddonAssignmentDialog(product: Product) {
-    currentProductForFlavorAddonId = product.id;
-    addonAssignmentOpen = true;
-  }
-
-  function openAddonAssignmentForEditingProduct() {
-    if (!editingProductId) return;
-    const product = products.find((item) => item.id === editingProductId);
-    if (!product) return;
-    openAddonAssignmentDialog(product);
-  }
-
-  function closeAddonAssignmentDialog() {
-    addonAssignmentOpen = false;
-    if (!flavorAssignmentOpen) {
-      currentProductForFlavorAddonId = null;
-    }
-  }
-
-  async function assignFlavorsToCurrentProduct(flavorIds: string[]) {
-    if (!currentProductForFlavorAddon || flavorIds.length === 0) return;
-    flavorAddonBusy = true;
-    try {
-      trackAction("products_tab_flavors_assign", {
-        productId: currentProductForFlavorAddon.id,
-        count: flavorIds.length,
-      });
-      await Promise.all(
-        flavorIds.map((flavorId) =>
-          onLinkFlavor(currentProductForFlavorAddon.id, flavorId),
-        ),
-      );
-    } catch (error) {
-      trackError(error, "ProductsTab.assignFlavorsToCurrentProduct", {
-        productId: currentProductForFlavorAddon.id,
-      });
-      throw error;
-    } finally {
-      flavorAddonBusy = false;
-    }
-  }
-
-  async function unassignFlavorsFromCurrentProduct(flavorIds: string[]) {
-    if (!currentProductForFlavorAddon || flavorIds.length === 0) return;
-    flavorAddonBusy = true;
-    try {
-      trackAction("products_tab_flavors_unassign", {
-        productId: currentProductForFlavorAddon.id,
-        count: flavorIds.length,
-      });
-      await Promise.all(
-        flavorIds.map((flavorId) =>
-          onUnlinkFlavor(currentProductForFlavorAddon.id, flavorId),
-        ),
-      );
-    } catch (error) {
-      trackError(error, "ProductsTab.unassignFlavorsFromCurrentProduct", {
-        productId: currentProductForFlavorAddon.id,
-      });
-      throw error;
-    } finally {
-      flavorAddonBusy = false;
-    }
-  }
-
-  async function assignAddonsToCurrentProduct(addonIds: string[]) {
-    if (!currentProductForFlavorAddon || addonIds.length === 0) return;
-    flavorAddonBusy = true;
-    try {
-      trackAction("products_tab_addons_assign", {
-        productId: currentProductForFlavorAddon.id,
-        count: addonIds.length,
-      });
-      await Promise.all(
-        addonIds.map((addonId) =>
-          onLinkAddon(currentProductForFlavorAddon.id, addonId),
-        ),
-      );
-    } catch (error) {
-      trackError(error, "ProductsTab.assignAddonsToCurrentProduct", {
-        productId: currentProductForFlavorAddon.id,
-      });
-      throw error;
-    } finally {
-      flavorAddonBusy = false;
-    }
-  }
-
-  async function unassignAddonsFromCurrentProduct(addonIds: string[]) {
-    if (!currentProductForFlavorAddon || addonIds.length === 0) return;
-    flavorAddonBusy = true;
-    try {
-      trackAction("products_tab_addons_unassign", {
-        productId: currentProductForFlavorAddon.id,
-        count: addonIds.length,
-      });
-      await Promise.all(
-        addonIds.map((addonId) =>
-          onUnlinkAddon(currentProductForFlavorAddon.id, addonId),
-        ),
-      );
-    } catch (error) {
-      trackError(error, "ProductsTab.unassignAddonsFromCurrentProduct", {
-        productId: currentProductForFlavorAddon.id,
-      });
-      throw error;
-    } finally {
-      flavorAddonBusy = false;
-    }
   }
 
   function toggleProductAvailability(product: Product, checked: boolean) {
@@ -406,8 +264,6 @@
   onClose={closeProductEditor}
   onOpenImageGalleryModal={openImageGalleryModal}
   onClearSelectedImage={clearSelectedImage}
-  onOpenFlavorAssignmentForEditingProduct={openFlavorAssignmentForEditingProduct}
-  onOpenAddonAssignmentForEditingProduct={openAddonAssignmentForEditingProduct}
 />
 
 <GlobalFlavorsManager
@@ -450,28 +306,6 @@
   onDelete={async (imageName) => {
     await onDeleteGalleryImage(imageName);
   }}
-/>
-
-<FlavorAssignmentPanel
-  open={flavorAssignmentOpen}
-  productName={currentProductForFlavorAddon?.name ?? ""}
-  allFlavors={flavors}
-  assignedFlavorIds={currentProductFlavorIds}
-  busy={busy || flavorAddonBusy}
-  onClose={closeFlavorAssignmentDialog}
-  onAssignMany={assignFlavorsToCurrentProduct}
-  onUnassignMany={unassignFlavorsFromCurrentProduct}
-/>
-
-<AddonAssignmentPanel
-  open={addonAssignmentOpen}
-  productName={currentProductForFlavorAddon?.name ?? ""}
-  allAddons={addons}
-  assignedAddonIds={currentProductAddonIds}
-  busy={busy || flavorAddonBusy}
-  onClose={closeAddonAssignmentDialog}
-  onAssignMany={assignAddonsToCurrentProduct}
-  onUnassignMany={unassignAddonsFromCurrentProduct}
 />
 
 <ConfirmDialog

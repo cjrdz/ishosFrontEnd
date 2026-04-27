@@ -10,6 +10,8 @@ export type StoreCartItem = {
   addons?: string[]; // legacy array of addon IDs (all paid)
   included_addon_ids?: string[];
   extra_addon_ids?: string[];
+  topping_selection?: "none" | "selected";
+  jalea_selection?: "none" | "selected";
   notes?: string;
 };
 
@@ -25,6 +27,8 @@ export function cartItemsMatch(a: StoreCartItem, b: StoreCartItem): boolean {
   return (
     a.product_id === b.product_id &&
     (a.flavor_id || null) === (b.flavor_id || null) &&
+    (a.topping_selection || "") === (b.topping_selection || "") &&
+    (a.jalea_selection || "") === (b.jalea_selection || "") &&
     (a.notes || "") === (b.notes || "") &&
     arraysEqualUnordered(a.addons || [], b.addons || []) &&
     arraysEqualUnordered(
@@ -105,6 +109,8 @@ export function updateCartItemQuantity(
   notes?: string,
   includedAddonIds?: string[],
   extraAddonIds?: string[],
+  toppingSelection?: "none" | "selected",
+  jaleaSelection?: "none" | "selected",
 ) {
   const items = getCartItems();
   const updated = items
@@ -112,6 +118,8 @@ export function updateCartItemQuantity(
       if (
         item.product_id === productId &&
         (item.flavor_id || null) === (flavorId || null) &&
+        (item.topping_selection || "") === (toppingSelection || "") &&
+        (item.jalea_selection || "") === (jaleaSelection || "") &&
         (item.notes || "") === (notes || "") &&
         arraysEqualUnordered(item.addons || [], addons || []) &&
         arraysEqualUnordered(
@@ -136,12 +144,16 @@ export function removeCartItem(
   notes?: string,
   includedAddonIds?: string[],
   extraAddonIds?: string[],
+  toppingSelection?: "none" | "selected",
+  jaleaSelection?: "none" | "selected",
 ) {
   const items = getCartItems().filter(
     (item) =>
       !(
         item.product_id === productId &&
         (item.flavor_id || null) === (flavorId || null) &&
+        (item.topping_selection || "") === (toppingSelection || "") &&
+        (item.jalea_selection || "") === (jaleaSelection || "") &&
         (item.notes || "") === (notes || "") &&
         arraysEqualUnordered(item.addons || [], addons || []) &&
         arraysEqualUnordered(

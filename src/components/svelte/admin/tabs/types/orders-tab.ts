@@ -38,6 +38,8 @@ export interface ManualOrderItemDraft {
   flavor_id?: string;
   included_addon_ids: string[];
   extra_addon_ids: string[];
+  topping_selection?: "none" | "selected";
+  jalea_selection?: "none" | "selected";
 }
 
 export interface OrderFormState {

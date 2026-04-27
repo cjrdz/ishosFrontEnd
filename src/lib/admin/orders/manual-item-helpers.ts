@@ -36,9 +36,9 @@ export function manualItemUnitPrice(
   const product = products.find((p) => p.id === item.product_id);
   const addonPrice = (item.extra_addon_ids ?? []).reduce((sum, addonId) => {
     const addon = product?.addons?.find((a) => a.id === addonId);
-    return sum + (addon?.price ?? 0);
+    return sum + Number(addon?.price ?? 0);
   }, 0);
-  return (product?.price ?? 0) + addonPrice;
+  return Number(product?.price ?? 0) + addonPrice;
 }
 
 /** Calculates the subtotal for a manual item (unit price × quantity) */
@@ -73,6 +73,12 @@ export function buildCustomizationsFromDraft(
   }
   if ((item.extra_addon_ids ?? []).length > 0) {
     customizations.extra_addon_ids = item.extra_addon_ids;
+  }
+  if (item.topping_selection) {
+    customizations.topping_selection = item.topping_selection;
+  }
+  if (item.jalea_selection) {
+    customizations.jalea_selection = item.jalea_selection;
   }
   return Object.keys(customizations).length > 0 ? customizations : undefined;
 }

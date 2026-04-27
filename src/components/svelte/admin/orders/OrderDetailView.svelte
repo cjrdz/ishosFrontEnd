@@ -358,7 +358,7 @@
                         Sabor: {item.customizations.flavor_name}
                       </div>
                     {/if}
-                    {#if Array.isArray(item.customizations.addon_names) && item.customizations.addon_names.length > 0}
+                    {#if Array.isArray(item.customizations.addon_names) && item.customizations.addon_names.length > 0 && !Array.isArray(item.customizations.included_addon_names) && !Array.isArray(item.customizations.extra_addon_names)}
                       <div class="text-xs text-base-content/60">
                         Complementos: {item.customizations.addon_names.join(
                           ", ",

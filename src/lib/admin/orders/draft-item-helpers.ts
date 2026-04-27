@@ -4,6 +4,7 @@ import {
   normalizeIdList,
   arraysEqualUnordered,
 } from "../../../components/svelte/admin/tabs/utils/list";
+import { normalizeAddonGroupName } from "../../store/helpers";
 
 /** Builds a draft item from the current form state, with validation */
 export function buildCurrentDraftItem(
@@ -42,15 +43,56 @@ export function buildCurrentDraftItem(
     return { item: null, error: "Selecciona un sabor para este producto" };
   }
 
+  const normalizedToppingSelection =
+    includedToppingId === "none" ? "none" : includedToppingId;
+  const normalizedJaleaSelection =
+    includedJaleaId === "none" ? "none" : includedJaleaId;
+
+  const hasToppingOptions = (selectedProduct?.addons ?? []).some(
+    (addon) =>
+      addon.is_active &&
+      normalizeAddonGroupName(addon.group_name) === "toppings",
+  );
+  const hasJaleaOptions = (selectedProduct?.addons ?? []).some(
+    (addon) =>
+      addon.is_active && normalizeAddonGroupName(addon.group_name) === "jalea",
+  );
+
+  if (hasToppingOptions && !normalizedToppingSelection) {
+    return {
+      item: null,
+      error: "Selecciona un topping o marca 'Sin topping'",
+    };
+  }
+
+  if (hasJaleaOptions && !normalizedJaleaSelection) {
+    return {
+      item: null,
+      error: "Selecciona una jalea o marca 'Sin jalea'",
+    };
+  }
+
   return {
     item: {
       product_id: productId,
       quantity: safeQuantity,
       flavor_id: selectedFlavorId || undefined,
       included_addon_ids: normalizeIdList(
-        [includedToppingId, includedJaleaId].filter((v) => v),
+        [normalizedToppingSelection, normalizedJaleaSelection].filter(
+          (value) => value && value !== "none",
+        ),
       ),
       extra_addon_ids: normalizeIdList(selectedExtraAddonIds),
+      topping_selection: hasToppingOptions
+        ? normalizedToppingSelection === "none"
+          ? "none"
+          : "selected"
+        : undefined,
+      jalea_selection: hasJaleaOptions
+        ? normalizedJaleaSelection === "none"
+          ? "none"
+          : "selected"
+        : undefined,
     },
     error: "",
   };
