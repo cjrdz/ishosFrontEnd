@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Icon from "../shared/AppIcon.svelte";
+  import { ApiError } from "../../../lib/errors";
   import {
     trackPublicOrder,
     type PublicOrderStatus,
@@ -22,10 +23,22 @@
   let trackingError = $state("");
   let trackedOrder = $state<PublicOrderTrackingResponse | null>(null);
   let pollTimer: ReturnType<typeof setInterval> | undefined;
+  let cooldownTimer: ReturnType<typeof setInterval> | undefined;
+  let trackingCooldownUntil = $state(0);
+  let cooldownNow = $state(Date.now());
   let productsExpanded = $state(false);
+
+  const TRACKING_POLL_INTERVAL_MS = 20000;
+  const TRACKING_RATE_LIMIT_COOLDOWN_MS = 60000;
 
   const trackedOrderItems = $derived(trackedOrder?.items ?? []);
   const trackingLookupActive = $derived(trackingBusy || trackingRefreshing);
+  const trackingCooldownActive = $derived(trackingCooldownUntil > cooldownNow);
+  const trackingCooldownSeconds = $derived(
+    trackingCooldownActive
+      ? Math.max(1, Math.ceil((trackingCooldownUntil - cooldownNow) / 1000))
+      : 0,
+  );
 
   onMount(() => {
     const url = new URL(window.location.href);
@@ -55,13 +68,47 @@
 
     return () => {
       if (pollTimer) clearInterval(pollTimer);
+      if (cooldownTimer) clearInterval(cooldownTimer);
     };
   });
+
+  function startTrackingCooldown(
+    durationMs: number = TRACKING_RATE_LIMIT_COOLDOWN_MS,
+  ) {
+    trackingCooldownUntil = Date.now() + durationMs;
+    cooldownNow = Date.now();
+    stopTrackingPolling();
+
+    if (cooldownTimer) clearInterval(cooldownTimer);
+    cooldownTimer = setInterval(() => {
+      cooldownNow = Date.now();
+      if (trackingCooldownUntil <= cooldownNow && cooldownTimer) {
+        clearInterval(cooldownTimer);
+        cooldownTimer = undefined;
+      }
+    }, 1000);
+  }
+
+  function clearTrackingCooldown() {
+    trackingCooldownUntil = 0;
+    cooldownNow = Date.now();
+    if (cooldownTimer) {
+      clearInterval(cooldownTimer);
+      cooldownTimer = undefined;
+    }
+  }
 
   async function runTrackingLookup(options?: { silent?: boolean }) {
     const orderNumber = trackingOrderNumber.trim();
     const token = trackingToken.trim();
     const silent = options?.silent ?? false;
+
+    if (trackingCooldownUntil > Date.now()) {
+      if (!silent) {
+        trackingError = `Hiciste muchas consultas. Intenta de nuevo en ${trackingCooldownSeconds}s.`;
+      }
+      return;
+    }
 
     if (!orderNumber) {
       trackingError = "Ingresa tu número de orden.";
@@ -93,6 +140,7 @@
       }
 
       trackedOrder = order;
+      clearTrackingCooldown();
       saveTracking(orderNumber, token);
 
       const hasActiveOrder =
@@ -104,6 +152,15 @@
       }
     } catch (error) {
       trackedOrder = null;
+
+      if (error instanceof ApiError && error.status === 429) {
+        startTrackingCooldown();
+        trackingError =
+          "Hiciste muchas consultas en poco tiempo. Espera 60 segundos e intenta de nuevo.";
+        stopTrackingPolling();
+        return;
+      }
+
       trackingError =
         error instanceof Error
           ? error.message
@@ -141,7 +198,7 @@
     stopTrackingPolling();
     pollTimer = setInterval(() => {
       void runTrackingLookup({ silent: true });
-    }, 20000);
+    }, TRACKING_POLL_INTERVAL_MS);
   }
 
   function stopTrackingPolling() {
@@ -150,19 +207,26 @@
     pollTimer = undefined;
   }
 
-  function itemAddonSummary(
+  function itemIncludedAddonSummary(
+    item: PublicOrderTrackingResponse["items"][number],
+  ): string[] {
+    const customizations = item.customizations;
+    if (!customizations) return [];
+    return Array.from(new Set(customizations.included_addon_names ?? []));
+  }
+
+  function itemExtraAddonSummary(
     item: PublicOrderTrackingResponse["items"][number],
   ): string[] {
     const customizations = item.customizations;
     if (!customizations) return [];
 
-    const groups = [
-      ...(customizations.addon_names ?? []),
-      ...(customizations.included_addon_names ?? []),
-      ...(customizations.extra_addon_names ?? []),
-    ];
+    if (Array.isArray(customizations.extra_addon_names)) {
+      return Array.from(new Set(customizations.extra_addon_names));
+    }
 
-    return Array.from(new Set(groups));
+    // Backward compatibility: legacy orders only stored addon_names.
+    return Array.from(new Set(customizations.addon_names ?? []));
   }
 </script>
 
@@ -213,9 +277,15 @@
         class="btn btn-primary btn-lg rounded-2xl min-w-32 shadow-lg hover:shadow-xl transition-all"
         type="button"
         onclick={() => runTrackingLookup()}
-        disabled={trackingBusy}
+        disabled={trackingLookupActive || trackingCooldownActive}
       >
-        {trackingBusy ? "Buscando..." : "Consultar"}
+        {#if trackingCooldownActive}
+          Espera {trackingCooldownSeconds}s
+        {:else if trackingBusy}
+          Buscando...
+        {:else}
+          Consultar
+        {/if}
       </button>
     </div>
 
@@ -368,7 +438,8 @@
               </summary>
               <div class="collapse-content pt-0 space-y-3">
                 {#each trackedOrderItems as item}
-                  {@const addonSummary = itemAddonSummary(item)}
+                  {@const includedAddonSummary = itemIncludedAddonSummary(item)}
+                  {@const extraAddonSummary = itemExtraAddonSummary(item)}
                   <div
                     class="rounded-2xl border border-base-200/80 bg-base-100 px-4 py-3 shadow-sm"
                   >
@@ -382,9 +453,14 @@
                             Sabor: {item.customizations.flavor_name}
                           </p>
                         {/if}
-                        {#if addonSummary.length > 0}
+                        {#if includedAddonSummary.length > 0}
                           <p class="text-sm text-base-content/65 mt-1">
-                            Extras: {addonSummary.join(", ")}
+                            Incluidos: {includedAddonSummary.join(", ")}
+                          </p>
+                        {/if}
+                        {#if extraAddonSummary.length > 0}
+                          <p class="text-sm text-base-content/65 mt-1">
+                            Extras: {extraAddonSummary.join(", ")}
                           </p>
                         {/if}
                         {#if item.customizations?.notes}

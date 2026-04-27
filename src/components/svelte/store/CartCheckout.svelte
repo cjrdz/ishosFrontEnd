@@ -22,6 +22,9 @@
   } from "../../../lib/store/helpers";
   import { normalizeIdList } from "../../../lib/utils/collections";
 
+  const UNSELECTED_CUSTOMIZATION = "__unselected__";
+  const NO_ADDON_SELECTED = "__none__";
+
   type CheckoutForm = {
     customer_name: string;
     customer_phone: string;
@@ -82,7 +85,12 @@
   );
 
   const customizationsStepComplete = $derived(
-    !items.some((item) => requiresFlavorSelection(item)),
+    !items.some(
+      (item) =>
+        requiresFlavorSelection(item) ||
+        requiresGroupSelection(item, "toppings") ||
+        requiresGroupSelection(item, "jalea"),
+    ),
   );
 
   const activeCheckoutStep = $derived(
@@ -106,7 +114,7 @@
       if (product?.addons) {
         for (const addonId of payableAddonIds) {
           const addon = product.addons.find((a) => a.id === addonId);
-          if (addon) price += addon.price;
+          if (addon) price += Number(addon.price ?? 0);
         }
       }
     }
@@ -189,6 +197,52 @@
     return activeFlavors(product).length > 0 && !item.flavor_id;
   }
 
+  function selectedIncludedAddonIdForGroup(
+    item: StoreCartItem,
+    groupName: "toppings" | "jalea",
+  ): string {
+    const product = productById(item.product_id);
+    const options = addonsForGroup(product, groupName);
+    return (
+      options.find((addon) =>
+        (item.included_addon_ids || []).includes(addon.id),
+      )?.id || ""
+    );
+  }
+
+  function hasExplicitNoneSelection(
+    item: StoreCartItem,
+    groupName: "toppings" | "jalea",
+  ): boolean {
+    if (groupName === "toppings") {
+      return item.topping_selection === "none";
+    }
+    return item.jalea_selection === "none";
+  }
+
+  function requiresGroupSelection(
+    item: StoreCartItem,
+    groupName: "toppings" | "jalea",
+  ): boolean {
+    const product = productById(item.product_id);
+    const options = addonsForGroup(product, groupName);
+    if (options.length === 0) return false;
+    if (selectedIncludedAddonIdForGroup(item, groupName)) return false;
+    return !hasExplicitNoneSelection(item, groupName);
+  }
+
+  function addonGroupSelectValue(
+    item: StoreCartItem,
+    groupName: "toppings" | "jalea",
+  ): string {
+    const selectedId = selectedIncludedAddonIdForGroup(item, groupName);
+    if (selectedId) return selectedId;
+    if (hasExplicitNoneSelection(item, groupName)) {
+      return NO_ADDON_SELECTED;
+    }
+    return UNSELECTED_CUSTOMIZATION;
+  }
+
   function resolveFlavorName(item: StoreCartItem): string | null {
     if (!item.flavor_id || products.length === 0) return null;
     const product = products.find((p) => p.id === item.product_id);
@@ -245,6 +299,8 @@
     return [
       item.product_id,
       item.flavor_id || "",
+      item.topping_selection || "",
+      item.jalea_selection || "",
       normalizeIdList(item.addons).join(","),
       normalizeIdList(item.included_addon_ids).join(","),
       normalizeIdList(item.extra_addon_ids).join(","),
@@ -293,6 +349,8 @@
       addons: undefined,
       included_addon_ids: normalizeIdList(value.included_addon_ids),
       extra_addon_ids: normalizeIdList(value.extra_addon_ids),
+      topping_selection: value.topping_selection || undefined,
+      jalea_selection: value.jalea_selection || undefined,
     });
 
     let nextList = [...baseList];
@@ -338,19 +396,28 @@
       nextIncluded.sort();
     }
 
-    const existingExtras =
+    const nextExtras =
       item.extra_addon_ids && item.extra_addon_ids.length > 0
         ? item.extra_addon_ids
         : item.addons || [];
-    const nextExtras = normalizeIdList(
-      existingExtras.filter((id) => id !== addonId),
-    );
 
     applyCustomizationUpdate(item, (base) => ({
       ...base,
       addons: undefined,
       included_addon_ids: nextIncluded,
       extra_addon_ids: nextExtras,
+      topping_selection:
+        groupName === "toppings"
+          ? addonId
+            ? "selected"
+            : "none"
+          : base.topping_selection,
+      jalea_selection:
+        groupName === "jalea"
+          ? addonId
+            ? "selected"
+            : "none"
+          : base.jalea_selection,
     }));
   }
 
@@ -359,10 +426,6 @@
     addonId: string,
     checked: boolean,
   ) {
-    if ((item.included_addon_ids || []).includes(addonId)) {
-      return;
-    }
-
     const existingExtras =
       item.extra_addon_ids && item.extra_addon_ids.length > 0
         ? item.extra_addon_ids
@@ -391,6 +454,12 @@
     if (item.flavor_id) customizations.flavor_id = item.flavor_id;
     if (item.included_addon_ids && item.included_addon_ids.length > 0) {
       customizations.included_addon_ids = item.included_addon_ids;
+    }
+    if (item.topping_selection) {
+      customizations.topping_selection = item.topping_selection;
+    }
+    if (item.jalea_selection) {
+      customizations.jalea_selection = item.jalea_selection;
     }
     if (item.extra_addon_ids && item.extra_addon_ids.length > 0) {
       customizations.extra_addon_ids = item.extra_addon_ids;
@@ -432,6 +501,24 @@
     if (missingFlavor) {
       error =
         "Debes seleccionar un sabor en todos los productos que tienen sabores disponibles.";
+      return;
+    }
+
+    const missingTopping = items.some((item) =>
+      requiresGroupSelection(item, "toppings"),
+    );
+    if (missingTopping) {
+      error =
+        "Debes seleccionar una opcion de topping en todos los productos que lo requieran (incluye 'Sin topping').";
+      return;
+    }
+
+    const missingJalea = items.some((item) =>
+      requiresGroupSelection(item, "jalea"),
+    );
+    if (missingJalea) {
+      error =
+        "Debes seleccionar una opcion de jalea en todos los productos que lo requieran (incluye 'Sin jalea').";
       return;
     }
 
@@ -549,6 +636,11 @@
               {@const extraGroups = paidAddonGroups(product)}
               {@const flavorIsRequired =
                 flavorOptions.length > 0 && !item.flavor_id}
+              {@const toppingIsRequired = requiresGroupSelection(
+                item,
+                "toppings",
+              )}
+              {@const jaleaIsRequired = requiresGroupSelection(item, "jalea")}
               {@const flavorSummary = itemFlavorSummary(item)}
 
               <div
@@ -567,6 +659,30 @@
                           class={`badge badge-sm sm:badge-md font-medium border-0 ${flavorIsRequired ? "bg-warning/20 text-warning-content" : "bg-primary/10 text-primary"}`}
                         >
                           Sabor: {flavorSummary}
+                        </div>
+                      {/if}
+                      {#if toppingOptions.length > 0}
+                        <div
+                          class={`badge badge-sm sm:badge-md font-medium border-0 ${toppingIsRequired ? "bg-warning/20 text-warning-content" : "bg-secondary/10 text-secondary"}`}
+                        >
+                          Topping: {toppingIsRequired
+                            ? "Pendiente"
+                            : addonGroupSelectValue(item, "toppings") ===
+                                NO_ADDON_SELECTED
+                              ? "Sin topping"
+                              : "Seleccionado"}
+                        </div>
+                      {/if}
+                      {#if jaleaOptions.length > 0}
+                        <div
+                          class={`badge badge-sm sm:badge-md font-medium border-0 ${jaleaIsRequired ? "bg-warning/20 text-warning-content" : "bg-secondary/10 text-secondary"}`}
+                        >
+                          Jalea: {jaleaIsRequired
+                            ? "Pendiente"
+                            : addonGroupSelectValue(item, "jalea") ===
+                                NO_ADDON_SELECTED
+                              ? "Sin jalea"
+                              : "Seleccionada"}
                         </div>
                       {/if}
                     </div>
@@ -613,6 +729,17 @@
                     <span class="text-xl">⚠️</span>
                     <span class="font-medium"
                       >Selecciona un sabor primero para continuar.</span
+                    >
+                  </div>
+                {/if}
+
+                {#if toppingIsRequired || jaleaIsRequired}
+                  <div
+                    class="mx-5 mb-4 alert alert-warning shadow-sm border-warning/20 text-sm rounded-2xl flex gap-3 p-3"
+                  >
+                    <span class="font-medium"
+                      >Selecciona una opcion para topping/jalea (puede ser Sin
+                      topping o Sin jalea).</span
                     >
                   </div>
                 {/if}
@@ -690,25 +817,32 @@
                             <div
                               class="collapse-title font-bold text-base-content/90"
                             >
-                              Topping opcional
+                              Topping (requerido)
                             </div>
                             <div class="collapse-content pt-0">
                               <select
                                 class="select select-bordered bg-base-100 focus:bg-base-200 w-full rounded-xl transition-all"
-                                value={toppingOptions.find((addon) =>
-                                  (item.included_addon_ids || []).includes(
-                                    addon.id,
-                                  ),
-                                )?.id || ""}
-                                onchange={(event) =>
+                                value={addonGroupSelectValue(item, "toppings")}
+                                onchange={(event) => {
+                                  const value = (
+                                    event.currentTarget as HTMLSelectElement
+                                  ).value;
+                                  if (value === UNSELECTED_CUSTOMIZATION)
+                                    return;
                                   updateIncludedAddon(
                                     item,
                                     "toppings",
-                                    (event.currentTarget as HTMLSelectElement)
-                                      .value,
-                                  )}
+                                    value === NO_ADDON_SELECTED ? "" : value,
+                                  );
+                                }}
                               >
-                                <option value="">Sin topping</option>
+                                <option
+                                  value={UNSELECTED_CUSTOMIZATION}
+                                  disabled>Selecciona una opcion</option
+                                >
+                                <option value={NO_ADDON_SELECTED}
+                                  >Sin topping</option
+                                >
                                 {#each toppingOptions as addon (addon.id)}
                                   <option value={addon.id}>{addon.name}</option>
                                 {/each}
@@ -725,25 +859,32 @@
                             <div
                               class="collapse-title font-bold text-base-content/90"
                             >
-                              Jalea opcional
+                              Jalea (requerida)
                             </div>
                             <div class="collapse-content pt-0">
                               <select
                                 class="select select-bordered bg-base-100 focus:bg-base-200 w-full rounded-xl transition-all"
-                                value={jaleaOptions.find((addon) =>
-                                  (item.included_addon_ids || []).includes(
-                                    addon.id,
-                                  ),
-                                )?.id || ""}
-                                onchange={(event) =>
+                                value={addonGroupSelectValue(item, "jalea")}
+                                onchange={(event) => {
+                                  const value = (
+                                    event.currentTarget as HTMLSelectElement
+                                  ).value;
+                                  if (value === UNSELECTED_CUSTOMIZATION)
+                                    return;
                                   updateIncludedAddon(
                                     item,
                                     "jalea",
-                                    (event.currentTarget as HTMLSelectElement)
-                                      .value,
-                                  )}
+                                    value === NO_ADDON_SELECTED ? "" : value,
+                                  );
+                                }}
                               >
-                                <option value="">Sin jalea</option>
+                                <option
+                                  value={UNSELECTED_CUSTOMIZATION}
+                                  disabled>Selecciona una opcion</option
+                                >
+                                <option value={NO_ADDON_SELECTED}
+                                  >Sin jalea</option
+                                >
                                 {#each jaleaOptions as addon (addon.id)}
                                   <option value={addon.id}>{addon.name}</option>
                                 {/each}
@@ -798,9 +939,6 @@
                                     item.addons ||
                                     []
                                   ).includes(addon.id)}
-                                  disabled={(
-                                    item.included_addon_ids || []
-                                  ).includes(addon.id)}
                                   onchange={(event) =>
                                     toggleItemExtraAddon(
                                       item,
@@ -843,9 +981,6 @@
                                     item.extra_addon_ids ||
                                     item.addons ||
                                     []
-                                  ).includes(addon.id)}
-                                  disabled={(
-                                    item.included_addon_ids || []
                                   ).includes(addon.id)}
                                   onchange={(event) =>
                                     toggleItemExtraAddon(

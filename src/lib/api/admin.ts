@@ -24,6 +24,8 @@ export interface Product {
   image_url?: string | null;
   image_path?: string | null;
   is_available: boolean;
+  exclude_global_flavors?: boolean;
+  exclude_global_addons?: boolean;
   flavors?: Flavor[];
   addons?: Addon[];
   created_at?: string;
@@ -211,6 +213,8 @@ export async function createProduct(
     price: number;
     category_id: string;
     image_path?: string;
+    exclude_global_flavors?: boolean;
+    exclude_global_addons?: boolean;
   },
 ): Promise<Product> {
   return apiRequest<Product>("/products", {
@@ -229,6 +233,8 @@ export async function updateProduct(
     price: number;
     image_path: string;
     is_available: boolean;
+    exclude_global_flavors: boolean;
+    exclude_global_addons: boolean;
   }>,
 ): Promise<Product> {
   return apiRequest<Product>(`/products/${id}`, {
