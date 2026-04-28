@@ -9,8 +9,8 @@
  */
 
 import { defineMiddleware } from "astro:middleware";
-import { getSession } from "./lib/api/auth";
-import { getApiBaseUrl } from "./lib/config";
+import { getSession } from "@features/auth";
+import { getApiBaseUrl } from "@core/config";
 
 // Routes that require authentication
 const protectedRoutes = ["/admin"];

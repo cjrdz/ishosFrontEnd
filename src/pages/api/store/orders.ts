@@ -6,11 +6,8 @@
  */
 
 import type { APIRoute } from "astro";
-import {
-  forwardUpstreamJson,
-  getServerApiBaseUrl,
-} from "../../../lib/bff/proxy";
-import { CreatePublicOrderSchema } from "../../../lib/validators/store";
+import { forwardUpstreamJson, getServerApiBaseUrl } from "@core/bff/proxy";
+import { CreatePublicOrderSchema } from "@features/catalog";
 
 export const prerender = false;
 

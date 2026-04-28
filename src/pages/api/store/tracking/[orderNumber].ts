@@ -6,10 +6,7 @@
  */
 
 import type { APIRoute } from "astro";
-import {
-  forwardUpstreamJson,
-  getServerApiBaseUrl,
-} from "../../../../lib/bff/proxy";
+import { forwardUpstreamJson, getServerApiBaseUrl } from "@core/bff/proxy";
 
 const ORDER_NUMBER_RE = /^ORD-\d{8}-\d{4}$/;
 

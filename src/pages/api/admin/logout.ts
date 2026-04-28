@@ -7,8 +7,7 @@
  */
 
 import type { APIRoute } from "astro";
-import { logout } from "../../../lib/api/auth";
-import { clearCachedSession } from "../../../lib/auth/session";
+import { clearCachedSession, logout } from "@features/auth";
 
 export const prerender = false;
 

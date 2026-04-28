@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 
 import cloudflare from '@astrojs/cloudflare';
@@ -29,6 +30,13 @@ export default defineConfig({
   },
   integrations: [svelte()],
   vite: {
+    resolve: {
+      alias: {
+        '@core': fileURLToPath(new URL('./src/core', import.meta.url)),
+        '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
+        '@features': fileURLToPath(new URL('./src/features', import.meta.url)),
+      },
+    },
     server: {
       allowedHosts: ['.vusercontent.net'],
       cors: true,

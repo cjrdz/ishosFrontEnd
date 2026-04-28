@@ -1,13 +1,13 @@
 {
   "extends": "./node_modules/astro/tsconfigs/strict",
   "compilerOptions": {
+    "paths": {
+      "@core/*": ["./src/core/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@features/*": ["./src/features/*"]
+    },
     "types": ["astro/client", "node"]
   },
   "include": [".astro/types.d.ts", "astro.config.mjs", "src/**/*"],
-  "exclude": [
-    "dist",
-    "node_modules",
-    "src/components/Analytics.svelte",
-    "src/components/ExportTool.svelte"
-  ]
+  "exclude": ["dist", "node_modules"]
 }

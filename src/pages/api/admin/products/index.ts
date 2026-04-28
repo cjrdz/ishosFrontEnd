@@ -7,7 +7,7 @@
  */
 
 import type { APIRoute } from "astro";
-import { proxyToBackend } from "../../../../lib/bff/proxy";
+import { proxyToBackend } from "@core/bff/proxy";
 
 export const prerender = false;
 
