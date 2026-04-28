@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { getApiBaseUrl } from "../../../../lib/config";
+import { getApiBaseUrl } from "@core/config";
 
 export const prerender = false;
 

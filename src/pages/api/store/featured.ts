@@ -9,10 +9,7 @@
  */
 
 import type { APIRoute } from "astro";
-import {
-  forwardUpstreamJson,
-  getServerApiBaseUrl,
-} from "../../../lib/bff/proxy";
+import { forwardUpstreamJson, getServerApiBaseUrl } from "@core/bff/proxy";
 
 export const prerender = false;
 

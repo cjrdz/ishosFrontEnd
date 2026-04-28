@@ -12,8 +12,8 @@
  */
 
 import type { APIRoute } from "astro";
-import { requireAction, requireUuidParam } from "../../../../lib/bff/params";
-import { proxyToBackend } from "../../../../lib/bff/proxy";
+import { requireAction, requireUuidParam } from "@core/bff/params";
+import { proxyToBackend } from "@core/bff/proxy";
 
 export const prerender = false;
 

@@ -8,11 +8,8 @@
  */
 
 import type { APIRoute } from "astro";
-import {
-  requireAction,
-  requireSafePathParam,
-} from "../../../../lib/bff/params";
-import { proxyToBackend } from "../../../../lib/bff/proxy";
+import { requireAction, requireSafePathParam } from "@core/bff/params";
+import { proxyToBackend } from "@core/bff/proxy";
 
 export const prerender = false;
 

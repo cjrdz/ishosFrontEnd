@@ -7,7 +7,7 @@
  */
 
 import type { APIRoute } from "astro";
-import { getSession } from "../../../lib/api/auth";
+import { getSession } from "@features/auth";
 
 export const prerender = false;
 

@@ -8,8 +8,8 @@
  */
 
 import type { APIRoute } from "astro";
-import { requireUuidParam } from "../../../../lib/bff/params";
-import { proxyToBackend } from "../../../../lib/bff/proxy";
+import { requireUuidParam } from "@core/bff/params";
+import { proxyToBackend } from "@core/bff/proxy";
 
 export const prerender = false;
 

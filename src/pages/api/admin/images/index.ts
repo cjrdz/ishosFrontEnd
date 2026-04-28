@@ -8,8 +8,8 @@
  */
 
 import type { APIRoute } from "astro";
-import { proxyToBackend } from "../../../../lib/bff/proxy";
-import { getApiBaseUrl } from "../../../../lib/config";
+import { proxyToBackend } from "@core/bff/proxy";
+import { getApiBaseUrl } from "@core/config";
 
 export const prerender = false;
 

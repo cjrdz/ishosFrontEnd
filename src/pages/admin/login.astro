@@ -2,7 +2,7 @@
 export const prerender = false;
 
 import AdminLayout from "../../layouts/AdminLayout.astro";
-import AdminLoginForm from "../../components/svelte/admin/AdminLoginForm.svelte";
+import { AdminLoginForm } from "@features/auth";
 ---
 
 <AdminLayout title="Admin Login - IshosFactory">

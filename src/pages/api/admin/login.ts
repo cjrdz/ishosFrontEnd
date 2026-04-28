@@ -9,8 +9,8 @@
  */
 
 import type { APIRoute } from "astro";
-import { login } from "../../../lib/api/auth";
-import { LoginSchema } from "../../../lib/validators/admin";
+import { login } from "@features/auth";
+import { LoginSchema } from "@features/admin-management";
 
 export const prerender = false;
 

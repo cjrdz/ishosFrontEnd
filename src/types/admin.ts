@@ -9,10 +9,10 @@ import type {
   Order as ApiOrder,
   User,
   UserOrderHistoryItem,
-} from "../lib/api/admin";
-import type { TabKey } from "../components/svelte/admin/config/tabs";
-import type { OrdersTabProps } from "../components/svelte/admin/tabs/types/orders-tab";
-import type { ProductsTabProps } from "../components/svelte/admin/tabs/types/products-tab";
+  TabKey,
+} from "@features/admin-management";
+import type { OrdersTabProps } from "@features/orders";
+import type { ProductsTabProps } from "@features/products";
 
 /**
  * Employee record (admin/staff)
