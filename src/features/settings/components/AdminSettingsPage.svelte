@@ -3,20 +3,22 @@
   import Icon from "@shared/components/AppIcon.svelte";
   import ThemeToggle from "@shared/components/ThemeToggle.svelte";
   import {
-    getAdminPanelConfig,
-    getAdminStoreSettings,
-    getAdminTabsSettings,
-    updateAdminPanelConfig,
-    updateAdminStoreSettings,
-    updateAdminTabsSettings,
+    getAdminLocalSettings,
+    saveAdminPanelConfig,
+    saveAdminRowsPerTable,
+    saveAdminStoreSettings,
+    saveAdminTabOrder,
+    setCurrentAdminContext,
+    type RowsPerTableConfig,
     type PanelConfigValues,
+    type StoreOfferItem,
+    DEFAULT_PANEL_CONFIG,
+    DEFAULT_ROWS_PER_TABLE_CONFIG,
     DEFAULT_TAB_ORDER,
     normalizeTabOrder,
     type TabKey,
   } from "@features/admin-management";
   import SettingsTab from "../../admin-management/components/SettingsTab.svelte";
-  import type { StoreOfferItem } from "@features/catalog";
-  import { ApiError } from "@core/errors";
 
   type Session = {
     id: string;
@@ -50,14 +52,6 @@
     }
   }
 
-  // IMPORTANT: Keep this in sync with backend defaults (see TokenTTLConfig in Go backend)
-  const DEFAULT_PANEL_CONFIG: PanelConfigValues = {
-    auth_cookie_ttl_hours: 24,
-    auth_token_ttl_hours: 168,
-    tracking_token_ttl_hours: 720,
-    inactivity_logout_seconds: 900,
-  };
-
   const SEARCH_ITEMS = [
     {
       id: "navegacion-panel",
@@ -89,6 +83,13 @@
       keywords: ["branding", "widgets", "atajos", "personalizar", "proximo"],
     },
     {
+      id: "filas-tablas",
+      title: "Filas por tabla",
+      description: "Cantidad default de filas por tabla en el panel",
+      icon: "lucide:table-properties",
+      keywords: ["filas", "tabla", "row", "rows", "paginacion", "limite"],
+    },
+    {
       id: "operacion-tienda",
       title: "Operacion de tienda",
       description: "Pausar o reactivar pedidos publicos",
@@ -112,6 +113,9 @@
   let session = $state<Session | null>(null);
   let tabOrder = $state<TabKey[]>([...DEFAULT_TAB_ORDER]);
   let panelConfig = $state<PanelConfigValues>({ ...DEFAULT_PANEL_CONFIG });
+  let rowsPerTable = $state<RowsPerTableConfig>({
+    ...DEFAULT_ROWS_PER_TABLE_CONFIG,
+  });
   let storeOrdersEnabled = $state(true);
   let storeOffers = $state<StoreOfferItem[]>([]);
 
@@ -241,72 +245,23 @@
     busy = true;
     moduleError = "";
 
-    const [tabsResult, panelConfigResult, storeSettingsResult] =
-      await Promise.allSettled([
-        getAdminTabsSettings(),
-        getAdminPanelConfig(),
-        getAdminStoreSettings(),
-      ]);
-
-    let tabsError = "";
-    let panelConfigError = "";
-    let storeSettingsError = "";
-
-    if (tabsResult.status === "fulfilled") {
-      tabOrder = normalizeTabOrder(tabsResult.value.tab_order);
-    } else {
-      trackError(tabsResult.reason, "AdminSettingsPage.loadSettings.tabs");
-      tabsError =
-        tabsResult.reason instanceof Error
-          ? tabsResult.reason.message
-          : "No se pudo cargar la configuracion de pestanas";
+    if (!session?.id) {
       tabOrder = [...DEFAULT_TAB_ORDER];
-    }
-
-    if (panelConfigResult.status === "fulfilled") {
-      panelConfig = {
-        auth_cookie_ttl_hours: panelConfigResult.value.auth_cookie_ttl_hours,
-        auth_token_ttl_hours: panelConfigResult.value.auth_token_ttl_hours,
-        tracking_token_ttl_hours:
-          panelConfigResult.value.tracking_token_ttl_hours,
-        inactivity_logout_seconds:
-          panelConfigResult.value.inactivity_logout_seconds ?? 900,
-      };
-    } else {
-      trackError(
-        panelConfigResult.reason,
-        "AdminSettingsPage.loadSettings.panelConfig",
-      );
-      panelConfigError =
-        panelConfigResult.reason instanceof Error
-          ? panelConfigResult.reason.message
-          : "No se pudo cargar la configuracion de seguridad";
       panelConfig = { ...DEFAULT_PANEL_CONFIG };
-    }
-
-    if (storeSettingsResult.status === "fulfilled") {
-      storeOrdersEnabled = storeSettingsResult.value.orders_enabled;
-      storeOffers = storeSettingsResult.value.offers ?? [];
-    } else {
-      trackError(
-        storeSettingsResult.reason,
-        "AdminSettingsPage.loadSettings.storeSettings",
-      );
-      storeSettingsError =
-        storeSettingsResult.reason instanceof ApiError &&
-        storeSettingsResult.reason.status === 404
-          ? "No se pudo conectar con la configuracion de tienda. Verifica que el backend este actualizado."
-          : storeSettingsResult.reason instanceof Error
-            ? storeSettingsResult.reason.message
-            : "No se pudo cargar la operacion de tienda";
+      rowsPerTable = { ...DEFAULT_ROWS_PER_TABLE_CONFIG };
       storeOrdersEnabled = true;
       storeOffers = [];
+      busy = false;
+      return;
     }
 
-    // Combine errors for display
-    moduleError = [tabsError, panelConfigError, storeSettingsError]
-      .filter(Boolean)
-      .join(" | ");
+    const settings = getAdminLocalSettings(session.id);
+    tabOrder = normalizeTabOrder(settings.tab_order);
+    panelConfig = settings.panel_config;
+    rowsPerTable = settings.rows_per_table;
+    storeOrdersEnabled = settings.store_settings.orders_enabled;
+    storeOffers = settings.store_settings.offers ?? [];
+    setCurrentAdminContext(session.id, rowsPerTable.default);
     busy = false;
   }
 
@@ -314,8 +269,10 @@
     busy = true;
     moduleError = "";
     try {
-      const response = await updateAdminTabsSettings(nextTabOrder as TabKey[]);
-      tabOrder = normalizeTabOrder(response.tab_order);
+      if (!session?.id) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      tabOrder = saveAdminTabOrder(session.id, nextTabOrder as TabKey[]);
       setNotice("Orden del panel actualizada");
       trackAction("admin_settings_tab_order_saved", {
         tabCount: nextTabOrder.length,
@@ -337,13 +294,10 @@
     busy = true;
     moduleError = "";
     try {
-      const response = await updateAdminPanelConfig(nextPanelConfig);
-      panelConfig = {
-        auth_cookie_ttl_hours: response.auth_cookie_ttl_hours,
-        auth_token_ttl_hours: response.auth_token_ttl_hours,
-        tracking_token_ttl_hours: response.tracking_token_ttl_hours,
-        inactivity_logout_seconds: response.inactivity_logout_seconds ?? 900,
-      };
+      if (!session?.id) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      panelConfig = saveAdminPanelConfig(session.id, nextPanelConfig);
       setNotice("Configuracion de seguridad actualizada");
       trackAction(
         "admin_settings_panel_config_saved",
@@ -369,7 +323,10 @@
     moduleError = "";
 
     try {
-      const response = await updateAdminStoreSettings({
+      if (!session?.id) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      const response = saveAdminStoreSettings(session.id, {
         orders_enabled: enabled,
         offers: storeOffers,
       });
@@ -387,6 +344,32 @@
         requestError instanceof Error
           ? requestError.message
           : "No se pudo actualizar la operacion de tienda";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleSaveRowsPerTable(nextRowsPerTable: RowsPerTableConfig) {
+    busy = true;
+    moduleError = "";
+    try {
+      if (!session?.id) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      rowsPerTable = saveAdminRowsPerTable(session.id, nextRowsPerTable);
+      setCurrentAdminContext(session.id, rowsPerTable.default);
+      setNotice("Filas por tabla actualizadas");
+      trackAction("admin_settings_rows_per_table_saved", {
+        ...rowsPerTable,
+      });
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.handleSaveRowsPerTable", {
+        ...nextRowsPerTable,
+      });
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo guardar filas por tabla";
     } finally {
       busy = false;
     }
@@ -486,12 +469,15 @@
       <SettingsTab
         {tabOrder}
         {panelConfig}
+        rowsPerTable={rowsPerTable as unknown as any}
         {storeOrdersEnabled}
         {busy}
         {moduleError}
         onSave={handleSaveTabOrder}
         onSavePanelConfig={handleSavePanelConfig}
         onToggleStoreOrders={handleToggleStoreOrders}
+        onSaveRowsPerTable={(rows) =>
+          void handleSaveRowsPerTable(rows as unknown as RowsPerTableConfig)}
       />
 
       <section id="proximas-personalizaciones" class="card bg-base-100 shadow">

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./variables.css";
+@import "./order-steps.css";
 @plugin "daisyui" {
   themes: all;
 }

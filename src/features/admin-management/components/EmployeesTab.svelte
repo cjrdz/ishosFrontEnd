@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Employee } from "@features/admin-management/lib/api";
+  import { getCurrentRowsPerTable } from "@features/admin-management";
   import Icon from "@shared/components/AppIcon.svelte";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
 
@@ -71,6 +72,10 @@
 
   const rowLimitOptions = [5, 10, 25, 50, 100] as const;
   let employeeRowLimit = $state<number>(5);
+
+  $effect(() => {
+    employeeRowLimit = getCurrentRowsPerTable("empleados");
+  });
 
   const visibleEmployees = $derived(
     employeeRowLimit <= 0
@@ -258,7 +263,7 @@
   <div class="card bg-base-100 shadow">
     <div class="card-body gap-4">
       <div class="flex flex-wrap items-center gap-3">
-        <h2 class="card-title shrink-0 mr-1">Gestion de empleados</h2>
+        <h2 class="card-title shrink-0 mr-1">Empleados</h2>
 
         <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
 

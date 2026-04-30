@@ -1,5 +1,8 @@
 <script lang="ts">
-  import type { Product } from "@features/admin-management";
+  import {
+    getCurrentRowsPerTable,
+    type Product,
+  } from "@features/admin-management";
   import { formatCurrency } from "@shared/utils/formatters";
 
   interface Props {
@@ -33,6 +36,10 @@
   const rowLimitOptions = [5, 10, 25, 50, 100] as const;
   let productRowLimit = $state<number>(5);
 
+  $effect(() => {
+    productRowLimit = getCurrentRowsPerTable("productos");
+  });
+
   const visibleProducts = $derived(
     productRowLimit <= 0
       ? filteredProducts
@@ -51,7 +58,7 @@
 <div class="card bg-base-100 shadow">
   <div class="card-body gap-4">
     <div class="flex flex-wrap items-center gap-3">
-      <h2 class="card-title shrink-0 mr-1">Gestion de productos</h2>
+      <h2 class="card-title shrink-0 mr-1">Productos</h2>
 
       <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
 
@@ -129,14 +136,14 @@
         type="button"
         onclick={onOpenGlobalFlavors}
       >
-        Sabores globales
+        Sabores
       </button>
       <button
         class="btn btn-sm btn-outline shrink-0"
         type="button"
         onclick={onOpenGlobalAddons}
       >
-        Complementos globales
+        Complementos
       </button>
       <button
         class="btn btn-sm btn-primary shrink-0"

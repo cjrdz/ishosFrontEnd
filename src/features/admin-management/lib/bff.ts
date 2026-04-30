@@ -6,6 +6,7 @@
  */
 
 import { ApiError } from "@core/errors";
+import { getAdminImageUploadMaxMB } from "@core/config";
 
 export interface BFFResponse<T> {
   data?: T;
@@ -43,6 +44,9 @@ export type OrderStatus =
 
 type ParsedResponseBody = Record<string, unknown> | string | null;
 
+const ADMIN_IMAGE_UPLOAD_MAX_MB = getAdminImageUploadMaxMB();
+const ADMIN_IMAGE_UPLOAD_MAX_BYTES = ADMIN_IMAGE_UPLOAD_MAX_MB * 1024 * 1024;
+
 async function parseResponseBody(
   response: Response,
 ): Promise<ParsedResponseBody> {
@@ -68,7 +72,12 @@ function responseErrorMessage(
   fallback: string,
 ): string {
   if (!body) return fallback;
-  if (typeof body === "string") return body;
+  if (typeof body === "string") {
+    if (body.includes("FUNCTION_PAYLOAD_TOO_LARGE")) {
+      return `La imagen excede el limite del servidor proxy. Usa un archivo de maximo ${ADMIN_IMAGE_UPLOAD_MAX_MB} MB.`;
+    }
+    return body;
+  }
 
   const error = body.error;
   if (typeof error === "string" && error.trim()) return error;
@@ -301,6 +310,14 @@ export async function uploadAdminImage(
   file: File,
   folder = "",
 ): Promise<{ path: string; message: string }> {
+  if (file.size > ADMIN_IMAGE_UPLOAD_MAX_BYTES) {
+    throw new ApiError(
+      `La imagen es demasiado grande. Tamano maximo: ${ADMIN_IMAGE_UPLOAD_MAX_MB} MB.`,
+      413,
+      "UPLOAD_TOO_LARGE",
+    );
+  }
+
   const formData = new FormData();
   formData.append("image", file);
   if (folder.trim()) {
