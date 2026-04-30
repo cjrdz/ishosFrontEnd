@@ -71,8 +71,8 @@ export interface OrdersTabProps {
   onFilterChange: (status: string) => void;
   onReload: () => void;
   onOpenOrder: (id: string) => Promise<Order | null>;
-  onApprove: (id: string, reason?: string) => void;
-  onReject: (id: string, reason: string) => void;
+  onApprove: (id: string, reason?: string) => Promise<Order | null>;
+  onReject: (id: string, reason: string) => Promise<Order | null>;
   onStatusChange: (
     id: string,
     status: "recibida" | "en_proceso" | "lista" | "entregada",

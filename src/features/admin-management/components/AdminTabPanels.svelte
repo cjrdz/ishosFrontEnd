@@ -213,7 +213,7 @@
       </div>
     </section>
   {:else}
-    <OffersTab products={products.products} />
+    <OffersTab adminId="" products={products.products} />
   {/if}
 {/if}
 

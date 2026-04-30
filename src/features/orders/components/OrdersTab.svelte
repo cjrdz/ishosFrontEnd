@@ -18,6 +18,7 @@
   import * as DialogState from "../lib/dialog-state";
   import * as OrderSubmission from "../lib/order-submission";
   import * as SaveUserHelpers from "../lib/save-user-helpers";
+  import { emitOrderStatusSync } from "../lib/status-sync";
   import OrderDetailView from "./admin/OrderDetailView.svelte";
   import OrderList from "./admin/OrderList.svelte";
   import OrderEditor from "./admin/OrderEditor.svelte";
@@ -659,7 +660,9 @@
     const newState = DialogState.openConfirm(
       "Aprobar orden",
       `Confirmar aprobacion de ${order.order_number}?`,
-      () => onApprove(order.id),
+      () => {
+        void approveAndSync(order.id);
+      },
     );
     confirmTitle = newState.title;
     confirmMessage = newState.message;
@@ -913,13 +916,35 @@
     rejectState = DialogState.openReject(orderId);
   }
 
+  async function approveAndSync(orderId: string, reason?: string) {
+    const updated = await onApprove(orderId, reason);
+    if (!updated) return;
+    emitOrderStatusSync({
+      orderId: updated.id,
+      orderNumber: updated.order_number,
+      status: updated.status,
+    });
+    await onOpenOrder(orderId);
+  }
+
+  async function rejectAndSync(orderId: string, reason: string) {
+    const updated = await onReject(orderId, reason);
+    if (!updated) return;
+    emitOrderStatusSync({
+      orderId: updated.id,
+      orderNumber: updated.order_number,
+      status: updated.status,
+    });
+    await onOpenOrder(orderId);
+  }
+
   function confirmReject() {
     if (!rejectState.targetId) return;
     if (!rejectState.reason.trim()) {
       rejectState.error = "Debes indicar el motivo de rechazo";
       return;
     }
-    onReject(rejectState.targetId, rejectState.reason.trim());
+    void rejectAndSync(rejectState.targetId, rejectState.reason.trim());
     rejectState = DialogState.closeReject();
   }
 
@@ -937,7 +962,10 @@
       reactivateState.error = "Debes indicar el motivo de reactivacion";
       return;
     }
-    onApprove(reactivateState.targetId, reactivateState.reason.trim());
+    void approveAndSync(
+      reactivateState.targetId,
+      reactivateState.reason.trim(),
+    );
     closeReactivate();
   }
 
@@ -996,6 +1024,11 @@
   ) {
     const updated = await onStatusChange(orderId, status);
     if (!updated) return;
+    emitOrderStatusSync({
+      orderId: updated.id,
+      orderNumber: updated.order_number,
+      status: updated.status,
+    });
     await onOpenOrder(orderId);
   }
 
@@ -1021,6 +1054,11 @@
     closePrintPrompt();
     const updated = await onStatusChange(id, status);
     if (!updated) return;
+    emitOrderStatusSync({
+      orderId: updated.id,
+      orderNumber: updated.order_number,
+      status: updated.status,
+    });
     await onOpenOrder(id);
   }
 </script>

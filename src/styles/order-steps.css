@@ -1,0 +1,53 @@
+.order-steps .step::before,
+.order-steps .step::after {
+  transition: background-color 200ms ease;
+}
+
+.order-step-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  border: 1px solid
+    color-mix(in oklab, var(--fallback-bc, oklch(0% 0 0)) 12%, transparent);
+  transition: all 220ms ease;
+}
+
+.order-steps--compact .order-step-node {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+
+.order-steps--cozy .order-step-node {
+  width: 2.6rem;
+  height: 2.6rem;
+}
+
+.order-step-node--current {
+  background: color-mix(in oklab, var(--color-primary) 24%, transparent);
+  color: var(--color-primary);
+  border-color: color-mix(in oklab, var(--color-primary) 52%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-primary) 14%, transparent);
+  transform: scale(1.06);
+}
+
+.order-step-node--complete {
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  border-color: color-mix(in oklab, var(--color-primary) 30%, transparent);
+}
+
+.order-step-node--pending {
+  background: color-mix(
+    in oklab,
+    var(--fallback-b1, oklch(100% 0 0)) 88%,
+    transparent
+  );
+  color: color-mix(
+    in oklab,
+    var(--fallback-bc, oklch(0% 0 0)) 32%,
+    transparent
+  );
+}

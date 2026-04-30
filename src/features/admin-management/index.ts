@@ -5,6 +5,7 @@ export { default as EmployeesTab } from "./components/EmployeesTab.svelte";
 export { default as SettingsTab } from "./components/SettingsTab.svelte";
 export { default as UsersTab } from "./components/UsersTab.svelte";
 export * from "./lib/bff";
+export * from "./lib/local-settings";
 export * from "./lib/tabs";
 export * from "./lib/validators";
 export type {

@@ -259,19 +259,40 @@
                 </button>
               {/if}
             </div>
-            <ul class="steps steps-sm w-full max-w-2xl mt-2">
+            <ul
+              class="steps steps-vertical sm:steps-horizontal w-full max-w-2xl mt-2 order-steps order-steps--compact"
+            >
               {#each canceledFlow as stepStatus}
-                <li class="step step-primary text-center">
-                  <span class="step-icon"
-                    ><Icon
-                      icon={stepStatus === selectedOrder.status
-                        ? canceledStepIconsActive[stepStatus]
-                        : canceledStepIconsStatic[stepStatus]}
-                      width="16"
-                      height="16"
-                    /></span
+                {@const reached =
+                  canceledFlow.indexOf(stepStatus) <=
+                  canceledFlow.indexOf("cancelada")}
+                {@const completed =
+                  canceledFlow.indexOf(stepStatus) <
+                  canceledFlow.indexOf("cancelada")}
+                {@const current = stepStatus === "cancelada"}
+                <li
+                  data-content=""
+                  class={`step min-h-18! ${reached ? "step-primary" : ""}`}
+                >
+                  <div
+                    class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-1"
                   >
-                  <span>{canceledStepLabels[stepStatus]}</span>
+                    <span
+                      class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"}`}
+                    >
+                      <Icon
+                        icon={current
+                          ? canceledStepIconsActive[stepStatus]
+                          : canceledStepIconsStatic[stepStatus]}
+                        width="18"
+                        height="18"
+                      />
+                    </span>
+                    <span
+                      class={`text-sm font-semibold ${current ? "text-error" : completed ? "text-base-content" : "text-base-content/45"}`}
+                      >{canceledStepLabels[stepStatus]}</span
+                    >
+                  </div>
                 </li>
               {/each}
             </ul>
@@ -284,30 +305,51 @@
               <p><strong>Estado:</strong></p>
             </div>
             <div>
-              <ul class="steps steps-sm w-full max-w-3xl mx-auto">
+              <ul
+                class="steps steps-vertical sm:steps-horizontal w-full max-w-3xl mx-auto order-steps order-steps--compact"
+              >
                 {#each linearStatuses as stepStatus}
+                  {@const reached = isStepReached(
+                    selectedOrder.status,
+                    stepStatus,
+                  )}
+                  {@const completed =
+                    reached && selectedOrder.status !== stepStatus}
+                  {@const current = selectedOrder.status === stepStatus}
                   <li
-                    class={`step ${isStepReached(selectedOrder.status, stepStatus) ? "step-primary" : ""} text-center`}
+                    data-content=""
+                    class={`step min-h-18! ${reached ? "step-primary" : ""}`}
                   >
-                    <span class="step-icon"
-                      ><Icon
-                        icon={stepStatus === selectedOrder.status
-                          ? statusStepIconsActive[stepStatus]
-                          : statusStepIconsStatic[stepStatus]}
-                        width="16"
-                        height="16"
-                      /></span
+                    <div
+                      class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-1"
                     >
-                    <button
-                      class="cursor-pointer bg-transparent border-0 p-0 m-0 text-inherit disabled:cursor-default"
-                      type="button"
-                      onclick={() =>
-                        onHandleStepClick(selectedOrder, stepStatus)}
-                      disabled={!onCanChangeToStep(selectedOrder, stepStatus)}
-                      aria-label={`Actualizar estado a ${statusLabels[stepStatus]}`}
-                    >
-                      {statusLabels[stepStatus]}
-                    </button>
+                      <button
+                        class={`order-step-node cursor-pointer ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"} disabled:cursor-default`}
+                        type="button"
+                        onclick={() =>
+                          onHandleStepClick(selectedOrder, stepStatus)}
+                        disabled={!onCanChangeToStep(selectedOrder, stepStatus)}
+                        aria-label={`Actualizar estado a ${statusLabels[stepStatus]}`}
+                      >
+                        <Icon
+                          icon={current
+                            ? statusStepIconsActive[stepStatus]
+                            : statusStepIconsStatic[stepStatus]}
+                          width="18"
+                          height="18"
+                        />
+                      </button>
+                      <button
+                        class={`cursor-pointer bg-transparent border-0 p-0 m-0 text-sm font-semibold ${current ? "text-primary" : completed ? "text-base-content" : "text-base-content/45"} disabled:cursor-default disabled:text-base-content/45`}
+                        type="button"
+                        onclick={() =>
+                          onHandleStepClick(selectedOrder, stepStatus)}
+                        disabled={!onCanChangeToStep(selectedOrder, stepStatus)}
+                        aria-label={`Actualizar estado a ${statusLabels[stepStatus]}`}
+                      >
+                        {statusLabels[stepStatus]}
+                      </button>
+                    </div>
                   </li>
                 {/each}
               </ul>

@@ -9,6 +9,7 @@ const RECENT_TRACKING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export interface RecentTrackingOrder {
   orderNumber: string;
   token: string;
+  customerName?: string;
   status: PublicOrderStatus;
   totalAmount: number;
   updatedAt: string;
@@ -156,6 +157,15 @@ export function getRecentTrackingOrders(): RecentTrackingOrder[] {
 export function clearRecentTrackingOrders() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(RECENT_TRACKING_KEY);
+}
+
+export function removeRecentTrackingOrder(orderNumber: string, token: string) {
+  if (typeof window === "undefined") return;
+  const existing = getRecentTrackingOrders();
+  const next = existing.filter(
+    (entry) => !(entry.orderNumber === orderNumber && entry.token === token),
+  );
+  localStorage.setItem(RECENT_TRACKING_KEY, JSON.stringify(next));
 }
 
 export function getRememberTrackingPreference(): boolean {

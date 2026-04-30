@@ -1,16 +1,19 @@
 <script lang="ts">
   import Icon from "@shared/components/AppIcon.svelte";
+  import type { RowsPerTableConfig } from "../lib/local-settings";
   import type { PanelConfigValues } from "../types/settings";
 
   interface Props {
     tabOrder: string[];
     panelConfig: PanelConfigValues;
     storeOrdersEnabled: boolean;
+    rowsPerTable: RowsPerTableConfig;
     busy: boolean;
     moduleError: string;
     onSave: (tabOrder: string[]) => void;
     onSavePanelConfig: (config: PanelConfigValues) => void;
     onToggleStoreOrders: (enabled: boolean) => void | Promise<void>;
+    onSaveRowsPerTable: (rows: RowsPerTableConfig) => void;
   }
 
   const TAB_LABELS: Record<string, string> = {
@@ -26,11 +29,13 @@
     tabOrder,
     panelConfig,
     storeOrdersEnabled,
+    rowsPerTable,
     busy,
     moduleError,
     onSave,
     onSavePanelConfig,
     onToggleStoreOrders,
+    onSaveRowsPerTable,
   }: Props = $props();
   let localOrder = $state<string[]>([]);
   let localPanelConfig = $state<PanelConfigValues>({
@@ -40,6 +45,15 @@
     inactivity_logout_seconds: 900,
   });
   let confirmPauseDialog = $state<HTMLDialogElement | null>(null);
+  const rowsPerTableOptions = [5, 10, 25, 50, 100] as const;
+  let localRowsPerTable = $state<RowsPerTableConfig>({
+    default: 5,
+    ordenes: 5,
+    categorias: 5,
+    productos: 5,
+    usuarios: 5,
+    empleados: 5,
+  });
 
   $effect(() => {
     localOrder = [...tabOrder];
@@ -52,6 +66,10 @@
       tracking_token_ttl_hours: panelConfig.tracking_token_ttl_hours,
       inactivity_logout_seconds: panelConfig.inactivity_logout_seconds,
     };
+  });
+
+  $effect(() => {
+    localRowsPerTable = { ...rowsPerTable };
   });
 
   function moveUp(index: number) {
@@ -130,6 +148,10 @@
   function confirmPauseOrders() {
     confirmPauseDialog?.close();
     void onToggleStoreOrders(false);
+  }
+
+  function handleSaveRowsPerTable() {
+    onSaveRowsPerTable({ ...localRowsPerTable });
   }
 </script>
 
@@ -374,6 +396,109 @@
           type="button"
           onclick={handleSavePanelConfig}
           disabled={busy}>Guardar expiraciones</button
+        >
+      </div>
+    </div>
+  </div>
+
+  <div id="filas-tablas" class="card bg-base-100 shadow">
+    <div class="card-body space-y-4">
+      <div>
+        <h2 class="card-title">Filas por tabla</h2>
+        <p class="text-sm text-base-content/70">
+          Define el numero de filas visible por defecto en tablas de ordenes,
+          categorias, productos, usuarios y empleados.
+        </p>
+      </div>
+
+      <div class="rounded-2xl border border-base-300 bg-base-50/60 p-4 sm:p-5">
+        <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <label class="form-control">
+            <span class="label-text text-sm font-semibold">Default</span>
+            <select
+              class="select select-bordered mt-2 w-full"
+              bind:value={localRowsPerTable.default}
+              disabled={busy}
+            >
+              {#each rowsPerTableOptions as option}
+                <option value={option}>{option}</option>
+              {/each}
+            </select>
+          </label>
+
+          <label class="form-control">
+            <span class="label-text text-sm font-semibold">Ordenes</span>
+            <select
+              class="select select-bordered mt-2 w-full"
+              bind:value={localRowsPerTable.ordenes}
+              disabled={busy}
+            >
+              {#each rowsPerTableOptions as option}
+                <option value={option}>{option}</option>
+              {/each}
+            </select>
+          </label>
+
+          <label class="form-control">
+            <span class="label-text text-sm font-semibold">Categorias</span>
+            <select
+              class="select select-bordered mt-2 w-full"
+              bind:value={localRowsPerTable.categorias}
+              disabled={busy}
+            >
+              {#each rowsPerTableOptions as option}
+                <option value={option}>{option}</option>
+              {/each}
+            </select>
+          </label>
+
+          <label class="form-control">
+            <span class="label-text text-sm font-semibold">Productos</span>
+            <select
+              class="select select-bordered mt-2 w-full"
+              bind:value={localRowsPerTable.productos}
+              disabled={busy}
+            >
+              {#each rowsPerTableOptions as option}
+                <option value={option}>{option}</option>
+              {/each}
+            </select>
+          </label>
+
+          <label class="form-control">
+            <span class="label-text text-sm font-semibold">Usuarios</span>
+            <select
+              class="select select-bordered mt-2 w-full"
+              bind:value={localRowsPerTable.usuarios}
+              disabled={busy}
+            >
+              {#each rowsPerTableOptions as option}
+                <option value={option}>{option}</option>
+              {/each}
+            </select>
+          </label>
+
+          <label class="form-control">
+            <span class="label-text text-sm font-semibold">Empleados</span>
+            <select
+              class="select select-bordered mt-2 w-full"
+              bind:value={localRowsPerTable.empleados}
+              disabled={busy}
+            >
+              {#each rowsPerTableOptions as option}
+                <option value={option}>{option}</option>
+              {/each}
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button
+          class="btn btn-primary"
+          type="button"
+          onclick={handleSaveRowsPerTable}
+          disabled={busy}>Guardar filas por tabla</button
         >
       </div>
     </div>

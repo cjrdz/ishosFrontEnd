@@ -2,8 +2,6 @@
   import { onDestroy, onMount } from "svelte";
   import {
     deleteAdminImage,
-    getAdminTabsSettings,
-    getAdminPanelConfig,
     listAdminImages,
     listCategories,
     listEmployees,
@@ -46,6 +44,11 @@
     type TabKey,
   } from "@features/admin-management/lib/tabs";
   import type { PanelConfigValues } from "../types/settings";
+  import {
+    getAdminLocalSettings,
+    DEFAULT_PANEL_CONFIG,
+    setCurrentAdminContext,
+  } from "@features/admin-management/lib/local-settings";
 
   type Session = {
     id: string;
@@ -130,12 +133,6 @@
   };
   let tabLazyState = $state(structuredClone(DEFAULT_TAB_LAZY_STATE));
   let tabOrder = $state<TabKey[]>([...DEFAULT_TAB_ORDER]);
-  const DEFAULT_PANEL_CONFIG: PanelConfigValues = {
-    auth_cookie_ttl_hours: 24,
-    auth_token_ttl_hours: 168,
-    tracking_token_ttl_hours: 720,
-    inactivity_logout_seconds: 900,
-  };
   let panelConfig = $state<PanelConfigValues>({ ...DEFAULT_PANEL_CONFIG });
   const ORDERS_POLLING_INTERVAL_MS = 15000;
   const SESSION_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
@@ -763,51 +760,17 @@
   }
 
   async function loadTabsSettings() {
-    if (!isAdmin) return;
-    setBusy("configuracion", true);
-    clearModuleError("configuracion");
-    try {
-      const settings = await getAdminTabsSettings();
-      tabOrder = normalizeTabOrder(settings.tab_order);
-    } catch (requestError) {
-      setModuleError(
-        "configuracion",
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo cargar configuracion",
-      );
-      tabOrder = [...DEFAULT_TAB_ORDER];
-    } finally {
-      setBusy("configuracion", false);
-    }
+    if (!isAdmin || !session?.id) return;
+    const settings = getAdminLocalSettings(session.id);
+    tabOrder = normalizeTabOrder(settings.tab_order);
   }
 
   async function loadPanelConfig() {
-    if (!isAdmin) return;
-    setBusy("configuracion", true);
-    clearModuleError("configuracion");
-    try {
-      const config = await getAdminPanelConfig();
-      panelConfig = {
-        auth_cookie_ttl_hours: config.auth_cookie_ttl_hours,
-        auth_token_ttl_hours: config.auth_token_ttl_hours,
-        tracking_token_ttl_hours: config.tracking_token_ttl_hours,
-        inactivity_logout_seconds: config.inactivity_logout_seconds ?? 900,
-      };
-      if (session) {
-        startInactivityLogoutTracking();
-      }
-    } catch (requestError) {
-      setModuleError(
-        "configuracion",
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo cargar configuracion",
-      );
-      panelConfig = { ...DEFAULT_PANEL_CONFIG };
-    } finally {
-      setBusy("configuracion", false);
-    }
+    if (!isAdmin || !session?.id) return;
+    const settings = getAdminLocalSettings(session.id);
+    panelConfig = settings.panel_config;
+    setCurrentAdminContext(session.id, settings.rows_per_table.default);
+    startInactivityLogoutTracking();
   }
 
   async function loadFlavors() {

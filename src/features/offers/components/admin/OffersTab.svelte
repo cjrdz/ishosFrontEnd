@@ -2,19 +2,24 @@
   import { onMount } from "svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import {
-    getAdminStoreSettings,
-    updateAdminStoreSettings,
+    DEFAULT_ROWS_PER_TABLE,
+    getCurrentAdminId,
+    getCurrentRowsPerTable,
+    getAdminLocalSettings,
+    setCurrentAdminContext,
+    saveAdminStoreSettings,
     type StoreOfferItem,
   } from "@features/admin-management";
-  import { ApiError } from "@core/errors";
   import type { Product } from "@features/admin-management";
   import { formatCurrency } from "@shared/utils/formatters";
 
   interface Props {
+    adminId?: string;
     products: Product[];
   }
 
-  let { products }: Props = $props();
+  let { adminId = "", products }: Props = $props();
+  let resolvedAdminId = $state("");
 
   let localBusy = $state(false);
   let moduleError = $state("");
@@ -37,6 +42,48 @@
     void loadStoreSettings();
   });
 
+  async function resolveAdminId(): Promise<string> {
+    if (resolvedAdminId) return resolvedAdminId;
+
+    if (adminId.trim()) {
+      resolvedAdminId = adminId.trim();
+      return resolvedAdminId;
+    }
+
+    const currentAdminId = getCurrentAdminId();
+    if (currentAdminId) {
+      resolvedAdminId = currentAdminId;
+      return resolvedAdminId;
+    }
+
+    try {
+      const response = await fetch("/api/admin/session", {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      });
+      const payload = await response.json();
+      if (
+        response.ok &&
+        payload?.role === "admin" &&
+        typeof payload?.id === "string" &&
+        payload.id
+      ) {
+        resolvedAdminId = payload.id;
+        setCurrentAdminContext(
+          resolvedAdminId,
+          getCurrentRowsPerTable() || DEFAULT_ROWS_PER_TABLE,
+        );
+        return resolvedAdminId;
+      }
+    } catch {
+      // Keep the user-facing message from the caller when resolution fails.
+    }
+
+    return "";
+  }
+
   function setNotice(message: string) {
     notice = message;
     setTimeout(() => {
@@ -48,16 +95,18 @@
     localBusy = true;
     moduleError = "";
     try {
-      const response = await getAdminStoreSettings();
+      const currentAdminId = await resolveAdminId();
+      if (!currentAdminId) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      const response = getAdminLocalSettings(currentAdminId).store_settings;
       ordersEnabled = response.orders_enabled;
       offers = response.offers ?? [];
     } catch (requestError) {
       moduleError =
-        requestError instanceof ApiError && requestError.status === 404
-          ? "No se pudo conectar con la configuracion de ofertas. Verifica que el backend este actualizado."
-          : requestError instanceof Error
-            ? requestError.message
-            : "No se pudo cargar configuracion de ofertas";
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo cargar configuracion de ofertas";
     } finally {
       localBusy = false;
     }
@@ -173,7 +222,11 @@
     localBusy = true;
     moduleError = "";
     try {
-      const saved = await updateAdminStoreSettings(payload);
+      const currentAdminId = await resolveAdminId();
+      if (!currentAdminId) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      const saved = saveAdminStoreSettings(currentAdminId, payload);
       ordersEnabled = saved.orders_enabled;
       offers = saved.offers ?? [];
       resetOfferForm();

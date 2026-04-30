@@ -95,6 +95,8 @@ export interface PublicOrderCreateResponse {
 
 export interface PublicOrderTrackingResponse {
   order_number: string;
+  customer_name?: string;
+  customer_phone?: string;
   status: PublicOrderStatus;
   updated_at: string;
   created_at: string;

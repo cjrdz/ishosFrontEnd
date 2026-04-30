@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Order } from "@features/admin-management";
+  import { getCurrentRowsPerTable } from "@features/admin-management";
 
   interface Props {
     orders: Order[];
@@ -46,6 +47,10 @@
   const rowLimitOptions = [5, 10, 25, 50, 100] as const;
   let rowLimit = $state<number>(5);
 
+  $effect(() => {
+    rowLimit = getCurrentRowsPerTable("ordenes");
+  });
+
   const visibleOrders = $derived(
     rowLimit <= 0 ? filteredOrders : filteredOrders.slice(0, rowLimit),
   );
@@ -66,7 +71,7 @@
 <div class="card bg-base-100 shadow">
   <div class="card-body gap-4">
     <div class="flex flex-wrap items-center gap-3">
-      <h2 class="card-title shrink-0 mr-1">Gestion de ordenes</h2>
+      <h2 class="card-title shrink-0 mr-1">Ordenes</h2>
 
       <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
 

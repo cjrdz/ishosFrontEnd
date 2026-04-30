@@ -1,5 +1,8 @@
 <script lang="ts">
-  import type { Category } from "@features/admin-management";
+  import {
+    getCurrentRowsPerTable,
+    type Category,
+  } from "@features/admin-management";
   import Icon from "@shared/components/AppIcon.svelte";
   import { toSlug } from "@shared/utils/formatters";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
@@ -66,6 +69,10 @@
 
   const rowLimitOptions = [5, 10, 25, 50, 100] as const;
   let categoryRowLimit = $state<number>(5);
+
+  $effect(() => {
+    categoryRowLimit = getCurrentRowsPerTable("categorias");
+  });
 
   const visibleCategories = $derived(
     categoryRowLimit <= 0
@@ -173,7 +180,7 @@
   <div class="card bg-base-100 shadow">
     <div class="card-body gap-4">
       <div class="flex flex-wrap items-center gap-3">
-        <h2 class="card-title shrink-0 mr-1">Gestion de categorias</h2>
+        <h2 class="card-title shrink-0 mr-1">Categorias</h2>
 
         <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
 

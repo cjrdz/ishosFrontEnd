@@ -11,16 +11,23 @@
     clearRecentTrackingOrders,
     getRecentTrackingOrders,
     getRememberTrackingPreference,
+    removeRecentTrackingOrder,
     getTracking,
     saveRecentTrackingOrder,
     saveRememberTrackingPreference,
     saveTracking,
-    type RecentTrackingOrder,
     TRACKING_STATUS_FLOW,
     TRACKING_STATUS_LABELS,
     TRACKING_STATUS_ICONS_ACTIVE,
     TRACKING_STATUS_ICONS_STATIC,
   } from "@features/analytics";
+  import type { RecentTrackingOrder } from "@features/analytics/lib/tracking";
+  import { subscribeOrderStatusSync } from "@features/orders/lib/status-sync";
+
+  type RecentHistoryConfirmState =
+    | { kind: "delete-one"; order: RecentTrackingOrder }
+    | { kind: "clear-all"; count: number }
+    | null;
 
   let trackingOrderNumber = $state("");
   let trackingToken = $state("");
@@ -28,18 +35,24 @@
   let trackingRefreshing = $state(false);
   let trackingError = $state("");
   let trackedOrder = $state<PublicOrderTrackingResponse | null>(null);
-  let pollTimer: ReturnType<typeof setInterval> | undefined;
   let cooldownTimer: ReturnType<typeof setInterval> | undefined;
   let trackingCooldownUntil = $state(0);
   let cooldownNow = $state(Date.now());
   let productsExpanded = $state(false);
   let rememberTrackingOnDevice = $state(true);
   let recentTrackingOrders = $state<RecentTrackingOrder[]>([]);
+  let recentFilterQuery = $state("");
+  let recentSort = $state<"newest" | "oldest" | "name-asc" | "name-desc">(
+    "newest",
+  );
+  let recentHistoryActionMessage = $state("");
   let receiptActionMessage = $state("");
+  let lastExternalRefreshAt = $state(0);
+  let pendingRecentHistoryConfirm = $state<RecentHistoryConfirmState>(null);
 
-  const TRACKING_POLL_INTERVAL_MS = 20000;
   const TRACKING_RATE_LIMIT_COOLDOWN_MS = 60000;
   const RECENT_TRACKING_RETENTION_DAYS = 30;
+  const TRACKING_EXTERNAL_REFRESH_MIN_INTERVAL_MS = 5000;
 
   const trackedOrderItems = $derived(trackedOrder?.items ?? []);
   const trackingLookupActive = $derived(trackingBusy || trackingRefreshing);
@@ -50,6 +63,54 @@
       : 0,
   );
   const trackedOrderDelivered = $derived(trackedOrder?.status === "entregada");
+  const filteredRecentTrackingOrders = $derived.by(() => {
+    const query = recentFilterQuery.trim().toLowerCase();
+
+    return [...recentTrackingOrders]
+      .filter((entry) => {
+        if (!query) return true;
+
+        const orderNumber = entry.orderNumber.toLowerCase();
+        const statusLabel = TRACKING_STATUS_LABELS[entry.status].toLowerCase();
+        const customerName = entry.customerName?.toLowerCase() ?? "";
+        return (
+          orderNumber.includes(query) ||
+          statusLabel.includes(query) ||
+          customerName.includes(query)
+        );
+      })
+      .sort((a, b) => {
+        if (recentSort === "oldest") {
+          return (
+            new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+          );
+        }
+
+        if (recentSort === "name-asc") {
+          return (a.customerName ?? "").localeCompare(
+            b.customerName ?? "",
+            "es",
+            {
+              sensitivity: "base",
+            },
+          );
+        }
+
+        if (recentSort === "name-desc") {
+          return (b.customerName ?? "").localeCompare(
+            a.customerName ?? "",
+            "es",
+            {
+              sensitivity: "base",
+            },
+          );
+        }
+
+        return (
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      });
+  });
 
   onMount(() => {
     rememberTrackingOnDevice = getRememberTrackingPreference();
@@ -64,6 +125,26 @@
       url.searchParams.get("token")?.trim() ??
       url.searchParams.get("tracking_token")?.trim() ??
       "";
+
+    const runRefreshFromAdminEvent = () => {
+      if (trackingBusy || trackingRefreshing) return;
+      if (!trackingOrderNumber.trim() || !trackingToken.trim()) return;
+      const now = Date.now();
+      if (
+        now - lastExternalRefreshAt <
+        TRACKING_EXTERNAL_REFRESH_MIN_INTERVAL_MS
+      )
+        return;
+      if (trackingCooldownUntil > now) return;
+      lastExternalRefreshAt = now;
+      void runTrackingLookup({ silent: true });
+    };
+
+    const unsubscribeStatusSync = subscribeOrderStatusSync((event) => {
+      const trackedNumber = trackedOrder?.order_number ?? trackingOrderNumber;
+      if (!trackedNumber || event.orderNumber !== trackedNumber.trim()) return;
+      runRefreshFromAdminEvent();
+    });
 
     if (orderFromUrl && tokenFromUrl) {
       trackingOrderNumber = orderFromUrl;
@@ -81,7 +162,7 @@
     }
 
     return () => {
-      if (pollTimer) clearInterval(pollTimer);
+      unsubscribeStatusSync();
       if (cooldownTimer) clearInterval(cooldownTimer);
     };
   });
@@ -91,7 +172,6 @@
   ) {
     trackingCooldownUntil = Date.now() + durationMs;
     cooldownNow = Date.now();
-    stopTrackingPolling();
 
     if (cooldownTimer) clearInterval(cooldownTimer);
     cooldownTimer = setInterval(() => {
@@ -149,7 +229,6 @@
         trackedOrder = null;
         trackingError =
           "No encontramos la orden. Verifica el número o usa el dispositivo donde realizaste el pedido.";
-        stopTrackingPolling();
         return;
       }
 
@@ -162,19 +241,12 @@
         saveRecentTrackingOrder({
           orderNumber,
           token,
+          customerName: order.customer_name?.trim() || undefined,
           status: order.status,
           totalAmount: order.total_amount,
           updatedAt: order.updated_at,
         });
         recentTrackingOrders = getRecentTrackingOrders();
-      }
-
-      const hasActiveOrder =
-        order.status !== "entregada" && order.status !== "cancelada";
-      if (hasActiveOrder) {
-        startTrackingPolling();
-      } else {
-        stopTrackingPolling();
       }
     } catch (error) {
       trackedOrder = null;
@@ -182,7 +254,6 @@
       if (error instanceof ApiError && error.status === 404) {
         trackingError =
           "Tu orden fue cancelada. Contáctanos para más información.";
-        stopTrackingPolling();
         return;
       }
 
@@ -190,7 +261,6 @@
         startTrackingCooldown();
         trackingError =
           "Hiciste muchas consultas en poco tiempo. Espera 60 segundos e intenta de nuevo.";
-        stopTrackingPolling();
         return;
       }
 
@@ -198,7 +268,6 @@
         error instanceof Error
           ? error.message
           : "No se pudo consultar la orden.";
-      stopTrackingPolling();
     } finally {
       if (silent) {
         trackingRefreshing = false;
@@ -225,19 +294,6 @@
       currency: "USD",
       minimumFractionDigits: 2,
     }).format(value);
-  }
-
-  function startTrackingPolling() {
-    stopTrackingPolling();
-    pollTimer = setInterval(() => {
-      void runTrackingLookup({ silent: true });
-    }, TRACKING_POLL_INTERVAL_MS);
-  }
-
-  function stopTrackingPolling() {
-    if (!pollTimer) return;
-    clearInterval(pollTimer);
-    pollTimer = undefined;
   }
 
   function itemIncludedAddonSummary(
@@ -275,7 +331,45 @@
 
   function clearRecentOrders() {
     clearRecentTrackingOrders();
+    recentHistoryActionMessage = "Se borro todo el historial reciente.";
     recentTrackingOrders = [];
+  }
+
+  function removeRecentOrder(entry: RecentTrackingOrder) {
+    removeRecentTrackingOrder(entry.orderNumber, entry.token);
+    recentHistoryActionMessage = `Se elimino ${entry.orderNumber} del historial.`;
+    recentTrackingOrders = getRecentTrackingOrders();
+    pendingRecentHistoryConfirm = null;
+  }
+
+  function openRecentDeleteConfirm(entry: RecentTrackingOrder) {
+    pendingRecentHistoryConfirm = {
+      kind: "delete-one",
+      order: entry,
+    };
+  }
+
+  function openClearRecentConfirm() {
+    pendingRecentHistoryConfirm = {
+      kind: "clear-all",
+      count: recentTrackingOrders.length,
+    };
+  }
+
+  function cancelRecentHistoryConfirm() {
+    pendingRecentHistoryConfirm = null;
+  }
+
+  function confirmRecentHistoryAction() {
+    if (!pendingRecentHistoryConfirm) return;
+
+    if (pendingRecentHistoryConfirm.kind === "delete-one") {
+      removeRecentOrder(pendingRecentHistoryConfirm.order);
+      return;
+    }
+
+    clearRecentOrders();
+    pendingRecentHistoryConfirm = null;
   }
 
   function escapeHtml(value: string): string {
@@ -508,54 +602,119 @@
     {/if}
 
     {#if recentTrackingOrders.length > 0}
-      <section
-        class="mt-6 rounded-3xl border border-base-200/70 bg-base-200/25 p-4 md:p-5"
-      >
-        <div class="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <h2
-              class="text-sm font-bold uppercase tracking-wider text-base-content/60"
-            >
-              Pedidos recientes en este dispositivo
-            </h2>
-            <p class="text-xs text-base-content/60 mt-1">
-              Solo visibles en este navegador. Puedes borrarlos cuando quieras.
-            </p>
-          </div>
-          <button
-            class="btn btn-ghost btn-xs text-error"
-            type="button"
-            onclick={clearRecentOrders}
-          >
-            Borrar historial
-          </button>
-        </div>
-
-        <div class="space-y-2">
-          {#each recentTrackingOrders as recentOrder}
-            <div
-              class="rounded-2xl bg-base-100 border border-base-200/80 px-3 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-            >
+      <section class="mt-6">
+        <div
+          class="collapse collapse-arrow rounded-3xl border border-base-200/70 bg-base-200/25"
+        >
+          <input type="checkbox" checked />
+          <div class="collapse-title pe-12">
+            <div class="flex items-center justify-between gap-3">
               <div>
-                <p class="font-semibold text-sm break-all">
-                  {recentOrder.orderNumber}
-                </p>
+                <h2
+                  class="text-sm font-bold uppercase tracking-wider text-base-content/60"
+                >
+                  Pedidos recientes en este dispositivo
+                </h2>
                 <p class="text-xs text-base-content/60 mt-1">
-                  {TRACKING_STATUS_LABELS[recentOrder.status]} •
-                  {formatMoney(recentOrder.totalAmount)} •
-                  {formatDate(recentOrder.updatedAt)}
+                  Solo visibles en este navegador. Puedes borrarlos cuando
+                  quieras.
                 </p>
               </div>
+            </div>
+          </div>
+          <div class="collapse-content pt-0 pb-4 md:pb-5">
+            <div
+              class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3"
+            >
+              <label class="input input-sm w-full sm:flex-1">
+                <Icon icon="lucide:search" width="14" height="14" />
+                <input
+                  type="text"
+                  placeholder="Filtrar por orden, cliente o estado"
+                  bind:value={recentFilterQuery}
+                />
+              </label>
+
+              <label class="select select-sm w-full sm:w-56">
+                <span class="label text-xs text-base-content/60">Orden</span>
+                <select bind:value={recentSort}>
+                  <option value="newest">Mas recientes</option>
+                  <option value="oldest">Mas antiguos</option>
+                  <option value="name-asc">Nombre A-Z</option>
+                  <option value="name-desc">Nombre Z-A</option>
+                </select>
+              </label>
+
               <button
-                class="btn btn-outline btn-sm rounded-full"
+                class="btn btn-ghost btn-xs text-error"
                 type="button"
-                onclick={() => loadRecentOrder(recentOrder)}
-                disabled={trackingLookupActive || trackingCooldownActive}
+                onclick={(event) => {
+                  event.stopPropagation();
+                  openClearRecentConfirm();
+                }}
               >
-                Cargar pedido
+                Borrar historial
               </button>
             </div>
-          {/each}
+
+            {#if recentHistoryActionMessage}
+              <div
+                class="alert alert-success mb-3 rounded-xl px-3 py-2 text-sm"
+              >
+                <span>{recentHistoryActionMessage}</span>
+              </div>
+            {/if}
+            <div class="space-y-2">
+              {#if filteredRecentTrackingOrders.length === 0}
+                <div
+                  class="rounded-xl border border-dashed border-base-300/80 px-3 py-4 text-sm text-base-content/60"
+                >
+                  No hay pedidos que coincidan con los filtros actuales.
+                </div>
+              {/if}
+
+              {#each filteredRecentTrackingOrders as recentOrder}
+                <div
+                  class="rounded-2xl bg-base-100 border border-base-200/80 px-3 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                >
+                  <div>
+                    <button
+                      class="font-semibold text-sm break-all text-left text-primary hover:underline cursor-pointer"
+                      type="button"
+                      onclick={() => loadRecentOrder(recentOrder)}
+                      disabled={trackingLookupActive || trackingCooldownActive}
+                      title="Cargar pedido"
+                    >
+                      {recentOrder.orderNumber}
+                    </button>
+                    <p class="text-xs text-base-content/60 mt-1">
+                      {TRACKING_STATUS_LABELS[recentOrder.status]} •
+                      {formatMoney(recentOrder.totalAmount)} •
+                      {formatDate(recentOrder.updatedAt)}
+                    </p>
+                    {#if recentOrder.customerName}
+                      <p class="text-xs text-base-content/50 mt-1">
+                        Cliente: {recentOrder.customerName}
+                      </p>
+                    {/if}
+                  </div>
+                  <div class="flex items-center gap-2 sm:justify-end">
+                    <div class="relative">
+                      <button
+                        class="btn btn-ghost btn-sm rounded-full text-error"
+                        type="button"
+                        onclick={() => openRecentDeleteConfirm(recentOrder)}
+                        aria-label={`Eliminar ${recentOrder.orderNumber} del historial`}
+                        title="Eliminar del historial"
+                      >
+                        <Icon icon="lucide:trash-2" width="16" height="16" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
         </div>
       </section>
     {/if}
@@ -621,6 +780,14 @@
                   >{trackedOrder.order_type === "para_llevar"
                     ? "Para llevar"
                     : "En local"}</span
+                >
+              </div>
+              <div class="flex flex-col gap-1 sm:col-span-2">
+                <span class="text-xs font-bold text-base-content/50 uppercase"
+                  >Cliente</span
+                >
+                <span class="font-semibold text-base-content"
+                  >{trackedOrder.customer_name?.trim() || "No disponible"}</span
                 >
               </div>
             </div>
@@ -774,59 +941,33 @@
             </div>
           {:else}
             <div class="w-full relative z-10 pt-2 sm:pt-4 pb-2">
-              <!-- Mobile: clean custom vertical timeline -->
-              <div class="sm:hidden px-1 pt-1">
+              <ul
+                class="steps steps-vertical sm:steps-horizontal w-full order-steps order-steps--cozy"
+              >
                 {#each TRACKING_STATUS_FLOW as step, index}
-                  {@const active = index <= stepIndex(trackedOrder.status)}
-                  {@const isCurrent = step === trackedOrder.status}
-                  <div class="flex gap-3 relative">
-                    {#if index < TRACKING_STATUS_FLOW.length - 1}
-                      <div
-                        class={`absolute left-4.75 top-10 w-0.5 h-[calc(100%-2rem)] ${index < stepIndex(trackedOrder.status) ? "bg-primary/40" : "bg-base-200"}`}
-                      ></div>
-                    {/if}
-                    <div
-                      class={`shrink-0 z-10 flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${isCurrent ? "bg-primary text-primary-content shadow-lg shadow-primary/30 scale-110" : active ? "bg-primary/15 text-primary" : "bg-base-200 text-base-content/30"}`}
-                    >
-                      <Icon
-                        icon={isCurrent
-                          ? TRACKING_STATUS_ICONS_ACTIVE[step]
-                          : TRACKING_STATUS_ICONS_STATIC[step]}
-                        width="18"
-                        height="18"
-                      />
-                    </div>
-                    <div class="flex-1 flex items-center pb-5">
-                      <span
-                        class={`font-bold text-sm ${isCurrent ? "text-primary" : active ? "text-primary/70" : "text-base-content/35"}`}
-                        >{TRACKING_STATUS_LABELS[step]}</span
-                      >
-                    </div>
-                  </div>
-                {/each}
-              </div>
-
-              <!-- Desktop: DaisyUI horizontal steps -->
-              <ul class="hidden sm:flex steps steps-horizontal w-full">
-                {#each TRACKING_STATUS_FLOW as step, index}
-                  {@const active = index <= stepIndex(trackedOrder.status)}
+                  {@const reached = index <= stepIndex(trackedOrder.status)}
+                  {@const completed = index < stepIndex(trackedOrder.status)}
+                  {@const current = step === trackedOrder.status}
                   <li
-                    data-content={active ? "✓" : ""}
-                    class={`step font-bold ${active ? "step-primary text-primary" : "text-base-content/40"}`}
+                    data-content=""
+                    class={`step min-h-18! ${reached ? "step-primary" : ""}`}
                   >
-                    <div class="flex flex-col items-center gap-2 mt-4 ml-2">
+                    <div
+                      class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-2 sm:mt-4 sm:ml-2"
+                    >
                       <span
-                        class={`p-3 rounded-full flex shrink-0 items-center justify-center transition-all duration-300 ${active ? (step === trackedOrder.status ? "bg-primary text-primary-content shadow-lg shadow-primary/40 scale-110" : "bg-primary/10 text-primary") : "bg-base-200/50 text-base-content/30 border border-base-200"}`}
+                        class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"}`}
                       >
                         <Icon
-                          icon={step === trackedOrder.status
+                          icon={current
                             ? TRACKING_STATUS_ICONS_ACTIVE[step]
                             : TRACKING_STATUS_ICONS_STATIC[step]}
-                          width="24"
-                          height="24"
+                          width="20"
+                          height="20"
                         />
                       </span>
-                      <span class="text-sm mt-1"
+                      <span
+                        class={`text-sm font-semibold ${current ? "text-primary" : completed ? "text-base-content" : "text-base-content/45"}`}
                         >{TRACKING_STATUS_LABELS[step]}</span
                       >
                     </div>
@@ -839,6 +980,64 @@
       </div>
     {/if}
   </section>
+
+  {#if pendingRecentHistoryConfirm}
+    <div
+      class="modal modal-open modal-bottom sm:modal-middle"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirmar eliminacion de pedido reciente"
+    >
+      <div class="modal-box max-w-sm rounded-2xl border border-base-300/70">
+        {#if pendingRecentHistoryConfirm.kind === "delete-one"}
+          <h3 class="text-base font-bold">Eliminar pedido del historial?</h3>
+          <p class="mt-2 text-sm text-base-content/75">
+            Esta accion borrara
+            <span class="font-semibold"
+              >{pendingRecentHistoryConfirm.order.orderNumber}</span
+            >
+            de este dispositivo.
+          </p>
+        {:else}
+          <h3 class="text-base font-bold">Borrar historial completo?</h3>
+          <p class="mt-2 text-sm text-base-content/75">
+            Esta accion eliminara
+            <span class="font-semibold"
+              >{pendingRecentHistoryConfirm.count}</span
+            >
+            {pendingRecentHistoryConfirm.count === 1
+              ? " pedido reciente"
+              : " pedidos recientes"}
+            de este dispositivo.
+          </p>
+        {/if}
+        <div class="modal-action mt-5">
+          <button
+            class="btn btn-ghost btn-sm"
+            type="button"
+            onclick={cancelRecentHistoryConfirm}
+          >
+            Cancelar
+          </button>
+          <button
+            class="btn btn-error btn-sm"
+            type="button"
+            onclick={confirmRecentHistoryAction}
+          >
+            {pendingRecentHistoryConfirm.kind === "clear-all"
+              ? "Borrar todo"
+              : "Eliminar"}
+          </button>
+        </div>
+      </div>
+      <button
+        class="modal-backdrop"
+        type="button"
+        aria-label="Cerrar confirmacion"
+        onclick={cancelRecentHistoryConfirm}
+      ></button>
+    </div>
+  {/if}
 </div>
 
 <style>

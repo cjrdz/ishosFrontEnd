@@ -93,7 +93,7 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
   }
 
   async function handleApprove(orderId: string, reactivationReason?: string) {
-    await runModuleAction<void>({
+    return runModuleAction<Order | null>({
       module: "ordenes",
       analyticsAction: "admin_order_approve",
       errorMessage: "No se pudo aprobar orden",
@@ -112,8 +112,9 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
         }
 
         mergeSelectedOrder(deps, orderId, finalUpdated);
+        return finalUpdated;
       },
-      defaultValue: undefined,
+      defaultValue: null,
       onSuccess: async () => {
         setNotice(
           reactivationReason?.trim() ? "Orden reactivada" : "Orden aprobada",
@@ -126,18 +127,19 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
   async function handleReject(orderId: string, reason: string) {
     if (!reason.trim()) {
       setOrderModuleError("Debes indicar el motivo de rechazo");
-      return;
+      return null;
     }
 
-    await runModuleAction<void>({
+    return runModuleAction<Order | null>({
       module: "ordenes",
       analyticsAction: "admin_order_reject",
       errorMessage: "No se pudo rechazar orden",
       action: async () => {
         const updated = await rejectOrder(orderId, reason);
         mergeSelectedOrder(deps, orderId, updated);
+        return updated;
       },
-      defaultValue: undefined,
+      defaultValue: null,
       onSuccess: async () => {
         setNotice("Orden rechazada");
         await loadOrders();
