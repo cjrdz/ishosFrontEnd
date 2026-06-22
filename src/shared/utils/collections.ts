@@ -5,6 +5,11 @@ export function arraysEqualUnordered(a: string[], b: string[]): boolean {
   return sortedA.every((value, index) => value === sortedB[index]);
 }
 
+export function arraysEqualOrdered(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
 export function normalizeIdList(values: string[] | undefined): string[] {
   return Array.from(new Set((values ?? []).filter(Boolean))).sort();
 }

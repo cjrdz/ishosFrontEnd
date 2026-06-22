@@ -1,4 +1,5 @@
 import { arraysEqualUnordered } from "@shared/utils/collections";
+import { normalizeSelectionIds } from "@features/catalog/lib/customization";
 
 export type StoreCartItem = {
   product_id: string;
@@ -7,6 +8,7 @@ export type StoreCartItem = {
   unit_price: number;
   quantity: number;
   flavor_id?: string | null;
+  flavor_ids?: string[]; // For mixed flavors (multiple flavor selections)
   addons?: string[]; // legacy array of addon IDs (all paid)
   included_addon_ids?: string[];
   extra_addon_ids?: string[];
@@ -15,18 +17,36 @@ export type StoreCartItem = {
   notes?: string;
 };
 
+function sanitizeCartItem(item: StoreCartItem): StoreCartItem {
+  return {
+    ...item,
+    quantity: normalizeCartQuantity(item.quantity),
+    flavor_id: item.flavor_id || undefined,
+    included_addon_ids: normalizeSelectionIds(item.included_addon_ids),
+    extra_addon_ids: normalizeSelectionIds(item.extra_addon_ids),
+    addons: item.extra_addon_ids?.length
+      ? undefined
+      : normalizeSelectionIds(item.addons),
+    topping_selection: item.topping_selection || undefined,
+    jalea_selection: item.jalea_selection || undefined,
+    notes: item.notes || undefined,
+  };
+}
+
 const CART_KEY = "ishos_storefront_cart_items";
 const CART_COUNT_KEY = "ishos_storefront_cart_count";
+const MAX_ITEM_QUANTITY = 100;
 
 export function normalizeCartQuantity(value: number, minimum = 1): number {
   if (!Number.isFinite(value)) return minimum;
-  return Math.max(minimum, Math.floor(value));
+  return Math.min(MAX_ITEM_QUANTITY, Math.max(minimum, Math.floor(value)));
 }
 
 export function cartItemsMatch(a: StoreCartItem, b: StoreCartItem): boolean {
   return (
     a.product_id === b.product_id &&
     (a.flavor_id || null) === (b.flavor_id || null) &&
+    arraysEqualUnordered(a.flavor_ids || [], b.flavor_ids || []) &&
     (a.topping_selection || "") === (b.topping_selection || "") &&
     (a.jalea_selection || "") === (b.jalea_selection || "") &&
     (a.notes || "") === (b.notes || "") &&
@@ -67,7 +87,10 @@ export function getCartItems(): StoreCartItem[] {
 
   try {
     const parsed = JSON.parse(raw) as StoreCartItem[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && typeof item === "object")
+      .map((item) => sanitizeCartItem(item));
   } catch {
     return [];
   }
@@ -80,25 +103,77 @@ export function setCartItems(items: StoreCartItem[]) {
 }
 
 export function addCartItem(item: StoreCartItem) {
+  const normalized = sanitizeCartItem(item);
   const items = getCartItems();
-  const existing = items.find((entry) => cartItemsMatch(entry, item));
+  const existing = items.find((entry) => cartItemsMatch(entry, normalized));
 
   if (existing) {
     const updated = items.map((entry) =>
       entry === existing
         ? {
             ...entry,
-            quantity: normalizeCartQuantity(entry.quantity + item.quantity),
+            quantity: normalizeCartQuantity(
+              entry.quantity + normalized.quantity,
+            ),
           }
         : entry,
     );
     setCartItems(updated);
-    notifyCartAdded(item);
+    notifyCartAdded(normalized);
     return;
   }
 
-  setCartItems([...items, item]);
-  notifyCartAdded(item);
+  setCartItems([...items, normalized]);
+  notifyCartAdded(normalized);
+}
+
+export function replaceCartItem(
+  original: StoreCartItem,
+  next: StoreCartItem,
+): StoreCartItem[] {
+  const items = getCartItems();
+  const originalIndex = items.findIndex((entry) =>
+    cartItemsMatch(entry, original),
+  );
+  const normalized = sanitizeCartItem(next);
+
+  const baseItems =
+    originalIndex < 0
+      ? items
+      : items.filter((_, index) => index !== originalIndex);
+
+  const existingIndex = baseItems.findIndex((entry) =>
+    cartItemsMatch(entry, normalized),
+  );
+
+  const nextItems =
+    existingIndex >= 0
+      ? baseItems.map((entry, index) =>
+          index === existingIndex
+            ? {
+                ...entry,
+                quantity: normalizeCartQuantity(
+                  entry.quantity + normalized.quantity,
+                ),
+              }
+            : entry,
+        )
+      : [...baseItems, normalized];
+
+  setCartItems(nextItems);
+  notifyCartAdded(normalized);
+  return nextItems;
+}
+
+export function upsertCartItem(
+  next: StoreCartItem,
+  previous?: StoreCartItem,
+): StoreCartItem[] {
+  if (previous) {
+    return replaceCartItem(previous, next);
+  }
+  addCartItem(next);
+  return getCartItems();
 }
 
 export function updateCartItemQuantity(

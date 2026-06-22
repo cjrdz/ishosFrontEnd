@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from "@shared/components/AppIcon.svelte";
   import { formatCurrency } from "@shared/utils/formatters";
+  import "../../../../styles/product-card.css";
   import type {
     PublicProduct,
     StoreOfferItem,
@@ -62,6 +63,16 @@
     event.stopPropagation();
     onSelect();
   }
+
+  let imgFailed = $state(false);
+  function handleImgError() {
+    imgFailed = true;
+  }
+  // Reset on imageUrl change (e.g. product swapped in a list)
+  $effect(() => {
+    imageUrl;
+    imgFailed = false;
+  });
 </script>
 
 <!--
@@ -101,16 +112,41 @@
 
 {#snippet cardInner()}
   <!-- Image layer -->
-  {#if imageUrl}
+  {#if imageUrl && !imgFailed}
     <figure class="pc-figure" aria-hidden="true">
-      <img src={imageUrl} alt={product.name} class="pc-img" loading="lazy" />
+      <img
+        src={imageUrl}
+        alt={product.name}
+        class="pc-img"
+        loading="lazy"
+        onerror={handleImgError}
+      />
       <!-- Gradient: stronger at bottom for legible text, lighter at top -->
       <div class="pc-gradient"></div>
     </figure>
   {:else}
-    <div class="pc-no-image">
-      <Icon icon="lucide:image-off" class="size-10 opacity-30" />
+    <div
+      class="pc-no-image"
+      role="img"
+      aria-label={`Imagen no disponible para ${product.name}`}
+    >
+      <Icon
+        icon="lucide:image-off"
+        class="size-10 opacity-30"
+        aria-hidden="true"
+      />
     </div>
+  {/if}
+
+  <!-- Stock status badge -->
+  {#if product.stock_status === "out_of_stock"}
+    <span class="badge badge-error badge-sm absolute left-3 top-3 z-20">
+      Agotado
+    </span>
+  {:else if product.stock_status === "low_stock"}
+    <span class="badge badge-warning badge-sm absolute left-3 top-3 z-20">
+      Stock bajo
+    </span>
   {/if}
 
   <!-- Offer badge (single source of truth — do not add a second badge in the parent) -->
@@ -148,7 +184,11 @@
   {/if}
 
   <!-- Info bar at bottom -->
-  <div class="pc-info {imageUrl ? 'pc-info--over-image' : 'pc-info--plain'}">
+  <div
+    class="pc-info {imageUrl && !imgFailed
+      ? 'pc-info--over-image'
+      : 'pc-info--plain'}"
+  >
     <div class="pc-info-inner">
       <h3 class="pc-name">{product.name}</h3>
 
@@ -185,6 +225,12 @@
     width: 100%;
     max-width: 17.5rem;
     margin-inline: auto;
+  }
+
+  @media (max-width: 767px) {
+    .pc-root {
+      max-width: 100%;
+    }
   }
 
   /* Featured variant fills its carousel slot fully */
@@ -226,9 +272,7 @@
     border-radius: 1.25rem;
     border: 1px solid oklch(var(--b2) / 0.7);
     background-color: oklch(var(--b1));
-    box-shadow:
-      0 1px 3px oklch(0% 0 0 / 0.07),
-      0 1px 2px oklch(0% 0 0 / 0.06);
+    box-shadow: var(--pc-card-shadow);
     transition:
       box-shadow 0.25s ease,
       transform 0.25s ease;
@@ -245,13 +289,113 @@
     box-shadow: 0 1px 2px oklch(0% 0 0 / 0.06);
   }
 
+  @media (max-width: 767px) {
+    .pc-card--menu {
+      min-height: 12.5rem;
+      display: grid;
+      grid-template-columns: minmax(0, 42%) minmax(0, 58%);
+    }
+
+    .pc-card--menu .pc-figure,
+    .pc-card--menu .pc-no-image {
+      position: relative;
+      inset: auto;
+      height: 100%;
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .pc-card--menu .pc-gradient {
+      background: linear-gradient(
+        to right,
+        transparent 55%,
+        oklch(0% 0 0 / 0.2) 100%
+      );
+    }
+
+    .pc-card--menu .pc-info {
+      grid-column: 2;
+      grid-row: 1;
+      margin-top: 0;
+      padding: 0.65rem;
+      display: flex;
+      align-items: stretch;
+    }
+
+    .pc-card--menu .pc-info-inner {
+      width: 100%;
+      justify-content: center;
+      padding: 0.15rem 0.1rem 0.15rem 0.35rem;
+      gap: 0.5rem;
+    }
+
+    .pc-card--menu .pc-info--over-image .pc-info-inner {
+      background: transparent;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      border: 0;
+      border-radius: 0;
+    }
+
+    .pc-card--menu .pc-name {
+      color: oklch(var(--bc));
+      font-size: 1.05rem;
+      line-height: 1.2;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pc-card--menu .pc-price-main {
+      color: oklch(var(--p));
+      font-size: 1.65rem;
+      line-height: 1;
+    }
+
+    .pc-card--menu .pc-price-before {
+      color: oklch(var(--bc) / 0.5);
+      font-size: 0.78rem;
+    }
+
+    .pc-card--menu .pc-note {
+      color: oklch(var(--bc) / 0.65);
+      font-size: 0.78rem;
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .pc-card--menu .pc-select-btn {
+      font-size: 0.82rem;
+      padding: 0.4rem 0.95rem;
+    }
+
+    .pc-card--menu .pc-add-btn {
+      bottom: 0.65rem;
+      right: 0.65rem;
+    }
+
+    .pc-card--menu .pc-countdown {
+      top: 0.55rem;
+      right: 0.55rem;
+    }
+
+    .pc-card--menu .badge {
+      top: 0.55rem;
+      left: 0.55rem;
+    }
+  }
+
   /* Hover: lift + subtle scale on the whole group */
   .pc-root:hover .pc-card,
   .pc-link:hover .pc-card {
-    box-shadow:
-      0 4px 16px oklch(0% 0 0 / 0.12),
-      0 2px 6px oklch(0% 0 0 / 0.08);
-    transform: translateY(-2px);
+    box-shadow: var(--pc-card-shadow-hover);
+    transform: translateY(-2px) scale(1.01);
   }
 
   /* ── Image & gradient ────────────────────────────────────────── */
@@ -278,12 +422,7 @@
   .pc-gradient {
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-      to top,
-      oklch(0% 0 0 / 0.82) 0%,
-      oklch(0% 0 0 / 0.28) 45%,
-      transparent 100%
-    );
+    background: var(--pc-gradient-overlay);
   }
 
   /* Fallback when no image */
@@ -365,18 +504,18 @@
 
   /* Frosted pill only when sitting over image */
   .pc-info--over-image .pc-info-inner {
-    background-color: oklch(var(--b1) / 0.18);
+    background-color: var(--pc-pill-bg);
     backdrop-filter: blur(10px) saturate(1.4);
     -webkit-backdrop-filter: blur(10px) saturate(1.4);
     border-radius: 0.875rem;
-    border: 1px solid oklch(1 0 0 / 0.1);
+    border: 1px solid var(--pc-pill-border);
   }
 
   .pc-name {
     font-size: 0.875rem;
     font-weight: 700;
     line-height: 1.25;
-    color: white;
+    color: var(--pc-text-over-image);
     margin: 0;
   }
 
@@ -401,7 +540,7 @@
   .pc-price-main {
     font-size: 1.125rem;
     font-weight: 800;
-    color: white;
+    color: var(--pc-text-over-image);
     line-height: 1;
   }
   @media (min-width: 768px) {
@@ -417,11 +556,11 @@
   .pc-price-before {
     font-size: 0.75rem;
     text-decoration: line-through;
-    color: oklch(1 0 0 / 0.55);
+    color: var(--pc-price-strikethrough-over);
   }
 
   .pc-info--plain .pc-price-before {
-    color: oklch(var(--bc) / 0.4);
+    color: var(--pc-price-strikethrough-plain);
   }
 
   /* ── Select button ───────────────────────────────────────────── */
@@ -463,11 +602,11 @@
     gap: 0.2rem;
     padding: 0.2rem 0.5rem;
     border-radius: 9999px;
-    background: oklch(0 0 0 / 0.42);
+    background: var(--pc-countdown-bg);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    border: 1px solid oklch(1 0 0 / 0.1);
-    color: white;
+    border: 1px solid var(--pc-countdown-border);
+    color: var(--pc-text-over-image);
     font-size: 0.68rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -478,7 +617,7 @@
   /* ── Offer note ──────────────────────────────────────────────── */
   .pc-note {
     font-size: 0.7rem;
-    color: oklch(1 0 0 / 0.72);
+    color: var(--pc-note-over);
     line-height: 1.3;
     margin: 0;
     overflow: hidden;
@@ -487,7 +626,7 @@
   }
 
   .pc-info--plain .pc-note {
-    color: oklch(var(--bc) / 0.6);
+    color: var(--pc-note-plain);
   }
 
   /* ── Dark-theme overrides ────────────────────────────────────── */

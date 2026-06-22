@@ -31,6 +31,5 @@ export interface LoginRequest {
  * Login response from backend
  */
 export interface LoginResponse {
-  token: string;
   employee: Session;
 }

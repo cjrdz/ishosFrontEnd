@@ -1,4 +1,5 @@
 export const DEFAULT_ADDON_GROUP_NAME = "extras";
+export const PRIMARY_ADDON_GROUPS = ["toppings", "jalea"] as const;
 
 const ADDON_GROUP_LABELS: Record<string, string> = {
   toppings: "Toppings",
@@ -10,6 +11,10 @@ export type AddonGroupItem = {
   name: string;
   group_name: string;
   display_order: number;
+};
+
+type AddonGroupSource = {
+  group_name: string;
 };
 
 export function normalizeAddonGroupName(value: string): string {
@@ -85,4 +90,36 @@ export function groupAddonsByGroup<T extends AddonGroupItem>(
         .slice()
         .sort((left, right) => sortByDisplayOrderAndName(left, right)),
     }));
+}
+
+export function collectAddonGroupOptions<T extends AddonGroupSource>(
+  source: T[],
+  customGroups: string[] = [],
+): string[] {
+  const seen = new Set<string>();
+  const options: string[] = [];
+
+  const addGroup = (value: string) => {
+    const normalized = normalizeAddonGroupName(value);
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    options.push(normalized);
+  };
+
+  for (const baseGroup of PRIMARY_ADDON_GROUPS) {
+    addGroup(baseGroup);
+  }
+
+  for (const addon of source) {
+    addGroup(addon.group_name);
+  }
+
+  for (const customGroup of customGroups) {
+    addGroup(customGroup);
+  }
+
+  return options;
 }

@@ -72,6 +72,7 @@ export interface DashboardStats {
 export interface AdminBusyState {
   categorias: boolean;
   productos: boolean;
+  inventario: boolean;
   sabores: boolean;
   complementos: boolean;
   ordenes: boolean;
@@ -84,6 +85,7 @@ export interface AdminModuleErrors {
   ordenes: string;
   categorias: string;
   productos: string;
+  inventario: string;
   sabores: string;
   complementos: string;
   empleados: string;
@@ -99,6 +101,7 @@ export interface TabPanelSharedProps {
   lazyTabState: {
     categorias: { loading: boolean; hydrated: boolean };
     productos: { loading: boolean; hydrated: boolean };
+    inventario: { loading: boolean; hydrated: boolean };
     personas: { loading: boolean; hydrated: boolean };
     ofertas: { loading: boolean; hydrated: boolean };
     herramientas: { loading: boolean; hydrated: boolean };
@@ -184,10 +187,16 @@ export interface UsersPanelProps {
   onLoadUserOrders: (userId: string) => void;
 }
 
+export interface InventoryPanelProps {
+  busy: boolean;
+  moduleError: string;
+}
+
 export interface AdminTabsProps {
   shared: TabPanelSharedProps;
   orders: OrdersPanelProps;
   products: ProductsPanelProps;
+  inventory: InventoryPanelProps;
   categories: CategoriesPanelProps;
   employees: EmployeesPanelProps;
   users: UsersPanelProps;

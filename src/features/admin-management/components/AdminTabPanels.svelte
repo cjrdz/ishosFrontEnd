@@ -6,11 +6,13 @@
   import UsersTab from "@features/admin-management/components/UsersTab.svelte";
   import { OffersTab } from "@features/offers";
   import { ToolsTab } from "@features/analytics";
+  import { InventoryTab } from "@features/inventory";
 
   let {
     shared,
     orders,
     products,
+    inventory,
     categories,
     employees,
     users,
@@ -190,6 +192,38 @@
         onLoadOrders={users.onLoadUserOrders}
       />
     </section>
+  {/if}
+{/if}
+
+{#if shared.isAdmin && shared.activeTab === "inventario"}
+  {#if shared.lazyTabState.inventario.loading && !shared.lazyTabState.inventario.hydrated}
+    <section class="space-y-4" aria-busy="true" aria-live="polite">
+      <div class="card bg-base-100 shadow" aria-hidden="true">
+        <div class="card-body gap-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="skeleton h-8 w-48"></div>
+            <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+            <div class="skeleton h-9 w-36"></div>
+            <div class="skeleton h-9 w-20"></div>
+          </div>
+          <div class="rounded-box border border-base-content/5 overflow-hidden">
+            <div class="bg-base-200/60 p-3">
+              <div class="skeleton h-5 w-full"></div>
+            </div>
+            <div class="p-3 space-y-3">
+              {#each [1, 2, 3, 4, 5] as item (item)}
+                <div class="skeleton h-10 w-full"></div>
+              {/each}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  {:else}
+    <InventoryTab
+      busy={shared.busy.inventario}
+      moduleError={shared.moduleErrors.inventario}
+    />
   {/if}
 {/if}
 

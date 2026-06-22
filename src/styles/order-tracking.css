@@ -1,0 +1,63 @@
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  OrderTracking — Ishos Factory brand styles & animations           */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Stagger fade-in ──────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up   { animation: fadeUp 0.6s ease forwards; opacity: 0; }
+.fade-up-1 { animation-delay: 0.1s; }
+.fade-up-2 { animation-delay: 0.25s; }
+.fade-up-3 { animation-delay: 0.4s; }
+
+/* ── Decorative diagonal stripe pattern ───────────────────────────── */
+.stripe-bg {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    color-mix(in srgb, var(--ishos-teal) 6%, transparent) 6px,
+    color-mix(in srgb, var(--ishos-teal) 6%, transparent) 12px
+  );
+}
+
+/* ── Brand section pill ───────────────────────────────────────────── */
+.section-pill {
+  display: inline-block;
+  border-radius: 0.75rem;
+  padding: 0.2rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: color-mix(in srgb, var(--ishos-teal) 12%, transparent);
+  color: var(--ishos-teal);
+}
+
+/* ── Brand button ─────────────────────────────────────────────────── */
+.btn-brand {
+  background-color: var(--ishos-teal);
+  color: white;
+  border-color: var(--ishos-teal);
+}
+.btn-brand:hover {
+  background-color: var(--ishos-teal-deep);
+  border-color: var(--ishos-teal-deep);
+}
+
+/* ── Brand steps ──────────────────────────────────────────────────── */
+.step-brand {
+  --step-color: var(--ishos-teal);
+}
+
+/* ── Section divider wave ─────────────────────────────────────────── */
+.wave-divider {
+  overflow: hidden;
+  line-height: 0;
+}
+.wave-divider svg {
+  display: block;
+}

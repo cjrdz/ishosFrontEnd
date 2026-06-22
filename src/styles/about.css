@@ -1,0 +1,123 @@
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  about.astro — Ishos Factory brand page styles                      */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Theme-aware design tokens ────────────────────────────────────── */
+:root {
+  --about-pill-teal-bg: color-mix(in srgb, var(--ishos-teal) 12%, transparent);
+  --about-pill-maroon-bg: color-mix(in srgb, var(--ishos-maroon) 10%, transparent);
+  --about-icon-teal-bg: color-mix(in srgb, var(--ishos-teal) 12%, transparent);
+  --about-icon-pink-bg: color-mix(in srgb, var(--ishos-pink) 18%, transparent);
+  --about-schedule-bg: color-mix(in srgb, var(--ishos-yellow) 35%, transparent);
+  --about-contact-wash: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--ishos-teal) 5%, transparent),
+    transparent
+  );
+  --about-wave-fill: color-mix(in srgb, var(--ishos-teal) 8%, transparent);
+  --about-hero-teal-opacity: 0.2;
+  --about-hero-pink-opacity: 0.15;
+  --about-social-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.15);
+  --about-phone-text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Dark theme (night) adjustments ───────────────────────────────── */
+[data-theme="night"] {
+  --about-pill-teal-bg: color-mix(in srgb, var(--ishos-teal) 20%, transparent);
+  --about-pill-maroon-bg: color-mix(in srgb, var(--ishos-maroon) 18%, transparent);
+  --about-icon-teal-bg: color-mix(in srgb, var(--ishos-teal) 22%, transparent);
+  --about-icon-pink-bg: color-mix(in srgb, var(--ishos-pink) 25%, transparent);
+  --about-schedule-bg: color-mix(in srgb, var(--ishos-yellow) 45%, transparent);
+  --about-contact-wash: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--ishos-teal) 12%, transparent),
+    transparent
+  );
+  --about-wave-fill: color-mix(in srgb, var(--ishos-teal) 16%, transparent);
+  --about-hero-teal-opacity: 0.35;
+  --about-hero-pink-opacity: 0.28;
+  --about-social-shadow: 0 8px 24px -6px rgba(255, 255, 255, 0.12);
+  --about-phone-text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Animated gradient border on hero card ────────────────────────── */
+@keyframes borderSpin {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.hero-card-border {
+  background: linear-gradient(
+    135deg,
+    var(--ishos-teal),
+    var(--ishos-pink),
+    var(--ishos-yellow),
+    var(--ishos-teal)
+  );
+  background-size: 300% 300%;
+  animation: borderSpin 6s ease infinite;
+  padding: 2px;
+  border-radius: 1.5rem;
+}
+
+/* ── Stagger fade-in ──────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up   { animation: fadeUp 0.6s ease forwards; opacity: 0; }
+.fade-up-1 { animation-delay: 0.1s; }
+.fade-up-2 { animation-delay: 0.25s; }
+.fade-up-3 { animation-delay: 0.4s; }
+.fade-up-4 { animation-delay: 0.55s; }
+.fade-up-5 { animation-delay: 0.7s; }
+
+/* ── Value card hover glow ────────────────────────────────────────── */
+.value-card:hover {
+  box-shadow: 0 8px 40px -8px
+    color-mix(in srgb, var(--ishos-teal) 30%, transparent);
+  transform: translateY(-4px);
+}
+
+/* ── Social pill hover ────────────────────────────────────────────── */
+.social-pill:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--about-social-shadow);
+}
+
+/* ── Decorative diagonal stripe pattern ───────────────────────────── */
+.stripe-bg {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    color-mix(in srgb, var(--ishos-teal) 6%, transparent) 6px,
+    color-mix(in srgb, var(--ishos-teal) 6%, transparent) 12px
+  );
+}
+
+/* ── Hero background blobs ────────────────────────────────────────── */
+.hero-blob-teal {
+  opacity: var(--about-hero-teal-opacity);
+}
+.hero-blob-pink {
+  opacity: var(--about-hero-pink-opacity);
+}
+
+/* ── Section divider wave ─────────────────────────────────────────── */
+.wave-divider {
+  overflow: hidden;
+  line-height: 0;
+}
+.wave-divider svg {
+  display: block;
+}
+
+/* ── Phone card text legibility ───────────────────────────────────── */
+.phone-card-text {
+  text-shadow: var(--about-phone-text-shadow);
+}

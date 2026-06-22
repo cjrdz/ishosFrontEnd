@@ -9,6 +9,8 @@
     saveAdminStoreSettings,
     saveAdminTabOrder,
     setCurrentAdminContext,
+    getAdminStoreSettings,
+    updateAdminStoreSettings,
     type RowsPerTableConfig,
     type PanelConfigValues,
     type StoreOfferItem,
@@ -259,9 +261,18 @@
     tabOrder = normalizeTabOrder(settings.tab_order);
     panelConfig = settings.panel_config;
     rowsPerTable = settings.rows_per_table;
-    storeOrdersEnabled = settings.store_settings.orders_enabled;
-    storeOffers = settings.store_settings.offers ?? [];
     setCurrentAdminContext(session.id, rowsPerTable.default);
+
+    try {
+      const storeSettings = await getAdminStoreSettings();
+      storeOrdersEnabled = storeSettings.orders_enabled;
+      storeOffers = storeSettings.offers ?? [];
+      saveAdminStoreSettings(session.id, storeSettings);
+    } catch {
+      storeOrdersEnabled = settings.store_settings.orders_enabled;
+      storeOffers = settings.store_settings.offers ?? [];
+    }
+
     busy = false;
   }
 
@@ -326,12 +337,13 @@
       if (!session?.id) {
         throw new Error("No se pudo identificar la sesion de administrador");
       }
-      const response = saveAdminStoreSettings(session.id, {
+      const response = await updateAdminStoreSettings({
         orders_enabled: enabled,
         offers: storeOffers,
       });
       storeOrdersEnabled = response.orders_enabled;
       storeOffers = response.offers ?? [];
+      saveAdminStoreSettings(session.id, response);
       setNotice(
         enabled ? "Pedidos publicos activados" : "Pedidos publicos pausados",
       );

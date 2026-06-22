@@ -10,8 +10,8 @@ import { forwardUpstreamJson, getServerApiBaseUrl } from "@core/bff/proxy";
 
 export const prerender = false;
 
-const CACHE_MAX_AGE = 30;
-const STALE_WHILE_REVALIDATE = 120;
+const CACHE_MAX_AGE = 5;
+const STALE_WHILE_REVALIDATE = 10;
 
 export const GET: APIRoute = async (context) => {
   try {

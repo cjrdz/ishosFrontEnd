@@ -34,6 +34,7 @@
     selectedProductAddons: Addon[];
     paidAddonGroups: AddonGroup[];
     selectedFlavorId: string;
+    selectedFlavorIds: string[];
     includedToppingId: string;
     includedJaleaId: string;
     selectedExtraAddonIds: string[];
@@ -50,6 +51,7 @@
     onProductChange: (value: string) => void;
     onQuantityChange: (value: number) => void;
     onFlavorChange: (value: string) => void;
+    onFlavorIdsChange: (value: string[]) => void;
     onChangeIncludedTopping: (value: string) => void;
     onChangeIncludedJalea: (value: string) => void;
     onToggleExtraAddonSelection: (addonId: string, checked: boolean) => void;
@@ -83,6 +85,7 @@
     selectedProductAddons,
     paidAddonGroups,
     selectedFlavorId,
+    selectedFlavorIds,
     includedToppingId,
     includedJaleaId,
     selectedExtraAddonIds,
@@ -99,6 +102,7 @@
     onProductChange,
     onQuantityChange,
     onFlavorChange,
+    onFlavorIdsChange,
     onChangeIncludedTopping,
     onChangeIncludedJalea,
     onToggleExtraAddonSelection,
@@ -325,6 +329,7 @@
         {selectedProductAddons}
         {paidAddonGroups}
         {selectedFlavorId}
+        {selectedFlavorIds}
         {includedToppingId}
         {includedJaleaId}
         {selectedExtraAddonIds}
@@ -336,6 +341,7 @@
         {onProductChange}
         {onQuantityChange}
         {onFlavorChange}
+        {onFlavorIdsChange}
         {onChangeIncludedTopping}
         {onChangeIncludedJalea}
         {onToggleExtraAddonSelection}

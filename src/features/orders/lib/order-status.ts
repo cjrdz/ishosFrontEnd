@@ -22,7 +22,7 @@ export const canceledFlow: CanceledOrderStatus[] = [
 ];
 
 export const statusLabels: Record<Order["status"], string> = {
-  pendiente_revision: "pendiente",
+  pendiente_revision: "Recibida",
   recibida: "aceptada",
   en_proceso: "preparando",
   lista: "lista",
@@ -102,6 +102,15 @@ export function canChangeToStep(
     order.status !== stepStatus &&
     stepStatus !== "pendiente_revision"
   );
+}
+
+export function suggestedNextStep(
+  status: Order["status"],
+): LinearOrderStatus | null {
+  if (status === "cancelada" || status === "entregada") return null;
+  const idx = linearStatuses.indexOf(status as LinearOrderStatus);
+  if (idx === -1 || idx >= linearStatuses.length - 1) return null;
+  return linearStatuses[idx + 1];
 }
 
 export function amountColumnLabel(status: Order["status"]): string {

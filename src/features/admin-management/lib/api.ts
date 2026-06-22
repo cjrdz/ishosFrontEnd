@@ -26,6 +26,10 @@ export interface Product {
   is_available: boolean;
   exclude_global_flavors?: boolean;
   exclude_global_addons?: boolean;
+  ball_based?: boolean;
+  ball_quantity?: number;
+  allows_mixed_flavors?: boolean;
+  stock_status?: string;
   flavors?: Flavor[];
   addons?: Addon[];
   created_at?: string;
@@ -87,6 +91,7 @@ export interface Order {
   tracking_token?: string | null;
   tracking_token_expires_at?: string | null;
   tracking_url?: string | null;
+  status_timestamps?: Record<string, string>;
 }
 
 export interface OrderItem {
@@ -96,7 +101,15 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
-  customizations?: Record<string, unknown> | null;
+  customizations?: {
+    flavor_name?: string;
+    flavor_names?: string[];
+    addon_names?: string[];
+    included_addon_names?: string[];
+    extra_addon_names?: string[];
+    notes?: string;
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface Employee {
@@ -143,12 +156,26 @@ export interface OrdersPaginatedResponse {
   };
 }
 
+interface BackendPaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    per_page: number;
+    total: number;
+    total_pages: number;
+  };
+}
+
 export async function listCategories(
   token: string,
   includeAll = false,
 ): Promise<Category[]> {
   const suffix = includeAll ? "?all=true" : "";
-  return apiRequest<Category[]>(`/categories${suffix}`, { token });
+  const res = await apiRequest<BackendPaginatedResponse<Category>>(
+    `/categories${suffix}`,
+    { token },
+  );
+  return res.data ?? [];
 }
 
 export async function createCategory(
@@ -202,7 +229,11 @@ export async function listProducts(
   includeAll = true,
 ): Promise<Product[]> {
   const suffix = includeAll ? "?all=true" : "";
-  return apiRequest<Product[]>(`/products${suffix}`, { token });
+  const res = await apiRequest<BackendPaginatedResponse<Product>>(
+    `/products${suffix}`,
+    { token },
+  );
+  return res.data ?? [];
 }
 
 export async function createProduct(
@@ -259,7 +290,19 @@ export async function listOrders(
   status = "",
 ): Promise<OrdersPaginatedResponse> {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
-  return apiRequest<OrdersPaginatedResponse>(`/orders${query}`, { token });
+  const res = await apiRequest<BackendPaginatedResponse<Order>>(
+    `/orders${query}`,
+    { token },
+  );
+  return {
+    orders: res.data ?? [],
+    pagination: {
+      page: res.pagination?.page ?? 1,
+      limit: res.pagination?.per_page ?? 50,
+      total: res.pagination?.total ?? 0,
+      totalPages: res.pagination?.total_pages ?? 1,
+    },
+  };
 }
 
 export async function getOrder(token: string, id: string): Promise<Order> {
@@ -379,7 +422,13 @@ export async function deleteOrder(
 }
 
 export async function listEmployees(token: string): Promise<Employee[]> {
-  return apiRequest<Employee[]>("/employees", { token });
+  const res = await apiRequest<BackendPaginatedResponse<Employee> | Employee[]>(
+    "/employees",
+    { token },
+  );
+  return Array.isArray(res)
+    ? res
+    : ((res as BackendPaginatedResponse<Employee>).data ?? []);
 }
 
 export async function createEmployee(
@@ -452,7 +501,11 @@ export async function listUsers(
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return apiRequest<User[]>(`/users${suffix}`, { token });
+  const res = await apiRequest<BackendPaginatedResponse<User>>(
+    `/users${suffix}`,
+    { token },
+  );
+  return res.data ?? [];
 }
 
 export async function getUser(token: string, id: string): Promise<User> {
@@ -539,7 +592,11 @@ export async function listFlavors(
   includeAll = false,
 ): Promise<Flavor[]> {
   const suffix = includeAll ? "?all=true" : "";
-  return apiRequest<Flavor[]>(`/flavors${suffix}`, { token });
+  const res = await apiRequest<BackendPaginatedResponse<Flavor>>(
+    `/flavors${suffix}`,
+    { token },
+  );
+  return res.data ?? [];
 }
 
 export async function getFlavor(token: string, id: string): Promise<Flavor> {
@@ -595,7 +652,11 @@ export async function listAddons(
   includeAll = false,
 ): Promise<Addon[]> {
   const suffix = includeAll ? "?all=true" : "";
-  return apiRequest<Addon[]>(`/addons${suffix}`, { token });
+  const res = await apiRequest<BackendPaginatedResponse<Addon>>(
+    `/addons${suffix}`,
+    { token },
+  );
+  return res.data ?? [];
 }
 
 export async function getAddon(token: string, id: string): Promise<Addon> {

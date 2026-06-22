@@ -80,6 +80,9 @@ export function buildCustomizationsFromDraft(
   if (item.flavor_id) {
     customizations.flavor_id = item.flavor_id;
   }
+  if (item.flavor_ids && item.flavor_ids.length > 0) {
+    customizations.flavor_ids = item.flavor_ids;
+  }
   if ((item.included_addon_ids ?? []).length > 0) {
     customizations.included_addon_ids = item.included_addon_ids;
   }

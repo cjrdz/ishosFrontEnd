@@ -5,11 +5,10 @@
     DEFAULT_ROWS_PER_TABLE,
     getCurrentAdminId,
     getCurrentRowsPerTable,
-    getAdminLocalSettings,
     setCurrentAdminContext,
-    saveAdminStoreSettings,
     type StoreOfferItem,
   } from "@features/admin-management";
+  import { ApiError } from "@core/api";
   import type { Product } from "@features/admin-management";
   import { formatCurrency } from "@shared/utils/formatters";
 
@@ -95,11 +94,13 @@
     localBusy = true;
     moduleError = "";
     try {
-      const currentAdminId = await resolveAdminId();
-      if (!currentAdminId) {
-        throw new Error("No se pudo identificar la sesion de administrador");
-      }
-      const response = getAdminLocalSettings(currentAdminId).store_settings;
+      // Always load from BFF admin endpoint
+      const res = await fetch("/api/admin/settings/store", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const response = await res.json();
       ordersEnabled = response.orders_enabled;
       offers = response.offers ?? [];
     } catch (requestError) {
@@ -206,31 +207,32 @@
   }
 
   async function saveOffers() {
-    await persistStoreSettings(
-      {
-        orders_enabled: ordersEnabled,
-        offers,
-      },
-      "Ofertas guardadas",
-    );
-  }
-
-  async function persistStoreSettings(
-    payload: { orders_enabled: boolean; offers: StoreOfferItem[] },
-    successNotice: string,
-  ) {
     localBusy = true;
     moduleError = "";
     try {
-      const currentAdminId = await resolveAdminId();
-      if (!currentAdminId) {
-        throw new Error("No se pudo identificar la sesion de administrador");
+      // PATCH to BFF admin endpoint
+      const res = await fetch("/api/admin/settings/store", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orders_enabled: ordersEnabled,
+          offers,
+        }),
+      });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try {
+          const data = await res.json();
+          if (typeof data?.error === "string") msg = data.error;
+        } catch {}
+        throw new ApiError(msg, res.status, "API_ERROR");
       }
-      const saved = saveAdminStoreSettings(currentAdminId, payload);
-      ordersEnabled = saved.orders_enabled;
-      offers = saved.offers ?? [];
+      // Reload from backend to ensure consistency
+      await loadStoreSettings();
       resetOfferForm();
-      setNotice(successNotice);
+      setNotice("Ofertas guardadas");
     } catch (requestError) {
       moduleError =
         requestError instanceof Error

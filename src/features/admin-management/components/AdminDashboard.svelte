@@ -16,6 +16,9 @@
     unlinkProductAddon,
     listFlavors,
     listAddons,
+    listInventoryItems,
+    getInventoryStats,
+    getLowStockItems,
   } from "@features/admin-management/lib/bff";
   // Re-export types from the original admin API for compatibility
   import type {
@@ -41,6 +44,7 @@
   import {
     DEFAULT_TAB_ORDER,
     normalizeTabOrder,
+    toTabKey,
     type TabKey,
   } from "@features/admin-management/lib/tabs";
   import type { PanelConfigValues } from "../types/settings";
@@ -81,6 +85,12 @@
         ...(metadata ?? {}),
       });
     }
+  }
+
+  function getTabFromUrl(): TabKey | null {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    return toTabKey(params.get("tab") ?? "");
   }
 
   let loading = $state(true);
@@ -127,6 +137,7 @@
   > = {
     categorias: { loading: false, hydrated: false },
     productos: { loading: false, hydrated: false },
+    inventario: { loading: false, hydrated: false },
     personas: { loading: false, hydrated: false },
     ofertas: { loading: false, hydrated: false },
     herramientas: { loading: false, hydrated: false },
@@ -458,6 +469,8 @@
           runLazyModuleLoad("addons", loadAddons),
           runLazyModuleLoad("product-images", loadProductImages),
         ]);
+      } else if (tab === "inventario") {
+        await runLazyModuleLoad("inventario", loadInventory);
       } else if (tab === "personas") {
         await Promise.allSettled([
           runLazyModuleLoad("empleados", loadEmployees),
@@ -566,6 +579,12 @@
     // Show dashboard immediately after session resolves.
     loading = false;
     trackAction("admin_session_loaded", { role: session?.role ?? "unknown" });
+
+    // Restore tab from URL query parameter
+    const urlTab = getTabFromUrl();
+    if (urlTab && (session?.role === "admin" || urlTab === "ordenes")) {
+      activeTab = urlTab;
+    }
 
     // Load modules in background so a slow endpoint cannot block the UI forever.
     void (async () => {
@@ -795,6 +814,28 @@
     }
   }
 
+  async function loadInventory() {
+    if (!isAdmin) return;
+    setBusy("inventario", true);
+    clearModuleError("inventario");
+    try {
+      await Promise.allSettled([
+        listInventoryItems(),
+        getInventoryStats(),
+        getLowStockItems(),
+      ]);
+    } catch (requestError) {
+      setModuleError(
+        "inventario",
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo cargar el inventario",
+      );
+    } finally {
+      setBusy("inventario", false);
+    }
+  }
+
   const {
     handleCreateOrder,
     handleDeleteOrder,
@@ -990,13 +1031,22 @@
     loadOrders();
   }
 
+  function replaceUrlTab(tab: TabKey) {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    window.history.replaceState({}, "", url.toString());
+  }
+
   function handleTabChange(tab: TabKey) {
     if (!isAdmin && tab !== "ordenes") {
       activeTab = "ordenes";
+      replaceUrlTab("ordenes");
       return;
     }
     activeTab = tab;
     void ensureTabDataLoaded(tab);
+    replaceUrlTab(tab);
   }
 
   const sharedPanelProps = $derived({
@@ -1077,6 +1127,10 @@
     onUpdate: handleUpdateUser,
     onDelete: handleDeleteUser,
     onLoadUserOrders: loadUserOrders,
+  });
+  const inventoryPanelProps = $derived({
+    busy: busy.inventario,
+    moduleError: moduleErrors.inventario,
   });
 
   function openSettingsPage() {
@@ -1169,6 +1223,7 @@
       orders={ordersPanelProps}
       categories={categoriesPanelProps}
       products={productsPanelProps}
+      inventory={inventoryPanelProps}
       employees={employeesPanelProps}
       users={usersPanelProps}
     />

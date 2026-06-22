@@ -2,6 +2,7 @@ export type TabKey =
   | "ordenes"
   | "categorias"
   | "productos"
+  | "inventario"
   | "personas"
   | "ofertas"
   | "herramientas";
@@ -10,6 +11,7 @@ export const TAB_LABELS: Record<TabKey, string> = {
   ordenes: "Ordenes",
   categorias: "Categorias",
   productos: "Productos",
+  inventario: "Inventario",
   personas: "Personas",
   ofertas: "Ofertas",
   herramientas: "Herramientas",
@@ -18,6 +20,7 @@ export const TAB_LABELS: Record<TabKey, string> = {
 export const ADMIN_ONLY_TABS = new Set<TabKey>([
   "categorias",
   "productos",
+  "inventario",
   "personas",
   "ofertas",
   "herramientas",
@@ -27,6 +30,7 @@ export const DEFAULT_TAB_ORDER: TabKey[] = [
   "ordenes",
   "categorias",
   "productos",
+  "inventario",
   "personas",
   "ofertas",
   "herramientas",

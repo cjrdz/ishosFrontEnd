@@ -1,4 +1,4 @@
-import type { Order } from "@features/admin-management";
+import type { Order, Product } from "@features/admin-management";
 import type {
   CreateOrderPayload,
   ManualOrderItemDraft,
@@ -10,6 +10,7 @@ import { buildCustomizationsFromDraft } from "./manual-item-helpers";
 export function prepareOrderItems(
   manualItems: ManualOrderItemDraft[],
   fallbackItem: ManualOrderItemDraft | null,
+  products: Product[] = [],
 ): CreateOrderPayload["items"] | null {
   const itemsToCreate =
     manualItems.length > 0 ? manualItems : fallbackItem ? [fallbackItem] : [];
@@ -21,7 +22,7 @@ export function prepareOrderItems(
   return itemsToCreate.map((item) => ({
     product_id: item.product_id,
     quantity: item.quantity,
-    customizations: buildCustomizationsFromDraft(item),
+    customizations: buildCustomizationsFromDraft(item, products),
   }));
 }
 

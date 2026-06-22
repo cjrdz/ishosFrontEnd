@@ -12,6 +12,7 @@
     canceledStepIconsStatic,
     kitchenBadge,
     isStepReached,
+    suggestedNextStep,
     amountColumnLabel,
     orderTypeLabel,
     createdByLabel,
@@ -99,6 +100,52 @@
     }
     return "";
   });
+
+  const suggestedNext = $derived(suggestedNextStep(selectedOrder.status));
+  const statusIndex = $derived(
+    linearStatuses.indexOf(selectedOrder.status as LinearOrderStatus),
+  );
+  const stepAnnouncement = $derived(
+    statusIndex >= 0
+      ? `Estado actualizado a ${statusLabels[selectedOrder.status]}, paso ${statusIndex + 1} de ${linearStatuses.length}`
+      : "",
+  );
+  const canceledStepAnnouncement = $derived(
+    selectedOrder.status === "cancelada" ? "Pedido denegado" : "",
+  );
+
+  function formatAdminDate(value: string): string {
+    return new Date(value).toLocaleString("es-SV", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  }
+
+  function stepTimestamp(status: string): string {
+    const ts = selectedOrder.status_timestamps?.[status];
+    if (ts) return formatAdminDate(ts);
+    // Fallback to updated_at for current status if no specific timestamp exists
+    if (status === selectedOrder.status && selectedOrder.updated_at) {
+      return formatAdminDate(selectedOrder.updated_at);
+    }
+    return "";
+  }
+
+  function itemFlavorText(
+    customizations: Order["items"][number]["customizations"],
+  ): string {
+    if (!customizations) return "";
+    if (
+      Array.isArray(customizations.flavor_names) &&
+      customizations.flavor_names.length > 0
+    ) {
+      return customizations.flavor_names.join(", ");
+    }
+    if (customizations.flavor_name) {
+      return customizations.flavor_name;
+    }
+    return "";
+  }
 </script>
 
 <div class="card bg-base-100 shadow-sm border border-base-200">
@@ -259,43 +306,64 @@
                 </button>
               {/if}
             </div>
-            <ul
-              class="steps steps-vertical sm:steps-horizontal w-full max-w-2xl mt-2 order-steps order-steps--compact"
+            <div
+              role="progressbar"
+              aria-valuenow={canceledFlow.indexOf(
+                selectedOrder.status as "pendiente_revision" | "cancelada",
+              ) + 1}
+              aria-valuemin={1}
+              aria-valuemax={canceledFlow.length}
+              aria-label="Estado de cancelacion"
             >
-              {#each canceledFlow as stepStatus}
-                {@const reached =
-                  canceledFlow.indexOf(stepStatus) <=
-                  canceledFlow.indexOf("cancelada")}
-                {@const completed =
-                  canceledFlow.indexOf(stepStatus) <
-                  canceledFlow.indexOf("cancelada")}
-                {@const current = stepStatus === "cancelada"}
-                <li
-                  data-content=""
-                  class={`step min-h-18! ${reached ? "step-primary" : ""}`}
-                >
-                  <div
-                    class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-1"
+              <ul
+                class="steps steps-vertical sm:steps-horizontal w-full max-w-2xl mt-2 order-steps order-steps--compact"
+              >
+                {#each canceledFlow as stepStatus}
+                  {@const reached =
+                    canceledFlow.indexOf(stepStatus) <=
+                    canceledFlow.indexOf("cancelada")}
+                  {@const completed =
+                    canceledFlow.indexOf(stepStatus) <
+                    canceledFlow.indexOf("cancelada")}
+                  {@const current = stepStatus === "cancelada"}
+                  <li
+                    data-content=""
+                    class={`step min-h-18! ${reached ? "step-primary" : ""}`}
+                    aria-current={current ? "step" : undefined}
                   >
-                    <span
-                      class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"}`}
+                    <div
+                      class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-1"
                     >
-                      <Icon
-                        icon={current
-                          ? canceledStepIconsActive[stepStatus]
-                          : canceledStepIconsStatic[stepStatus]}
-                        width="18"
-                        height="18"
-                      />
-                    </span>
-                    <span
-                      class={`text-sm font-semibold ${current ? "text-error" : completed ? "text-base-content" : "text-base-content/45"}`}
-                      >{canceledStepLabels[stepStatus]}</span
-                    >
-                  </div>
-                </li>
-              {/each}
-            </ul>
+                      <span
+                        class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"}`}
+                      >
+                        <Icon
+                          icon={current
+                            ? canceledStepIconsActive[stepStatus]
+                            : canceledStepIconsStatic[stepStatus]}
+                          width="18"
+                          height="18"
+                        />
+                      </span>
+                      <span
+                        class={`text-sm font-semibold ${current ? "text-error" : completed ? "text-base-content" : "text-base-content/45"}`}
+                        >{canceledStepLabels[stepStatus]}</span
+                      >
+                      {#if stepTimestamp(stepStatus)}
+                        <span class="order-step-timestamp"
+                          >{stepTimestamp(stepStatus)}</span
+                        >
+                      {/if}
+                    </div>
+                  </li>
+                {/each}
+              </ul>
+              <span
+                class="order-steps-sr-only"
+                aria-live="polite"
+                aria-atomic="true">{canceledStepAnnouncement}</span
+              >
+            </div>
           </div>
         {:else}
           <div
@@ -304,7 +372,13 @@
             <div class="text-left">
               <p><strong>Estado:</strong></p>
             </div>
-            <div>
+            <div
+              role="progressbar"
+              aria-valuenow={statusIndex + 1}
+              aria-valuemin={1}
+              aria-valuemax={linearStatuses.length}
+              aria-label="Progreso del pedido"
+            >
               <ul
                 class="steps steps-vertical sm:steps-horizontal w-full max-w-3xl mx-auto order-steps order-steps--compact"
               >
@@ -316,15 +390,18 @@
                   {@const completed =
                     reached && selectedOrder.status !== stepStatus}
                   {@const current = selectedOrder.status === stepStatus}
+                  {@const isHint =
+                    stepStatus === suggestedNext && !current && !completed}
                   <li
                     data-content=""
                     class={`step min-h-18! ${reached ? "step-primary" : ""}`}
+                    aria-current={current ? "step" : undefined}
                   >
                     <div
                       class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-1"
                     >
                       <button
-                        class={`order-step-node cursor-pointer ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"} disabled:cursor-default`}
+                        class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"} ${!current && !completed && onCanChangeToStep(selectedOrder, stepStatus) ? "order-step-node--clickable" : ""} ${isHint ? "order-step-node--hint" : ""}`}
                         type="button"
                         onclick={() =>
                           onHandleStepClick(selectedOrder, stepStatus)}
@@ -340,7 +417,7 @@
                         />
                       </button>
                       <button
-                        class={`cursor-pointer bg-transparent border-0 p-0 m-0 text-sm font-semibold ${current ? "text-primary" : completed ? "text-base-content" : "text-base-content/45"} disabled:cursor-default disabled:text-base-content/45`}
+                        class={`order-step-label-btn ${current ? "text-primary" : completed ? "text-base-content" : "text-base-content/45"}`}
                         type="button"
                         onclick={() =>
                           onHandleStepClick(selectedOrder, stepStatus)}
@@ -349,10 +426,20 @@
                       >
                         {statusLabels[stepStatus]}
                       </button>
+                      {#if stepTimestamp(stepStatus)}
+                        <span class="order-step-timestamp"
+                          >{stepTimestamp(stepStatus)}</span
+                        >
+                      {/if}
                     </div>
                   </li>
                 {/each}
               </ul>
+              <span
+                class="order-steps-sr-only"
+                aria-live="polite"
+                aria-atomic="true">{stepAnnouncement}</span
+              >
             </div>
             <div class="flex justify-end">
               <div class="flex items-center gap-2">
@@ -379,27 +466,24 @@
       <table class="table table-sm">
         <thead class="bg-base-200/60 text-base-content">
           <tr>
-            <th class="w-[55%] font-bold">Producto</th>
+            <th class="w-[40%] font-bold">Producto</th>
+            <th class="w-[25%] font-bold">Sabores</th>
             <th class="w-[15%] text-center font-bold">Cantidad</th>
-            <th class="w-[30%] text-right font-bold"
+            <th class="w-[20%] text-right font-bold"
               >{amountColumnLabel(selectedOrder.status)}</th
             >
           </tr>
         </thead>
         <tbody>
           {#if !selectedOrder.items || selectedOrder.items.length === 0}
-            <tr><td colspan="3">Sin items</td></tr>
+            <tr><td colspan="4">Sin items</td></tr>
           {:else}
             {#each selectedOrder.items as item}
+              {@const flavorText = itemFlavorText(item.customizations)}
               <tr>
                 <td>
                   <div>{item.product_name}</div>
                   {#if item.customizations}
-                    {#if item.customizations.flavor_name}
-                      <div class="text-xs text-base-content/60">
-                        Sabor: {item.customizations.flavor_name}
-                      </div>
-                    {/if}
                     {#if Array.isArray(item.customizations.addon_names) && item.customizations.addon_names.length > 0 && !Array.isArray(item.customizations.included_addon_names) && !Array.isArray(item.customizations.extra_addon_names)}
                       <div class="text-xs text-base-content/60">
                         Complementos: {item.customizations.addon_names.join(
@@ -426,6 +510,15 @@
                         Nota: {item.customizations.notes}
                       </div>
                     {/if}
+                  {/if}
+                </td>
+                <td>
+                  {#if flavorText}
+                    <span class="text-xs text-base-content/70"
+                      >{flavorText}</span
+                    >
+                  {:else}
+                    <span class="text-xs text-base-content/40">—</span>
                   {/if}
                 </td>
                 <td class="text-center">{item.quantity}</td>

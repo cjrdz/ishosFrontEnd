@@ -23,6 +23,7 @@
     selectedProductAddons: Addon[];
     paidAddonGroups: AddonGroup[];
     selectedFlavorId: string;
+    selectedFlavorIds: string[];
     includedToppingId: string;
     includedJaleaId: string;
     selectedExtraAddonIds: string[];
@@ -34,6 +35,7 @@
     onProductChange: (value: string) => void;
     onQuantityChange: (value: number) => void;
     onFlavorChange: (value: string) => void;
+    onFlavorIdsChange: (value: string[]) => void;
     onChangeIncludedTopping: (value: string) => void;
     onChangeIncludedJalea: (value: string) => void;
     onToggleExtraAddonSelection: (addonId: string, checked: boolean) => void;
@@ -63,6 +65,7 @@
     selectedProductAddons,
     paidAddonGroups,
     selectedFlavorId,
+    selectedFlavorIds,
     includedToppingId,
     includedJaleaId,
     selectedExtraAddonIds,
@@ -74,6 +77,7 @@
     onProductChange,
     onQuantityChange,
     onFlavorChange,
+    onFlavorIdsChange,
     onChangeIncludedTopping,
     onChangeIncludedJalea,
     onToggleExtraAddonSelection,
@@ -92,8 +96,17 @@
   const UNSELECTED_CUSTOMIZATION = "";
   const NONE_CUSTOMIZATION = "none";
 
+  const selectedProduct = $derived(onProductById(orderForm.product_id));
+  const ballQuantity = $derived(selectedProduct?.ball_quantity ?? 1);
+  const allowsMixedFlavors = $derived(
+    (selectedProduct?.allows_mixed_flavors ?? false) && ballQuantity > 1,
+  );
   const requiresFlavorSelection = $derived(
-    selectedProductFlavors.length > 0 && !selectedFlavorId,
+    selectedProductFlavors.length > 0 &&
+      (allowsMixedFlavors
+        ? selectedFlavorIds.length !== ballQuantity ||
+          selectedFlavorIds.some((id) => !id)
+        : !selectedFlavorId),
   );
   const requiresToppingSelection = $derived(
     toppingAddons.length > 0 && !includedToppingId,
@@ -223,27 +236,69 @@
       {#if selectedProductFlavors.length > 0 || hasIncludedAddonSelectors}
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {#if selectedProductFlavors.length > 0}
-            <div class="form-control">
-              <span id="order-flavor-label" class="label-text mb-1">
-                Sabor
-                <span class="text-error">*</span>
-              </span>
-              <select
-                id="order-flavor"
-                class="select select-bordered w-full"
-                value={selectedFlavorId}
-                aria-labelledby="order-flavor-label"
-                onchange={(event) =>
-                  onFlavorChange(
-                    (event.currentTarget as HTMLSelectElement).value,
-                  )}
-              >
-                <option value="">Selecciona un sabor</option>
-                {#each selectedProductFlavors as flavor}
-                  <option value={flavor.id}>{flavor.name}</option>
-                {/each}
-              </select>
-            </div>
+            {#if allowsMixedFlavors}
+              <div class="form-control md:col-span-2 xl:col-span-3">
+                <span id="order-flavor-label" class="label-text mb-1">
+                  Sabores
+                  <span class="text-error">*</span>
+                </span>
+                <div
+                  class="grid gap-3"
+                  style="grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));"
+                >
+                  {#each Array(ballQuantity) as _, index (index)}
+                    <div class="form-control">
+                      <span class="text-xs text-base-content/70 mb-1"
+                        >Bola {index + 1}</span
+                      >
+                      <select
+                        id={`order-flavor-${index}`}
+                        class="select select-bordered select-sm w-full"
+                        value={selectedFlavorIds[index]}
+                        aria-labelledby="order-flavor-label"
+                        onchange={(event) => {
+                          const nextIds = [...selectedFlavorIds];
+                          nextIds[index] = (
+                            event.currentTarget as HTMLSelectElement
+                          ).value;
+                          onFlavorIdsChange(nextIds);
+                        }}
+                      >
+                        <option value="">Seleccion sabor</option>
+                        {#each selectedProductFlavors as flavor}
+                          <option value={flavor.id}>{flavor.name}</option>
+                        {/each}
+                      </select>
+                    </div>
+                  {/each}
+                </div>
+                <p class="text-xs text-base-content/60 mt-2">
+                  Selecciona un sabor para cada bola.
+                </p>
+              </div>
+            {:else}
+              <div class="form-control">
+                <span id="order-flavor-label" class="label-text mb-1">
+                  Sabor
+                  <span class="text-error">*</span>
+                </span>
+                <select
+                  id="order-flavor"
+                  class="select select-bordered w-full"
+                  value={selectedFlavorId}
+                  aria-labelledby="order-flavor-label"
+                  onchange={(event) =>
+                    onFlavorChange(
+                      (event.currentTarget as HTMLSelectElement).value,
+                    )}
+                >
+                  <option value="">Selecciona un sabor</option>
+                  {#each selectedProductFlavors as flavor}
+                    <option value={flavor.id}>{flavor.name}</option>
+                  {/each}
+                </select>
+              </div>
+            {/if}
           {/if}
 
           {#if toppingAddons.length > 0}
@@ -535,7 +590,18 @@
             </p>
           </div>
         </div>
-        {#if currentFlavorName}
+        {#if allowsMixedFlavors && selectedFlavorIds.some((id) => id)}
+          <p class="text-xs text-base-content/70">
+            Sabores: {selectedFlavorIds
+              .map(
+                (id) =>
+                  selectedProductFlavors.find((flavor) => flavor.id === id)
+                    ?.name,
+              )
+              .filter(Boolean)
+              .join(", ")}
+          </p>
+        {:else if currentFlavorName}
           <p class="text-xs text-base-content/70">Sabor: {currentFlavorName}</p>
         {/if}
         {#if currentIncludedAddonNames.length > 0}
@@ -568,9 +634,19 @@
                   <h6 class="font-medium">
                     {onProductById(item.product_id)?.name ?? "Producto"}
                   </h6>
-                  {#if onResolveFlavorName(item.product_id, item.flavor_id)}
+                  {#if item.flavor_ids && item.flavor_ids.length > 0}
+                    {#each item.flavor_ids as flavorId}
+                      {@const name = onResolveFlavorName(
+                        item.product_id,
+                        flavorId,
+                      )}
+                      {#if name}
+                        <span class="badge badge-outline">{name}</span>
+                      {/if}
+                    {/each}
+                  {:else if onResolveFlavorName(item.product_id, item.flavor_id)}
                     <span class="badge badge-outline"
-                      >Sabor: {onResolveFlavorName(
+                      >{onResolveFlavorName(
                         item.product_id,
                         item.flavor_id,
                       )}</span

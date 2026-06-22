@@ -1,6 +1,13 @@
 <script lang="ts">
   import type { Flavor } from "@features/admin-management";
-  import Icon from "@shared/components/AppIcon.svelte";
+  import AdminCrudFormShell from "./AdminCrudFormShell.svelte";
+  import {
+    closeConfirmDialog,
+    confirmDialogNow,
+    createConfirmDialogState,
+    openConfirmDialog,
+    sortByDisplayOrderAndName,
+  } from "@features/products";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
 
   interface Props {
@@ -27,10 +34,7 @@
   let { flavors, busy, moduleError, onCreate, onUpdate, onDelete }: Props =
     $props();
   let flavorEditorDialog: HTMLDialogElement | null = null;
-  let confirmOpen = $state(false);
-  let confirmTitle = $state("Confirmar accion");
-  let confirmMessage = $state("");
-  let confirmAction = $state<null | (() => void)>(null);
+  let confirmDialog = $state(createConfirmDialogState());
   let editingFlavorId = $state<string | null>(null);
 
   let form = $state({
@@ -43,13 +47,16 @@
 
   let flavorActivityFilter = $state<"all" | "active" | "inactive">("all");
   const filteredFlavors = $derived(
-    flavorActivityFilter === "all"
+    (flavorActivityFilter === "all"
       ? flavors
       : flavors.filter((flavor) =>
           flavorActivityFilter === "active"
             ? flavor.is_active
             : !flavor.is_active,
-        ),
+        )
+    )
+      .slice()
+      .sort((left, right) => sortByDisplayOrderAndName(left, right)),
   );
   const flavorActivityFilterLabel = $derived(
     flavorActivityFilter === "all"
@@ -116,27 +123,9 @@
     closeFlavorEditor();
   }
 
-  function openConfirm(title: string, message: string, action: () => void) {
-    confirmTitle = title;
-    confirmMessage = message;
-    confirmAction = action;
-    confirmOpen = true;
-  }
-
-  function confirmNow() {
-    const action = confirmAction;
-    confirmAction = null;
-    confirmOpen = false;
-    if (action) action();
-  }
-
-  function closeConfirm() {
-    confirmAction = null;
-    confirmOpen = false;
-  }
-
   function requestDeleteFlavor(flavor: Flavor) {
-    openConfirm(
+    openConfirmDialog(
+      confirmDialog,
       "Eliminar sabor",
       `Seguro que deseas eliminar ${flavor.name}?`,
       () => onDelete(flavor.id),
@@ -286,102 +275,66 @@
 
 <dialog class="modal" bind:this={flavorEditorDialog} onclose={resetForm}>
   <div class="modal-box w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto p-0">
-    <div
-      class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4"
+    <AdminCrudFormShell
+      title={isEditing ? "Editar sabor" : "Crear sabor"}
+      icon="lucide:ice-cream-bowl"
+      onClose={closeFlavorEditor}
+      onSubmit={submit}
+      submitLabel={isEditing ? "Actualizar" : "Crear"}
+      submitDisabled={busy || !form.name.trim()}
     >
-      <div class="flex items-center gap-2.5">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"
-        >
-          <Icon
-            icon="lucide:ice-cream-bowl"
-            width="16"
-            height="16"
-            class="text-primary"
-          />
-        </div>
-        <h3 class="font-bold text-base leading-tight">
-          {isEditing ? "Editar sabor" : "Crear sabor"}
-        </h3>
+      <div class="form-control w-full">
+        <span id="flavor-name-label" class="label-text mb-1">Nombre</span>
+        <input
+          id="flavor-name"
+          class="input input-bordered w-full"
+          placeholder="Vainilla"
+          bind:value={form.name}
+          required
+          aria-labelledby="flavor-name-label"
+        />
       </div>
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        type="button"
-        onclick={closeFlavorEditor}
-        aria-label="Cerrar"
-      >
-        <Icon icon="lucide:x" width="16" height="16" />
-      </button>
-    </div>
 
-    <form class="p-5 space-y-5" onsubmit={submit}>
-      <div class="grid gap-5">
-        <div class="form-control w-full">
-          <span id="flavor-name-label" class="label-text mb-1">Nombre</span>
+      <div class="form-control w-full">
+        <span id="flavor-order-label" class="label-text mb-1"
+          >Orden de visualizacion</span
+        >
+        <input
+          id="flavor-order"
+          type="number"
+          class="input input-bordered w-full"
+          placeholder="0"
+          bind:value={form.display_order}
+          aria-labelledby="flavor-order-label"
+        />
+      </div>
+
+      <div class="form-control">
+        <label for="flavor-seasonal" class="label cursor-pointer">
+          <span class="label-text">Marcar como sabor de temporada</span>
           <input
-            id="flavor-name"
-            class="input input-bordered w-full"
-            placeholder="Vainilla"
-            bind:value={form.name}
-            required
-            aria-labelledby="flavor-name-label"
+            id="flavor-seasonal"
+            type="checkbox"
+            bind:checked={form.is_seasonal}
+            class="checkbox"
           />
-        </div>
+        </label>
+      </div>
 
-        <div class="form-control w-full">
-          <span id="flavor-order-label" class="label-text mb-1"
-            >Orden de visualizacion</span
-          >
-          <input
-            id="flavor-order"
-            type="number"
-            class="input input-bordered w-full"
-            placeholder="0"
-            bind:value={form.display_order}
-            aria-labelledby="flavor-order-label"
-          />
-        </div>
-
+      {#if isEditing}
         <div class="form-control">
-          <label for="flavor-seasonal" class="label cursor-pointer">
-            <span class="label-text">Marcar como sabor de temporada</span>
+          <label for="flavor-active" class="label cursor-pointer">
+            <span class="label-text">Activo</span>
             <input
-              id="flavor-seasonal"
+              id="flavor-active"
               type="checkbox"
-              bind:checked={form.is_seasonal}
+              bind:checked={form.is_active}
               class="checkbox"
             />
           </label>
         </div>
-
-        {#if isEditing}
-          <div class="form-control">
-            <label for="flavor-active" class="label cursor-pointer">
-              <span class="label-text">Activo</span>
-              <input
-                id="flavor-active"
-                type="checkbox"
-                bind:checked={form.is_active}
-                class="checkbox"
-              />
-            </label>
-          </div>
-        {/if}
-      </div>
-
-      <div class="flex flex-wrap gap-2 pt-1">
-        <button
-          class="btn btn-primary"
-          type="submit"
-          disabled={busy || !form.name.trim()}
-        >
-          {isEditing ? "Actualizar" : "Crear"}
-        </button>
-        <button type="button" class="btn btn-ghost" onclick={closeFlavorEditor}
-          >Cancelar</button
-        >
-      </div>
-    </form>
+      {/if}
+    </AdminCrudFormShell>
   </div>
   <form method="dialog" class="modal-backdrop">
     <button type="button" onclick={closeFlavorEditor}>close</button>
@@ -389,11 +342,11 @@
 </dialog>
 
 <ConfirmDialog
-  open={confirmOpen}
-  title={confirmTitle}
-  message={confirmMessage}
+  open={confirmDialog.open}
+  title={confirmDialog.title}
+  message={confirmDialog.message}
   {busy}
   variant="error"
-  onConfirm={confirmNow}
-  onCancel={closeConfirm}
+  onConfirm={() => confirmDialogNow(confirmDialog)}
+  onCancel={() => closeConfirmDialog(confirmDialog)}
 />

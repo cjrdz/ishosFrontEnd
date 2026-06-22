@@ -57,6 +57,10 @@ export interface PublicProduct {
   image_url?: string | null;
   image_path?: string | null;
   is_available: boolean;
+  ball_based?: boolean;
+  ball_quantity?: number;
+  allows_mixed_flavors?: boolean;
+  stock_status?: "in_stock" | "low_stock" | "out_of_stock" | "not_tracked";
   flavors?: PublicFlavor[];
   addons?: PublicAddon[];
 }
@@ -102,6 +106,7 @@ export interface PublicOrderTrackingResponse {
   created_at: string;
   total_amount: number;
   order_type: "en_local" | "para_llevar";
+  status_timestamps?: Record<string, string>;
   items: Array<{
     product_name: string;
     quantity: number;
@@ -109,6 +114,7 @@ export interface PublicOrderTrackingResponse {
     subtotal: number;
     customizations?: {
       flavor_name?: string;
+      flavor_names?: string[];
       addon_names?: string[];
       included_addon_names?: string[];
       extra_addon_names?: string[];
@@ -122,11 +128,21 @@ export interface PublicOrderTrackingHistoryResponse {
 }
 
 export async function listPublicCategories(): Promise<PublicCategory[]> {
-  return bffRequest<PublicCategory[]>("/api/store/categories");
+  const res = await bffRequest<{ data: PublicCategory[] } | PublicCategory[]>(
+    "/api/store/categories",
+  );
+  return Array.isArray(res)
+    ? res
+    : ((res as { data: PublicCategory[] }).data ?? []);
 }
 
 export async function listPublicProducts(): Promise<PublicProduct[]> {
-  return bffRequest<PublicProduct[]>("/api/store/products");
+  const res = await bffRequest<{ data: PublicProduct[] } | PublicProduct[]>(
+    "/api/store/products",
+  );
+  return Array.isArray(res)
+    ? res
+    : ((res as { data: PublicProduct[] }).data ?? []);
 }
 
 export async function createPublicOrder(

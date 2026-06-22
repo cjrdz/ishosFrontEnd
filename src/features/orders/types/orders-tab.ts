@@ -41,6 +41,7 @@ export interface ManualOrderItemDraft {
   product_id: string;
   quantity: number;
   flavor_id?: string;
+  flavor_ids?: string[];
   included_addon_ids: string[];
   extra_addon_ids: string[];
   topping_selection?: "none" | "selected";

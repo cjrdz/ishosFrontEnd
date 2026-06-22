@@ -41,6 +41,7 @@
     orderForm: OrderFormState;
     manualItems: ManualOrderItemDraft[];
     selectedFlavorId: string;
+    selectedFlavorIds: string[];
     includedToppingId: string;
     includedJaleaId: string;
     selectedExtraAddonIds: string[];
@@ -116,6 +117,7 @@
   let addItemError = $state("");
   let orderSearch = $state("");
   let selectedFlavorId = $state("");
+  let selectedFlavorIds = $state<string[]>([]);
   let includedToppingId = $state("");
   let includedJaleaId = $state("");
   let selectedExtraAddonIds = $state<string[]>([]);
@@ -151,6 +153,7 @@
       snapshot.manualItems.length > 0 ||
       snapshot.orderForm.quantity !== 1 ||
       snapshot.selectedFlavorId.length > 0 ||
+      snapshot.selectedFlavorIds.length > 0 ||
       snapshot.includedToppingId.length > 0 ||
       snapshot.includedJaleaId.length > 0 ||
       snapshot.selectedExtraAddonIds.length > 0
@@ -168,6 +171,7 @@
         extra_addon_ids: [...item.extra_addon_ids],
       })),
       selectedFlavorId,
+      selectedFlavorIds: [...selectedFlavorIds],
       includedToppingId,
       includedJaleaId,
       selectedExtraAddonIds: [...selectedExtraAddonIds],
@@ -257,6 +261,11 @@
               product_id: item.product_id,
               quantity: Number(item.quantity) || 1,
               flavor_id: item.flavor_id,
+              flavor_ids: Array.isArray(item.flavor_ids)
+                ? item.flavor_ids.filter(
+                    (id): id is string => typeof id === "string" && !!id,
+                  )
+                : undefined,
               included_addon_ids: includedIds,
               extra_addon_ids: normalizeIdList(item.extra_addon_ids ?? []),
               topping_selection: toppingSelection,
@@ -265,6 +274,9 @@
           })
         : [];
       selectedFlavorId = snapshot.selectedFlavorId ?? "";
+      selectedFlavorIds = (snapshot.selectedFlavorIds ?? []).filter(
+        (id): id is string => !!id,
+      );
       includedToppingId = snapshot.includedToppingId ?? "";
       includedJaleaId = snapshot.includedJaleaId ?? "";
       selectedExtraAddonIds = normalizeIdList(
@@ -287,7 +299,8 @@
     if (
       !isEditing &&
       selectedProductFlavors.length === 1 &&
-      !selectedFlavorId
+      !selectedFlavorId &&
+      !selectedProduct?.allows_mixed_flavors
     ) {
       selectedFlavorId = selectedProductFlavors[0].id;
     }
@@ -420,6 +433,10 @@
           typeof flavorIdRaw === "string" && flavorIdRaw.trim()
             ? flavorIdRaw.trim()
             : undefined;
+        const flavorIds = readCustomizationStringArray(
+          customizations,
+          "flavor_ids",
+        );
 
         const includedAddonIDs = readCustomizationStringArray(
           customizations,
@@ -455,6 +472,7 @@
           product_id: productID,
           quantity: Math.max(1, Number(item.quantity) || 1),
           flavor_id: flavorId,
+          flavor_ids: flavorIds.length > 0 ? flavorIds : undefined,
           included_addon_ids: includedAddonIDs,
           extra_addon_ids:
             extraAddonIDs.length > 0 ? extraAddonIDs : legacyAddonIDs,
@@ -510,6 +528,7 @@
       orderForm.product_id,
       orderForm.quantity,
       selectedFlavorId,
+      selectedFlavorIds,
       includedToppingId,
       includedJaleaId,
       selectedExtraAddonIds,
@@ -543,6 +562,7 @@
     orderForm.quantity = 1;
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
+    selectedFlavorIds = reset.selectedFlavorIds;
     includedToppingId = reset.includedToppingId;
     includedJaleaId = reset.includedJaleaId;
     selectedExtraAddonIds = reset.selectedExtraAddonIds;
@@ -600,6 +620,9 @@
     orderForm.product_id = targetItem.product_id;
     orderForm.quantity = targetItem.quantity;
     selectedFlavorId = targetItem.flavor_id ?? "";
+    selectedFlavorIds = (targetItem.flavor_ids ?? []).filter(
+      (id): id is string => !!id,
+    );
     includedToppingId = toppingId
       ? toppingId
       : targetItem.topping_selection === "none"
@@ -620,6 +643,7 @@
     orderForm.quantity = 1;
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
+    selectedFlavorIds = reset.selectedFlavorIds;
     includedToppingId = reset.includedToppingId;
     includedJaleaId = reset.includedJaleaId;
     selectedExtraAddonIds = reset.selectedExtraAddonIds;
@@ -627,9 +651,15 @@
 
   $effect(() => {
     const currentProductId = selectedProduct?.id ?? "";
+    const currentBallQuantity = selectedProduct?.ball_quantity ?? 1;
+    const currentAllowsMixed =
+      (selectedProduct?.allows_mixed_flavors ?? false) &&
+      currentBallQuantity > 1;
+
     if (currentProductId !== lastSelectedProductId) {
       lastSelectedProductId = currentProductId;
       selectedFlavorId = "";
+      selectedFlavorIds = Array(currentBallQuantity).fill("");
       includedToppingId = "";
       includedJaleaId = "";
       selectedExtraAddonIds = [];
@@ -641,6 +671,19 @@
       !selectedProductFlavors.some((flavor) => flavor.id === selectedFlavorId)
     ) {
       selectedFlavorId = "";
+    }
+
+    let validFlavorIds = selectedFlavorIds.filter((id) =>
+      selectedProductFlavors.some((flavor) => flavor.id === id),
+    );
+    if (currentAllowsMixed) {
+      validFlavorIds = validFlavorIds.slice(0, currentBallQuantity);
+      while (validFlavorIds.length < currentBallQuantity) {
+        validFlavorIds.push("");
+      }
+    }
+    if (validFlavorIds.length !== selectedFlavorIds.length) {
+      selectedFlavorIds = validFlavorIds;
     }
 
     const normalizedAddonIds = selectedExtraAddonIds.filter((addonId) =>
@@ -725,6 +768,7 @@
     addItemError = "";
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
+    selectedFlavorIds = reset.selectedFlavorIds;
     includedToppingId = reset.includedToppingId;
     includedJaleaId = reset.includedJaleaId;
     selectedExtraAddonIds = reset.selectedExtraAddonIds;
@@ -1018,6 +1062,7 @@
 
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
+    selectedFlavorIds = reset.selectedFlavorIds;
     includedToppingId = reset.includedToppingId;
     includedJaleaId = reset.includedJaleaId;
     selectedExtraAddonIds = reset.selectedExtraAddonIds;
@@ -1165,6 +1210,7 @@
   {selectedProductAddons}
   {paidAddonGroups}
   {selectedFlavorId}
+  {selectedFlavorIds}
   {includedToppingId}
   {includedJaleaId}
   {selectedExtraAddonIds}
@@ -1188,6 +1234,9 @@
   }}
   onFlavorChange={(value) => {
     selectedFlavorId = value;
+  }}
+  onFlavorIdsChange={(value) => {
+    selectedFlavorIds = value;
   }}
   onChangeIncludedTopping={changeIncludedTopping}
   onChangeIncludedJalea={changeIncludedJalea}

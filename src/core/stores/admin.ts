@@ -35,6 +35,7 @@ export const adminData = writable({ ...defaultAdminData });
 export const defaultAdminBusyState = {
   categorias: false,
   productos: false,
+  inventario: false,
   sabores: false,
   complementos: false,
   ordenes: false,
@@ -47,6 +48,7 @@ export const defaultAdminModuleErrors = {
   ordenes: "",
   categorias: "",
   productos: "",
+  inventario: "",
   sabores: "",
   complementos: "",
   empleados: "",

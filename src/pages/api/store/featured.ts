@@ -37,7 +37,9 @@ export const GET: APIRoute = async (context) => {
       const body = (await proxied.json()) as unknown;
       const raw = Array.isArray(body)
         ? body
-        : ((body as { products?: unknown[] }).products ?? []);
+        : ((body as { data?: unknown[]; products?: unknown[] }).data ??
+          (body as { products?: unknown[] }).products ??
+          []);
       products = (raw as Array<{ is_available?: boolean }>)
         .filter((p) => p.is_available !== false)
         .slice(0, FEATURED_LIMIT);

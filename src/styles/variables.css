@@ -24,4 +24,28 @@
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+  /* ── IshosFactory brand tokens ──────────────────────── */
+  --ishos-teal: #00b2a9;
+  --ishos-teal-deep: #009990;
+  --ishos-maroon: #63001f;
+  --ishos-mint: #91e2d6;
+  --ishos-pink: #f9b4da;
+  --ishos-yellow: #f9e9a9;
+
+  --brand-gradient: linear-gradient(
+    135deg,
+    var(--ishos-teal),
+    var(--ishos-teal-deep),
+    var(--ishos-maroon)
+  );
+}
+
+[data-theme="night"] {
+  --brand-gradient: linear-gradient(
+    135deg,
+    var(--ishos-teal),
+    var(--ishos-pink),
+    var(--ishos-yellow)
+  );
 }

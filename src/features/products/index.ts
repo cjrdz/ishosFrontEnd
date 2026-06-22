@@ -3,4 +3,5 @@ export { default as CategoriesTab } from "./components/admin/CategoriesTab.svelt
 export { default as FlavorsTab } from "./components/admin/FlavorsTab.svelte";
 export { default as ProductsTab } from "./components/admin/ProductsTab.svelte";
 export * from "./lib/addon-groups";
+export * from "./lib/admin-confirm-dialog";
 export type { ProductsTabProps } from "./types/products-tab";

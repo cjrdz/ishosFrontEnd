@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
+  import { animate } from "motion";
   import Icon from "@shared/components/AppIcon.svelte";
   import ProductCard from "./shared/ProductCard.svelte";
   import { toSafeImageUrl } from "@shared/utils/formatters";
@@ -23,6 +24,7 @@
   let activeIndex = $state(0);
   let trackEl = $state<HTMLDivElement | null>(null);
   let viewportEl = $state<HTMLDivElement | null>(null);
+  let sectionEl = $state<HTMLElement | null>(null);
   let cardsPerView = $state(1);
 
   // Drag state
@@ -75,6 +77,12 @@
       now = Date.now();
     }, 1000);
     startAutoSlide();
+
+    void animate(
+      sectionEl,
+      { opacity: [0, 1], transform: ["translateY(20px)", "translateY(0)"] },
+      { duration: 0.45, ease: [0, 0, 0.2, 1] },
+    );
   });
 
   onDestroy(() => {
@@ -204,6 +212,7 @@
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <section
     class="w-full max-w-2xl mx-auto px-4 py-4 select-none"
+    bind:this={sectionEl}
     onmouseenter={handleMouseEnter}
     onmouseleave={handleMouseExitArea}
     aria-label="Productos Especiales"
@@ -248,7 +257,7 @@
 
           <!-- Each slide occupies 1/cardsPerView of the track width -->
           <div
-            class="shrink-0 flex justify-center px-2"
+            class="shrink-0 flex justify-center px-2 transition-transform duration-200 hover:scale-[1.02]"
             style="width: {slideWidthPct}%"
             role="listitem"
             aria-label={product.name}
@@ -280,7 +289,7 @@
         <button
           class="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30
                btn btn-circle btn-sm bg-base-100/80 border-base-300/60
-               backdrop-blur-sm shadow-md hover:bg-base-100"
+               backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-[var(--ishos-teal)]"
           aria-label="Anterior"
           onclick={prev}
         >
@@ -289,7 +298,7 @@
         <button
           class="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30
                btn btn-circle btn-sm bg-base-100/80 border-base-300/60
-               backdrop-blur-sm shadow-md hover:bg-base-100"
+               backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-[var(--ishos-teal)]"
           aria-label="Siguiente"
           onclick={next}
         >
@@ -305,8 +314,9 @@
           <button
             class="h-1.75 rounded-full border-none p-0 cursor-pointer transition-all duration-200
                  {activeIndex === i
-              ? 'w-[1.1rem] bg-primary'
+              ? 'w-[1.1rem]'
               : 'w-1.75 bg-base-content/20 hover:bg-base-content/40'}"
+            style={activeIndex === i ? "background: var(--ishos-teal);" : ""}
             role="tab"
             aria-selected={activeIndex === i}
             aria-label={`Página ${i + 1}`}

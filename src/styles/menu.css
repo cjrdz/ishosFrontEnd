@@ -1,0 +1,182 @@
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  Menu page — Ishos Factory brand styles & animations               */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Theme-aware design tokens ────────────────────────────────────── */
+:root {
+  --menu-pill-bg: color-mix(in srgb, var(--ishos-teal) 12%, transparent);
+  --menu-tab-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 10px 20px -18px oklch(0.45 0.18 190 / 0.45);
+  --menu-dropdown-shadow: 0 16px 40px -20px rgba(15, 23, 42, 0.45);
+  --menu-tab-blob-shadow: 0 6px 14px -10px rgba(15, 23, 42, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.24) inset;
+  --menu-hero-teal-opacity: 0.2;
+  --menu-hero-pink-opacity: 0.15;
+  --menu-hero-blue-opacity: 0.12;
+  --menu-wave-fill: color-mix(in srgb, var(--ishos-teal) 8%, transparent);
+}
+
+[data-theme="night"] {
+  --menu-pill-bg: color-mix(in srgb, var(--ishos-teal) 20%, transparent);
+  --menu-tab-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 10px 20px -18px oklch(0.55 0.16 190 / 0.5);
+  --menu-dropdown-shadow: 0 16px 40px -20px rgba(0, 0, 0, 0.55);
+  --menu-tab-blob-shadow: 0 6px 14px -10px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.24) inset;
+  --menu-hero-teal-opacity: 0.35;
+  --menu-hero-pink-opacity: 0.28;
+  --menu-hero-blue-opacity: 0.2;
+  --menu-wave-fill: color-mix(in srgb, var(--ishos-teal) 16%, transparent);
+}
+
+/* ── Stagger fade-in ──────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up   { animation: fadeUp 0.6s ease forwards; opacity: 0; }
+.fade-up-1 { animation-delay: 0.1s; }
+.fade-up-2 { animation-delay: 0.25s; }
+.fade-up-3 { animation-delay: 0.4s; }
+
+/* ── Brand section pill ───────────────────────────────────────────── */
+.section-pill {
+  display: inline-block;
+  border-radius: 0.75rem;
+  padding: 0.2rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--menu-pill-bg);
+  color: var(--ishos-teal);
+}
+
+/* ── Category label contrast boost ────────────────────────────────── */
+.category-tab-label,
+.mobile-category-trigger,
+.mobile-category-option {
+  color: inherit;
+  opacity: 0.9;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.category-tab-label-active,
+.category-tab-label:hover,
+.mobile-category-option-active,
+.mobile-category-option:hover {
+  opacity: 1;
+}
+
+/* ── Mobile dropdown brand gradient ring ──────────────────────────── */
+.menu-mobile-ring {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--ishos-teal) 18%, transparent),
+    color-mix(in srgb, var(--ishos-pink) 16%, transparent),
+    color-mix(in srgb, var(--ishos-teal) 18%, transparent)
+  );
+}
+
+/* ── Mobile dropdown brand active item ────────────────────────────── */
+:root {
+  --menu-mobile-active-bg: color-mix(in srgb, var(--ishos-teal) 12%, transparent);
+}
+
+[data-theme="night"] {
+  --menu-mobile-active-bg: color-mix(in srgb, var(--ishos-teal) 18%, transparent);
+}
+
+.menu-mobile-active {
+  background: var(--menu-mobile-active-bg);
+  color: var(--ishos-teal);
+  font-weight: 600;
+}
+
+/* ── Desktop tab bar brand gradient ring ──────────────────────────── */
+.menu-desktop-ring {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--ishos-teal) 18%, transparent),
+    color-mix(in srgb, var(--ishos-pink) 16%, transparent),
+    color-mix(in srgb, var(--ishos-teal) 18%, transparent)
+  );
+}
+
+/* ── Responsive dropdown sizing ───────────────────────────────────── */
+.menu-mobile-ring {
+  max-width: 100%;
+}
+
+@media (min-width: 480px) {
+  .menu-mobile-ring {
+    max-width: 24rem;
+  }
+}
+
+/* Dropdown panel: 2-column grid + scroll */
+.menu-mobile-ring ul {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.25rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Responsive section pill */
+.section-pill {
+  padding: 0.2rem 1rem;
+  font-size: 0.7rem;
+}
+
+@media (min-width: 640px) {
+  .section-pill {
+    padding: 0.25rem 1.2rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Desktop tab bar responsive padding */
+.menu-desktop-ring {
+  padding: 0.125rem;
+}
+
+@media (min-width: 1024px) {
+  .menu-desktop-ring {
+    padding: 0.2rem;
+  }
+}
+
+/* ── Decorative diagonal stripe pattern ───────────────────────────── */
+.stripe-bg {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    color-mix(in srgb, var(--ishos-teal) 6%, transparent) 6px,
+    color-mix(in srgb, var(--ishos-teal) 6%, transparent) 12px
+  );
+}
+
+/* ── Hero background blobs ────────────────────────────────────────── */
+.hero-blob-teal {
+  opacity: var(--menu-hero-teal-opacity);
+}
+.hero-blob-pink {
+  opacity: var(--menu-hero-pink-opacity);
+}
+.hero-blob-blue {
+  opacity: var(--menu-hero-blue-opacity);
+}
+
+/* ── Section divider wave ─────────────────────────────────────────── */
+.wave-divider {
+  overflow: hidden;
+  line-height: 0;
+}
+.wave-divider svg {
+  display: block;
+}

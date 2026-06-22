@@ -12,6 +12,11 @@
     is_available: boolean;
     exclude_global_flavors: boolean;
     exclude_global_addons: boolean;
+    ball_based: boolean;
+    ball_quantity: number | "custom";
+    custom_ball_quantity: string;
+    allows_mixed_flavors: boolean;
+    stock_status: string;
   }
 
   interface Props {
@@ -43,6 +48,26 @@
     onOpenImageGalleryModal,
     onClearSelectedImage,
   }: Props = $props();
+
+  const ballQuantityOptions = [1, 2, 3];
+  const stockStatusOptions = [
+    { value: "auto", label: "Automatico (desde inventario)" },
+    { value: "in_stock", label: "En stock" },
+    { value: "low_stock", label: "Stock bajo" },
+    { value: "out_of_stock", label: "Agotado" },
+  ];
+
+  const isCustomBallQuantity = $derived(form.ball_quantity === "custom");
+  const effectiveBallQuantity = $derived(
+    isCustomBallQuantity
+      ? Number(form.custom_ball_quantity) || 0
+      : typeof form.ball_quantity === "number"
+        ? form.ball_quantity
+        : 0,
+  );
+  const showMixedFlavors = $derived(
+    form.ball_based && effectiveBallQuantity > 1,
+  );
 
   let dialogRef = $state<HTMLDialogElement | null>(null);
 
@@ -183,6 +208,94 @@
                   >Excluir este producto de complementos globales</span
                 >
               </label>
+            </div>
+          </div>
+
+          <div class="form-control w-full md:col-span-2">
+            <span class="label-text mb-1">Configuracion de Inventario</span>
+            <div class="space-y-3 rounded-lg border border-base-300/70 p-3">
+              <!-- Ball Based Toggle -->
+              <label class="label cursor-pointer justify-start gap-2 p-0">
+                <input
+                  class="toggle toggle-sm"
+                  type="checkbox"
+                  bind:checked={form.ball_based}
+                />
+                <span class="label-text">Basado en bolas</span>
+              </label>
+
+              {#if form.ball_based}
+                <!-- Ball Quantity -->
+                <div class="space-y-2">
+                  <span class="text-sm text-base-content/70"
+                    >Cantidad de bolas</span
+                  >
+                  <div class="flex flex-wrap gap-2">
+                    {#each ballQuantityOptions as qty (qty)}
+                      <label
+                        class="label cursor-pointer gap-1.5 rounded-lg border border-base-300 px-3 py-1.5 hover:bg-base-200/50"
+                      >
+                        <input
+                          type="radio"
+                          class="radio radio-sm"
+                          name="ball_quantity"
+                          value={qty}
+                          checked={form.ball_quantity === qty}
+                          onchange={() => (form.ball_quantity = qty)}
+                        />
+                        <span class="label-text">{qty}</span>
+                      </label>
+                    {/each}
+                    <label
+                      class="label cursor-pointer gap-1.5 rounded-lg border border-base-300 px-3 py-1.5 hover:bg-base-200/50"
+                    >
+                      <input
+                        type="radio"
+                        class="radio radio-sm"
+                        name="ball_quantity"
+                        value="custom"
+                        checked={isCustomBallQuantity}
+                        onchange={() => (form.ball_quantity = "custom")}
+                      />
+                      <span class="label-text">Custom</span>
+                    </label>
+                  </div>
+                  {#if isCustomBallQuantity}
+                    <input
+                      type="number"
+                      class="input input-bordered input-sm w-full"
+                      placeholder="Ej: 5"
+                      min="1"
+                      bind:value={form.custom_ball_quantity}
+                    />
+                  {/if}
+                </div>
+
+                <!-- Mixed Flavors -->
+                {#if showMixedFlavors}
+                  <label class="label cursor-pointer justify-start gap-2 p-0">
+                    <input
+                      class="toggle toggle-sm"
+                      type="checkbox"
+                      bind:checked={form.allows_mixed_flavors}
+                    />
+                    <span class="label-text">Permitir sabores mixtos</span>
+                  </label>
+                {/if}
+              {/if}
+
+              <!-- Stock Status -->
+              <div class="form-control w-full">
+                <span class="label-text mb-1 text-sm">Estado de stock</span>
+                <select
+                  class="select select-bordered select-sm w-full"
+                  bind:value={form.stock_status}
+                >
+                  {#each stockStatusOptions as opt (opt.value)}
+                    <option value={opt.value}>{opt.label}</option>
+                  {/each}
+                </select>
+              </div>
             </div>
           </div>
 

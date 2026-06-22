@@ -5,13 +5,38 @@
  * session data in the browser runtime for UI state.
  */
 
-import type { Session } from "../../../types/auth";
+import type { Session, UserRole } from "../../../types/auth";
 
 /**
  * Store session data in memory (not localStorage)
  * This is used only as a cache of the current session for UI purposes.
  */
 let cachedSession: Session | null = null;
+
+const ALLOWED_ROLES: ReadonlySet<UserRole> = new Set([
+  "admin",
+  "manager",
+  "staff",
+]);
+
+function isValidSession(value: unknown): value is Session {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const session = value as Record<string, unknown>;
+  return (
+    typeof session.id === "string" &&
+    session.id.length > 0 &&
+    typeof session.email === "string" &&
+    session.email.length > 0 &&
+    typeof session.name === "string" &&
+    typeof session.phone === "string" &&
+    typeof session.role === "string" &&
+    ALLOWED_ROLES.has(session.role as UserRole) &&
+    typeof session.active === "boolean"
+  );
+}
 
 /**
  * Get cached session from memory
@@ -26,11 +51,11 @@ export function getCachedSession(): Session | null {
 /**
  * Set cached session in memory
  */
-export function setCachedSession(session: Session | null): void {
+export function setCachedSession(session: unknown): void {
   if (typeof window === "undefined") {
     return;
   }
-  cachedSession = session;
+  cachedSession = isValidSession(session) ? session : null;
 }
 
 /**

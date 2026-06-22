@@ -51,3 +51,126 @@
     transparent
   );
 }
+
+/* ── Timestamp below current step label ─────────────────────────── */
+.order-step-timestamp {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: color-mix(
+    in oklab,
+    var(--fallback-bc, oklch(0% 0 0)) 48%,
+    transparent
+  );
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* ── Screen-reader-only live region ─────────────────────────────── */
+.order-steps-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Current step soft pulse ────────────────────────────────────── */
+@keyframes stepCurrentPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px
+      color-mix(in oklab, var(--color-primary) 14%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px
+      color-mix(in oklab, var(--color-primary) 8%, transparent);
+  }
+}
+
+.order-step-node--current {
+  animation: stepCurrentPulse 2.5s ease-in-out infinite;
+}
+
+/* ── Next-step hint pulse (admin) ───────────────────────────────── */
+@keyframes stepHintPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0px
+      color-mix(in oklab, var(--color-primary) 10%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px
+      color-mix(in oklab, var(--color-primary) 5%, transparent);
+  }
+}
+
+.order-step-node--hint {
+  animation: stepHintPulse 2s ease-in-out infinite;
+}
+
+/* ── Admin interactive (clickable) nodes ────────────────────────── */
+.order-step-node--clickable {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.order-step-node--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px
+    color-mix(in oklab, var(--fallback-bc, oklch(0% 0 0)) 10%, transparent);
+}
+
+.order-step-node--clickable:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.order-step-node--clickable:active {
+  transform: scale(0.94);
+}
+
+/* ── Admin step label buttons ───────────────────────────────────── */
+.order-step-label-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  transition: color 300ms ease, opacity 200ms ease;
+  cursor: pointer;
+}
+
+.order-step-label-btn:hover:not(:disabled) {
+  opacity: 0.75;
+}
+
+.order-step-label-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.order-step-label-btn:disabled {
+  cursor: default;
+}
+
+/* ── Respect reduced motion ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .order-step-node--current {
+    animation: none;
+  }
+
+  .order-step-node--hint {
+    animation: none;
+  }
+
+  .order-step-label-btn {
+    transition: none;
+  }
+}

@@ -24,6 +24,10 @@ export interface ProductsTabProps {
     is_available: boolean;
     exclude_global_flavors?: boolean;
     exclude_global_addons?: boolean;
+    ball_based?: boolean;
+    ball_quantity?: number;
+    allows_mixed_flavors?: boolean;
+    stock_status?: string;
   }) => void;
   onUpdate: (
     id: string,
@@ -36,6 +40,10 @@ export interface ProductsTabProps {
       is_available: boolean;
       exclude_global_flavors?: boolean;
       exclude_global_addons?: boolean;
+      ball_based?: boolean;
+      ball_quantity?: number;
+      allows_mixed_flavors?: boolean;
+      stock_status?: string;
     },
   ) => void;
   onDelete: (id: string) => void;

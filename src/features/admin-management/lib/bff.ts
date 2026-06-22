@@ -159,7 +159,20 @@ async function bffRequest<T>(
 // Orders
 export async function listOrders(status?: string) {
   const query = status ? { status } : undefined;
-  return bffRequest<any>("/api/admin/orders", { query });
+  const res = await bffRequest<any>("/api/admin/orders", { query });
+  const data = Array.isArray(res) ? res : (res?.data ?? []);
+  const pg = res?.pagination;
+  return {
+    orders: data,
+    pagination: pg
+      ? {
+          page: pg.page ?? 1,
+          limit: pg.per_page ?? 50,
+          total: pg.total ?? data.length,
+          totalPages: pg.total_pages ?? 1,
+        }
+      : { page: 1, limit: 50, total: data.length, totalPages: 1 },
+  };
 }
 
 export async function getOrder(id: string) {
@@ -221,7 +234,8 @@ export async function deleteOrder(id: string) {
 // Categories
 export async function listCategories(includeAll = false) {
   const query = includeAll ? { all: true } : undefined;
-  return bffRequest<any>("/api/admin/categories", { query });
+  const res = await bffRequest<any>("/api/admin/categories", { query });
+  return Array.isArray(res) ? res : (res?.data ?? []);
 }
 
 export async function createCategory(payload: any) {
@@ -246,7 +260,10 @@ export async function deleteCategory(id: string) {
 
 // Products
 export async function listProducts() {
-  return bffRequest<any>("/api/admin/products", { query: { all: true } });
+  const res = await bffRequest<any>("/api/admin/products", {
+    query: { all: true },
+  });
+  return Array.isArray(res) ? res : (res?.data ?? []);
 }
 
 export async function createProduct(payload: any) {
@@ -368,7 +385,8 @@ export async function deleteAdminImage(path: string) {
 
 // Employees
 export async function listEmployees() {
-  return bffRequest<any>("/api/admin/employees");
+  const res = await bffRequest<any>("/api/admin/employees");
+  return Array.isArray(res) ? res : (res?.data ?? []);
 }
 
 export async function createEmployee(payload: any) {
@@ -413,9 +431,10 @@ export async function listUsers(status?: string, search?: string) {
   const query: Record<string, string> = {};
   if (status) query.status = status;
   if (search) query.search = search;
-  return bffRequest<any>("/api/admin/users", {
+  const res = await bffRequest<any>("/api/admin/users", {
     query: Object.keys(query).length > 0 ? query : undefined,
   });
+  return Array.isArray(res) ? res : (res?.data ?? []);
 }
 
 export async function getUser(id: string) {
@@ -481,7 +500,8 @@ export async function updateAdminPanelConfig(payload: AdminPanelConfig) {
 // Flavors
 export async function listFlavors(includeAll = false) {
   const query = includeAll ? { all: true } : undefined;
-  return bffRequest<any>("/api/admin/flavors", { query });
+  const res = await bffRequest<any>("/api/admin/flavors", { query });
+  return Array.isArray(res) ? res : (res?.data ?? []);
 }
 
 export async function createFlavor(payload: any) {
@@ -507,7 +527,8 @@ export async function deleteFlavor(id: string) {
 // Addons
 export async function listAddons(includeAll = false) {
   const query = includeAll ? { all: true } : undefined;
-  return bffRequest<any>("/api/admin/addons", { query });
+  const res = await bffRequest<any>("/api/admin/addons", { query });
+  return Array.isArray(res) ? res : (res?.data ?? []);
 }
 
 export async function createAddon(payload: any) {
@@ -657,5 +678,271 @@ export async function updateAdminStoreSettings(payload: AdminStoreSettings) {
   return bffRequest<AdminStoreSettings>("/api/admin/settings/store", {
     method: "PATCH",
     body: payload,
+  });
+}
+
+// ── Inventory ──────────────────────────────────────────────────────
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  type: "ball_based" | "unit_based";
+  current_stock: number;
+  low_stock_threshold: number;
+  product_id?: string;
+  product?: { id: string; name: string };
+  flavor_id?: string;
+  flavor?: { id: string; name: string };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StockMovement {
+  id: string;
+  inventory_item_id: string;
+  type: "entry" | "sale" | "adjustment";
+  quantity: number;
+  quantity_containers?: number;
+  container_type_id?: string;
+  flavor_id?: string;
+  order_id?: string;
+  reason?: string;
+  created_by_user_id?: string;
+  created_at: string;
+}
+
+export interface InventoryStats {
+  total_items: number;
+  ball_based_items: number;
+  unit_based_items: number;
+  out_of_stock_items: number;
+  low_stock_items: number;
+  healthy_items: number;
+}
+
+export async function listInventoryItems() {
+  const res = await bffRequest<any>("/api/admin/inventory");
+  const data = Array.isArray(res) ? res : (res?.data ?? []);
+  const pg = res?.pagination;
+  return {
+    items: data,
+    pagination: pg
+      ? {
+          page: pg.page ?? 1,
+          limit: pg.per_page ?? 50,
+          total: pg.total ?? data.length,
+          totalPages: pg.total_pages ?? 1,
+        }
+      : { page: 1, limit: 50, total: data.length, totalPages: 1 },
+  };
+}
+
+export async function getInventoryItem(id: string) {
+  return bffRequest<InventoryItem>(`/api/admin/inventory/${id}`);
+}
+
+export async function recordInventoryEntry(
+  flavorId: string,
+  payload: {
+    container_type_id: string;
+    quantity_containers: number;
+    balls_per_container?: number;
+  },
+) {
+  return bffRequest<StockMovement>(`/api/admin/inventory/${flavorId}/entries`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function recordInventoryAdjustment(
+  id: string,
+  payload: {
+    quantity: number;
+    reason: string;
+  },
+) {
+  return bffRequest<StockMovement>(`/api/admin/inventory/${id}/adjustments`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function getLowStockItems() {
+  const res = await bffRequest<any>("/api/admin/inventory/low-stock");
+  return Array.isArray(res) ? res : (res?.data ?? []);
+}
+
+export async function getInventoryMovements(
+  id: string,
+  limit = 50,
+  offset = 0,
+) {
+  const res = await bffRequest<any>(`/api/admin/inventory/${id}/movements`, {
+    query: { limit, offset },
+  });
+  return {
+    movements: Array.isArray(res) ? res : (res?.data ?? []),
+    total: res?.total ?? 0,
+    limit: res?.limit ?? limit,
+    offset: res?.offset ?? offset,
+    totalPages: res?.total_pages ?? 1,
+  };
+}
+
+export async function getInventoryStats() {
+  return bffRequest<InventoryStats>("/api/admin/inventory/stats");
+}
+
+export async function getFlavorStockStatus(flavorId: string) {
+  return bffRequest<{
+    status: string;
+    current_stock: number;
+    threshold: number;
+  }>(`/api/admin/inventory/flavors/${flavorId}/stock`);
+}
+
+export async function listFlavorInventory() {
+  const res = await bffRequest<any>("/api/admin/inventory/flavors");
+  const data = Array.isArray(res) ? res : (res?.data ?? []);
+  return {
+    items: data,
+    pagination: res?.pagination ?? {
+      page: 1,
+      limit: 50,
+      total: data.length,
+      totalPages: 1,
+    },
+  };
+}
+
+export async function listUnitInventory() {
+  const res = await bffRequest<any>("/api/admin/inventory/unit-products");
+  const data = Array.isArray(res) ? res : (res?.data ?? []);
+  return {
+    items: data,
+    pagination: res?.pagination ?? {
+      page: 1,
+      limit: 50,
+      total: data.length,
+      totalPages: 1,
+    },
+  };
+}
+
+export async function recordUnitInventoryEntry(
+  inventoryId: string,
+  payload: {
+    quantity: number;
+  },
+) {
+  return bffRequest<StockMovement>(
+    `/api/admin/inventory/${inventoryId}/unit-entries`,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+}
+
+export async function createUnitInventoryItem(payload: {
+  name: string;
+  product_id: string;
+  low_stock_threshold: number;
+}) {
+  return bffRequest<InventoryItem>("/api/admin/inventory/unit-products", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function linkInventoryToProduct(
+  inventoryId: string,
+  productId: string,
+) {
+  return bffRequest<InventoryItem>(
+    `/api/admin/inventory/${inventoryId}/products/${productId}`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function unlinkInventoryFromProduct(inventoryId: string) {
+  return bffRequest<InventoryItem>(
+    `/api/admin/inventory/${inventoryId}/products/unlink`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
+export async function linkInventoryToFlavor(
+  inventoryId: string,
+  flavorId: string,
+) {
+  return bffRequest<InventoryItem>(
+    `/api/admin/inventory/${inventoryId}/flavors/${flavorId}`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function unlinkInventoryFromFlavor(inventoryId: string) {
+  return bffRequest<InventoryItem>(
+    `/api/admin/inventory/${inventoryId}/flavors/unlink`,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
+// ── Container Types ─────────────────────────────────────────────────
+
+export interface ContainerType {
+  id: string;
+  name: string;
+  balls_per_container: number;
+  is_custom: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listContainerTypes() {
+  const res = await bffRequest<any>("/api/admin/container-types");
+  return Array.isArray(res) ? res : (res?.data ?? []);
+}
+
+export async function createContainerType(payload: {
+  name: string;
+  balls_per_container: number;
+  is_custom: boolean;
+}) {
+  return bffRequest<ContainerType>("/api/admin/container-types", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function updateContainerType(
+  id: string,
+  payload: {
+    name?: string;
+    balls_per_container?: number;
+    is_custom?: boolean;
+    is_active?: boolean;
+  },
+) {
+  return bffRequest<ContainerType>(`/api/admin/container-types/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function deleteContainerType(id: string) {
+  return bffRequest<any>(`/api/admin/container-types/${id}`, {
+    method: "DELETE",
   });
 }

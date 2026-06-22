@@ -49,7 +49,7 @@ export const TRACKING_STATUS_FLOW: PublicOrderStatus[] = [
 ];
 
 export const TRACKING_STATUS_LABELS: Record<PublicOrderStatus, string> = {
-  pendiente_revision: "Pendiente",
+  pendiente_revision: "Recibida",
   recibida: "Aceptada",
   en_proceso: "Preparando",
   lista: "Lista",

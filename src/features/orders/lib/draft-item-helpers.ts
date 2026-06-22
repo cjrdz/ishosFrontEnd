@@ -3,6 +3,7 @@ import type { ManualOrderItemDraft } from "../types/orders-tab";
 import {
   normalizeIdList,
   arraysEqualUnordered,
+  arraysEqualOrdered,
 } from "@shared/utils/collections";
 import { normalizeAddonGroupName } from "@features/products";
 
@@ -11,6 +12,7 @@ export function buildCurrentDraftItem(
   productId: string,
   quantity: number,
   selectedFlavorId: string,
+  selectedFlavorIds: string[],
   includedToppingId: string,
   includedJaleaId: string,
   selectedExtraAddonIds: string[],
@@ -39,7 +41,16 @@ export function buildCurrentDraftItem(
         a.display_order - b.display_order || a.name.localeCompare(b.name),
     );
 
-  if (selectedProduct && activeFlavors.length > 0 && !selectedFlavorId) {
+  const allowsMixedFlavors =
+    (selectedProduct?.allows_mixed_flavors ?? false) &&
+    (selectedProduct?.ball_quantity ?? 1) > 1;
+  const ballQuantity = selectedProduct?.ball_quantity ?? 1;
+  const hasFlavorSelection = allowsMixedFlavors
+    ? selectedFlavorIds.length === ballQuantity &&
+      selectedFlavorIds.every((id) => !!id)
+    : !!selectedFlavorId;
+
+  if (selectedProduct && activeFlavors.length > 0 && !hasFlavorSelection) {
     return { item: null, error: "Selecciona un sabor para este producto" };
   }
 
@@ -76,7 +87,12 @@ export function buildCurrentDraftItem(
     item: {
       product_id: productId,
       quantity: safeQuantity,
-      flavor_id: selectedFlavorId || undefined,
+      flavor_id: allowsMixedFlavors ? undefined : selectedFlavorId || undefined,
+      flavor_ids: allowsMixedFlavors
+        ? Array(ballQuantity)
+            .fill("")
+            .map((_, index) => selectedFlavorIds[index] || "")
+        : undefined,
       included_addon_ids: normalizeIdList(
         [normalizedToppingSelection, normalizedJaleaSelection].filter(
           (value) => value && value !== "none",
@@ -107,6 +123,7 @@ export function addDraftItem(
     (item) =>
       item.product_id === newItem.product_id &&
       (item.flavor_id || "") === (newItem.flavor_id || "") &&
+      arraysEqualOrdered(item.flavor_ids ?? [], newItem.flavor_ids ?? []) &&
       arraysEqualUnordered(
         item.included_addon_ids,
         newItem.included_addon_ids,
@@ -155,6 +172,7 @@ export function draftItemKey(
   return [
     item.product_id,
     item.flavor_id || "",
+    (item.flavor_ids ?? []).join(","),
     item.included_addon_ids.join(","),
     item.extra_addon_ids.join(","),
     String(index),
@@ -164,12 +182,14 @@ export function draftItemKey(
 /** Resets customization selections (flavors, toppings, jaleas, extras) */
 export function resetCustomizationSelections(): {
   selectedFlavorId: string;
+  selectedFlavorIds: string[];
   includedToppingId: string;
   includedJaleaId: string;
   selectedExtraAddonIds: string[];
 } {
   return {
     selectedFlavorId: "",
+    selectedFlavorIds: [],
     includedToppingId: "",
     includedJaleaId: "",
     selectedExtraAddonIds: [],

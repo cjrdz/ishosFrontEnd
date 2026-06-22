@@ -46,7 +46,7 @@
       alt="Isho's"
       width="86"
       height="86"
-      class="group-hover:scale-110 transition-transform duration-200"
+      class="logo-img group-hover:scale-110 transition-transform duration-200"
     />
   {:else}
     <img
@@ -54,7 +54,7 @@
       alt="Isho's"
       width="86"
       height="86"
-      class="group-hover:scale-110 transition-transform duration-200"
+      class="logo-img group-hover:scale-110 transition-transform duration-200"
     />
   {/if}
 </a>

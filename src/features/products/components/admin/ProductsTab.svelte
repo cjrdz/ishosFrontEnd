@@ -73,7 +73,6 @@
   let confirmMessage = $state("");
   let confirmAction = $state<null | (() => void)>(null);
   let editingProductId = $state<string | null>(null);
-
   let productVisibilityFilter = $state<"all" | "active" | "inactive">("all");
   const filteredProducts = $derived(
     productVisibilityFilter === "all"
@@ -102,6 +101,11 @@
     is_available: true,
     exclude_global_flavors: false,
     exclude_global_addons: false,
+    ball_based: false,
+    ball_quantity: 1 as number | "custom",
+    custom_ball_quantity: "",
+    allows_mixed_flavors: false,
+    stock_status: "auto" as string,
   });
 
   const isEditing = $derived(!!editingProductId);
@@ -126,6 +130,11 @@
       is_available: true,
       exclude_global_flavors: false,
       exclude_global_addons: false,
+      ball_based: false,
+      ball_quantity: 1,
+      custom_ball_quantity: "",
+      allows_mixed_flavors: false,
+      stock_status: "auto",
     };
   }
 
@@ -169,6 +178,7 @@
 
   function editProduct(product: Product) {
     editingProductId = product.id;
+    const isCustom = product.ball_quantity && product.ball_quantity > 3;
     form = {
       id: product.id,
       name: product.name,
@@ -179,13 +189,23 @@
       is_available: product.is_available,
       exclude_global_flavors: Boolean(product.exclude_global_flavors),
       exclude_global_addons: Boolean(product.exclude_global_addons),
+      ball_based: Boolean(product.ball_based),
+      ball_quantity: isCustom ? "custom" : product.ball_quantity || 1,
+      custom_ball_quantity: isCustom ? String(product.ball_quantity) : "",
+      allows_mixed_flavors: Boolean(product.allows_mixed_flavors),
+      stock_status: product.stock_status || "auto",
     };
     productEditorOpen = true;
   }
 
   function submit(event: SubmitEvent) {
     event.preventDefault();
-    const payload = {
+    const ballQty =
+      form.ball_quantity === "custom"
+        ? Number(form.custom_ball_quantity)
+        : form.ball_quantity;
+
+    const payload: any = {
       name: form.name.trim(),
       description: form.description.trim(),
       price: Number(form.price),
@@ -194,7 +214,14 @@
       is_available: form.is_available,
       exclude_global_flavors: form.exclude_global_flavors,
       exclude_global_addons: form.exclude_global_addons,
+      ball_based: form.ball_based,
+      ball_quantity: ballQty,
+      allows_mixed_flavors: form.allows_mixed_flavors,
     };
+
+    if (form.stock_status && form.stock_status !== "auto") {
+      payload.stock_status = form.stock_status;
+    }
 
     if (form.id) {
       trackAction("products_tab_submit_update", { productId: form.id });
@@ -245,6 +272,10 @@
       category_id: product.category_id || "",
       image_path: product.image_path || undefined,
       is_available: nextAvailability,
+      ball_based: product.ball_based,
+      ball_quantity: product.ball_quantity,
+      allows_mixed_flavors: product.allows_mixed_flavors,
+      stock_status: product.stock_status || undefined,
     });
   }
 </script>

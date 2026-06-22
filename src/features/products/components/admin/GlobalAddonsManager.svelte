@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { Addon } from "@features/admin-management";
   import {
-    DEFAULT_ADDON_GROUP_NAME,
     addonGroupLabel,
+    collectAddonGroupOptions,
+    PRIMARY_ADDON_GROUPS,
     normalizeAddonGroupName,
     sortByDisplayOrderAndName,
   } from "@features/products";
@@ -33,6 +34,15 @@
     onDelete: (id: string) => void | Promise<void>;
   }
 
+  type AddonFormState = {
+    id: string;
+    name: string;
+    price: number;
+    group_name: string;
+    display_order: number;
+    is_active: boolean;
+  };
+
   let {
     open,
     addons,
@@ -47,14 +57,19 @@
   let dialogRef = $state<HTMLDialogElement | null>(null);
   let editingAddonId = $state<string | null>(null);
   let formBusy = $state(false);
-  let addonForm = $state({
+  let customGroups = $state<string[]>([]);
+  let customGroupName = $state("");
+  let selectingCustomGroup = $state(false);
+  let addonForm = $state<AddonFormState>({
     id: "",
     name: "",
     price: 0,
-    group_name: DEFAULT_ADDON_GROUP_NAME,
+    group_name: PRIMARY_ADDON_GROUPS[0],
     display_order: 0,
     is_active: true,
   });
+
+  const CUSTOM_GROUP_OPTION = "__custom_group__";
 
   const sortedAddons = $derived(
     addons.slice().sort((left, right) => {
@@ -65,6 +80,9 @@
         sortByDisplayOrderAndName(left, right)
       );
     }),
+  );
+  const addonGroupOptions = $derived(
+    collectAddonGroupOptions(addons, customGroups),
   );
 
   $effect(() => {
@@ -78,11 +96,13 @@
 
   function resetAddonForm() {
     editingAddonId = null;
+    selectingCustomGroup = false;
+    customGroupName = "";
     addonForm = {
       id: "",
       name: "",
       price: 0,
-      group_name: DEFAULT_ADDON_GROUP_NAME,
+      group_name: PRIMARY_ADDON_GROUPS[0],
       display_order: 0,
       is_active: true,
     };
@@ -94,6 +114,8 @@
 
   function editAddon(addon: Addon) {
     editingAddonId = addon.id;
+    selectingCustomGroup = false;
+    customGroupName = "";
     addonForm = {
       id: addon.id,
       name: addon.name,
@@ -104,10 +126,55 @@
     };
   }
 
+  function normalizeCustomGroupValue(value: string): string | null {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    return normalizeAddonGroupName(trimmed);
+  }
+
+  function selectAddonGroup(event: Event) {
+    const selected = (event.currentTarget as HTMLSelectElement).value;
+    if (selected === CUSTOM_GROUP_OPTION) {
+      selectingCustomGroup = true;
+      return;
+    }
+
+    selectingCustomGroup = false;
+    customGroupName = "";
+    addonForm.group_name = selected;
+  }
+
+  function addCustomGroup() {
+    const normalized = normalizeCustomGroupValue(customGroupName);
+    if (!normalized) {
+      return;
+    }
+
+    if (!addonGroupOptions.includes(normalized)) {
+      customGroups = [...customGroups, normalized];
+    }
+
+    addonForm.group_name = normalized;
+    selectingCustomGroup = false;
+    customGroupName = "";
+  }
+
+  function applyPendingCustomGroup() {
+    if (!selectingCustomGroup) {
+      return;
+    }
+
+    addCustomGroup();
+  }
+
   async function submitAddon(event: SubmitEvent) {
     event.preventDefault();
     formBusy = true;
     try {
+      applyPendingCustomGroup();
       const payload = {
         name: addonForm.name.trim(),
         price: Number(addonForm.price),
@@ -250,17 +317,36 @@
           </div>
           <div class="form-control w-full">
             <span class="label-text mb-1">Grupo</span>
-            <input
-              class="input input-bordered w-full"
-              placeholder="extras"
-              bind:value={addonForm.group_name}
-              list="addon-groups-list"
-            />
-            <datalist id="addon-groups-list">
-              <option value="toppings"></option>
-              <option value="jalea"></option>
-              <option value="extras"></option>
-            </datalist>
+            <select
+              class="select select-bordered w-full"
+              value={selectingCustomGroup
+                ? CUSTOM_GROUP_OPTION
+                : normalizeAddonGroupName(addonForm.group_name)}
+              onchange={selectAddonGroup}
+            >
+              {#each addonGroupOptions as groupName}
+                <option value={groupName}>{addonGroupLabel(groupName)}</option>
+              {/each}
+              <option value={CUSTOM_GROUP_OPTION}>+ Agregar nuevo grupo</option>
+            </select>
+
+            {#if selectingCustomGroup}
+              <div class="mt-2 flex items-center gap-2">
+                <input
+                  class="input input-bordered w-full"
+                  placeholder="Ej. Frutas"
+                  bind:value={customGroupName}
+                />
+                <button
+                  type="button"
+                  class="btn btn-outline btn-sm"
+                  onclick={addCustomGroup}
+                  disabled={!customGroupName.trim()}
+                >
+                  Agregar
+                </button>
+              </div>
+            {/if}
           </div>
           <div class="form-control w-full">
             <span class="label-text mb-1">Orden de visualizacion</span>

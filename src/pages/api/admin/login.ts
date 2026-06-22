@@ -3,18 +3,38 @@
  * Frontend login endpoint (BFF layer)
  *
  * Request body: { email: string, password: string }
- * Response: { token: string, employee: Session }
+ * Response: { employee: Session }
  *
- * Note: Backend sends HttpOnly cookie, this endpoint just proxies the request
+ * Note: Backend sets HttpOnly cookie; this endpoint reads the token from the
+ * backend Set-Cookie header and sets its own same-origin HttpOnly cookie.
  */
 
 import type { APIRoute } from "astro";
-import { login } from "@features/auth";
 import { LoginSchema } from "@features/admin-management";
+import { getApiBaseUrl } from "@core/config";
 
 export const prerender = false;
 
 const defaultCookieTTLSeconds = 60 * 60 * 24;
+
+function extractAuthTokenFromSetCookie(
+  setCookie: string | null,
+): string | null {
+  if (!setCookie) return null;
+
+  // Handle multiple Set-Cookie values separated by commas
+  // Each cookie starts with a name=value pair
+  const cookies = setCookie.split(",");
+  for (const cookie of cookies) {
+    const trimmed = cookie.trim();
+    if (trimmed.startsWith("auth_token=")) {
+      const value = trimmed.slice("auth_token=".length);
+      const endIdx = value.indexOf(";");
+      return endIdx >= 0 ? value.slice(0, endIdx) : value;
+    }
+  }
+  return null;
+}
 
 function resolveCookieTTLSeconds(token: string): number {
   const parts = token.split(".");
@@ -61,22 +81,156 @@ function buildAuthCookie(
   return parts.join("; ");
 }
 
+function isTrustedRequestOrigin(request: Request, requestUrl: URL): boolean {
+  const requestOrigin = request.headers.get("origin");
+  if (requestOrigin) {
+    return requestOrigin === requestUrl.origin;
+  }
+
+  const referer = request.headers.get("referer");
+  if (!referer) {
+    return false;
+  }
+
+  try {
+    return new URL(referer).origin === requestUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
+function getSafeError(value: unknown): string {
+  if (typeof value !== "string") return "Login failed";
+  const sanitized = value.replace(/[\u0000-\u001F\u007F]/g, "").trim();
+  return sanitized.slice(0, 180) || "Login failed";
+}
+
+function getRetryAfterSeconds(
+  response: Response,
+  payload: Record<string, unknown>,
+): number {
+  const fromPayload = payload.retryAfter;
+  if (
+    typeof fromPayload === "number" &&
+    Number.isFinite(fromPayload) &&
+    fromPayload > 0
+  ) {
+    return Math.floor(fromPayload);
+  }
+
+  const fromHeader = Number.parseInt(
+    response.headers.get("retry-after") ?? "",
+    10,
+  );
+  if (Number.isFinite(fromHeader) && fromHeader > 0) {
+    return fromHeader;
+  }
+
+  return 0;
+}
+
 export const POST: APIRoute = async (context) => {
   try {
+    if (!isTrustedRequestOrigin(context.request, context.url)) {
+      return new Response(
+        JSON.stringify({
+          error: "Forbidden",
+          code: "FORBIDDEN_ORIGIN",
+        }),
+        {
+          status: 403,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+
     // Parse and validate request body
     const body = await context.request.json();
     const validated = LoginSchema.parse(body);
 
-    // Call backend login
-    const response = await login(validated.email, validated.password);
-    const ttlSeconds = resolveCookieTTLSeconds(response.token);
+    const upstreamResponse = await fetch(`${getApiBaseUrl()}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: validated.email,
+        password: validated.password,
+      }),
+    });
+
+    const upstreamContentType =
+      upstreamResponse.headers.get("content-type")?.toLowerCase() ?? "";
+    const upstreamPayload = upstreamContentType.includes("application/json")
+      ? ((await upstreamResponse.json()) as Record<string, unknown>)
+      : { error: await upstreamResponse.text() };
+
+    if (!upstreamResponse.ok) {
+      const retryAfter = getRetryAfterSeconds(
+        upstreamResponse,
+        upstreamPayload,
+      );
+      const status = upstreamResponse.status;
+      const error = getSafeError(upstreamPayload.error);
+      const code = status === 429 ? "RATE_LIMITED" : "LOGIN_ERROR";
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+      };
+
+      if (retryAfter > 0) {
+        headers["Retry-After"] = String(retryAfter);
+      }
+
+      return new Response(
+        JSON.stringify({
+          error,
+          code,
+          retryAfter,
+        }),
+        {
+          status,
+          headers,
+        },
+      );
+    }
+
+    // Extract token from backend Set-Cookie header (cookie-only, not in response body)
+    const setCookieHeader = upstreamResponse.headers.get("set-cookie");
+    const token = extractAuthTokenFromSetCookie(setCookieHeader);
+
+    const employee =
+      upstreamPayload.employee && typeof upstreamPayload.employee === "object"
+        ? (upstreamPayload.employee as Record<string, unknown>)
+        : null;
+
+    if (!token || !employee) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid login response",
+          code: "LOGIN_ERROR",
+        }),
+        {
+          status: 502,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+
+    const ttlSeconds = resolveCookieTTLSeconds(token);
 
     const forwardedProto = context.request.headers.get("x-forwarded-proto");
     const isSecure =
       (forwardedProto ?? context.url.protocol.replace(":", "")) === "https";
 
     // Set same-origin HttpOnly cookie so Astro middleware can validate /admin routes.
-    context.cookies.set("auth_token", response.token, {
+    context.cookies.set("auth_token", token, {
       path: "/",
       httpOnly: true,
       sameSite: "lax",
@@ -84,20 +238,30 @@ export const POST: APIRoute = async (context) => {
       maxAge: ttlSeconds,
     });
 
+    const safeResponse = {
+      employee: {
+        ...employee,
+        active: typeof employee.active === "boolean" ? employee.active : true,
+      },
+    };
+
     // Return response with explicit Set-Cookie for edge/runtime consistency.
-    return new Response(JSON.stringify(response), {
+    return new Response(JSON.stringify(safeResponse), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "no-store, no-cache, must-revalidate, private",
         Pragma: "no-cache",
         Expires: "0",
-        "Set-Cookie": buildAuthCookie(response.token, isSecure, ttlSeconds),
+        "Set-Cookie": buildAuthCookie(token, isSecure, ttlSeconds),
       },
     });
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes("validation")) {
+      if (
+        error.message.includes("validation") ||
+        error.message.includes("Validation")
+      ) {
         return new Response(
           JSON.stringify({
             error: "Validation error",

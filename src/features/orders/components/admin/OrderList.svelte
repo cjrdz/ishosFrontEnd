@@ -244,12 +244,14 @@
                     >
                       Imprimir
                     </button>
-                    <button
-                      class="btn btn-xs sm:btn-sm btn-soft btn-accent whitespace-nowrap"
-                      onclick={() => onStartEdit(order.id)}
-                    >
-                      Editar
-                    </button>
+                    {#if !["recibida", "lista", "entregada", "cancelada"].includes(order.status)}
+                      <button
+                        class="btn btn-xs sm:btn-sm btn-soft btn-accent whitespace-nowrap"
+                        onclick={() => onStartEdit(order.id)}
+                      >
+                        Editar
+                      </button>
+                    {/if}
                     {#if order.status === "pendiente_revision"}
                       <button
                         class="btn btn-xs sm:btn-sm btn-soft btn-success whitespace-nowrap"
