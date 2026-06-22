@@ -7,6 +7,11 @@
   import { toSafeImageUrl } from "@shared/utils/formatters";
   import { isOfferActive } from "@features/catalog/lib/offers";
   import {
+    computeUnitPrice,
+    isProductConfigurable,
+    type ProductCustomizationDraft,
+  } from "@features/catalog/lib/customization";
+  import {
     listPublicCategories,
     listPublicProducts,
     fetchStoreSettings,
@@ -15,6 +20,7 @@
     type StoreOfferItem,
   } from "@features/catalog/lib/api";
   import { addCartItem } from "@features/catalog/lib/cart";
+  import "../../../styles/menu.css";
 
   let loading = $state(true);
   let loadingError = $state("");
@@ -36,8 +42,7 @@
   let isMobileCategoryMenuOpen = $state(false);
 
   let selectedProduct = $state<PublicProduct | null>(null);
-  let modalQty = $state(1);
-  let showImageDetails = $state(false);
+  let selectedDraft = $state<ProductCustomizationDraft | null>(null);
   const catalogSkeletonCards = Array.from({ length: 10 }, (_, index) => index);
   const categoryTabs = $derived([
     { id: "all", label: "Todos" },
@@ -55,9 +60,6 @@
     displayedCategory === "all"
       ? products
       : products.filter((product) => product.category_id === displayedCategory),
-  );
-  const modalDisplayPrice = $derived(
-    selectedProduct ? selectedProduct.price * normalizeQty(modalQty) : 0,
   );
 
   onMount(() => {
@@ -117,23 +119,12 @@
     }
   }
 
-  function openProductModal(product: PublicProduct) {
+  function openProductModal(
+    product: PublicProduct,
+    initialDraft?: ProductCustomizationDraft,
+  ) {
     selectedProduct = product;
-    modalQty = 1;
-    showImageDetails = false;
-  }
-
-  function normalizeQty(value: number): number {
-    if (!Number.isFinite(value)) return 1;
-    return Math.max(1, Math.floor(value));
-  }
-
-  function increaseModalQty() {
-    modalQty = normalizeQty(modalQty) + 1;
-  }
-
-  function decreaseModalQty() {
-    modalQty = Math.max(1, normalizeQty(modalQty) - 1);
+    selectedDraft = initialDraft ?? { quantity: 1 };
   }
 
   function hasSeasonalFlavors(product: PublicProduct): boolean {
@@ -293,11 +284,6 @@
   function evaluateCategoryLayoutMode() {
     if (typeof window === "undefined") return;
 
-    if (window.innerWidth >= 768) {
-      useMobileDropdown = false;
-      return;
-    }
-
     const requiredWidth = mobileTabsMeasureRef?.scrollWidth ?? 0;
     const availableWidth = window.innerWidth - 16;
     useMobileDropdown = requiredWidth > availableWidth;
@@ -321,44 +307,79 @@
     );
   }
 
-  function addSelectedToCart(goCheckout = false) {
-    if (!selectedProduct) return;
-
-    const safeQty = normalizeQty(modalQty);
-
-    modalQty = safeQty;
-
+  function addConfiguredProduct(
+    product: PublicProduct,
+    draft: ProductCustomizationDraft,
+  ) {
     addCartItem({
-      product_id: selectedProduct.id,
-      name: selectedProduct.name,
-      image_url: toSafeImageUrl(selectedProduct.image_url),
-      unit_price: selectedProduct.price,
-      quantity: safeQty,
+      product_id: product.id,
+      name: product.name,
+      image_url: toSafeImageUrl(product.image_url),
+      unit_price: computeUnitPrice(product, draft),
+      quantity: draft.quantity,
+      flavor_id: draft.flavor_id || undefined,
+      flavor_ids: draft.flavor_ids || undefined,
+      included_addon_ids: draft.included_addon_ids,
+      extra_addon_ids: draft.extra_addon_ids,
+      topping_selection: draft.topping_selection,
+      jalea_selection: draft.jalea_selection,
     });
 
     selectedProduct = null;
-
-    if (goCheckout) {
-      window.location.href = "/order/cart#checkout";
-    }
+    selectedDraft = null;
   }
 </script>
 
 <div class="space-y-5 pb-16 overflow-x-clip">
-  <section class="text-center px-4 pt-4 md:pt-3">
-    <div class="mx-auto max-w-2xl mb-1">
-      <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight">
+  <section
+    class="relative overflow-hidden text-center px-4 pt-8 pb-16 md:pt-12 md:pb-20"
+  >
+    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+      <div
+        class="hero-blob-teal absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl"
+        style="background: var(--ishos-teal);"
+      ></div>
+      <div
+        class="hero-blob-pink absolute -bottom-16 -right-16 w-80 h-80 rounded-full blur-3xl"
+        style="background: var(--ishos-pink);"
+      ></div>
+      <div
+        class="hero-blob-blue absolute top-1/3 right-1/4 w-64 h-64 rounded-full blur-3xl"
+        style="background: var(--ishos-yellow);"
+      ></div>
+      <div class="stripe-bg absolute inset-0 opacity-40"></div>
+    </div>
+    <div class="relative mx-auto max-w-2xl mb-1 lg:mb-2 fade-up fade-up-1">
+      <div class="section-pill mb-4">Nuestro Menú</div>
+      <h1
+        class="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight"
+      >
         <span
-          class="text-transparent bg-clip-text bg-linear-to-r from-primary to-secondary inline-block"
+          class="text-transparent bg-clip-text inline-block"
+          style="background-image: var(--brand-gradient);"
         >
-          Nuestro Menú
+          Sabores Artesanales
         </span>
       </h1>
     </div>
   </section>
 
+  <div class="wave-divider -mt-2" style="color: var(--ishos-teal);">
+    <svg
+      viewBox="0 0 1440 60"
+      xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="none"
+      style="height:40px; width:100%;"
+    >
+      <path
+        d="M0,30 C240,60 480,0 720,30 C960,60 1200,0 1440,30 L1440,60 L0,60 Z"
+        fill="var(--menu-wave-fill)"
+      ></path>
+    </svg>
+  </div>
+
   <section id="menu" class="max-w-7xl mx-auto px-2 space-y-4 md:space-y-5">
-    <div class="md:hidden px-2 relative overflow-hidden" aria-hidden="true">
+    <div class="px-2 relative overflow-hidden" aria-hidden="true">
       <div class="absolute -z-10 pointer-events-none opacity-0 left-0 top-0">
         <div
           class="inline-flex items-center gap-1 p-1.5"
@@ -376,9 +397,9 @@
     </div>
 
     {#if useMobileDropdown}
-      <div class="md:hidden px-2 relative z-30">
+      <div class="px-2 relative z-30">
         <details
-          class="group relative w-full max-w-xs mx-auto rounded-[1.15rem] p-0.5 bg-linear-to-r from-primary/18 via-secondary/16 to-primary/18 border border-primary/18 dark:border-primary/20 shadow-[0_1px_0_rgba(255,255,255,0.35)_inset,0_10px_20px_-18px_rgba(37,99,235,0.45)]"
+          class="group relative w-full mx-auto rounded-[1.15rem] p-0.5 menu-mobile-ring border border-primary/18 dark:border-primary/20 shadow-[var(--menu-tab-shadow)]"
           bind:this={mobileCategoryDetailsRef}
           ontoggle={() => {
             isMobileCategoryMenuOpen = !!mobileCategoryDetailsRef?.open;
@@ -388,26 +409,27 @@
           }}
         >
           <summary
-            class="list-none cursor-pointer flex items-center justify-between px-4 py-2.5 rounded-2xl font-semibold mobile-category-trigger bg-base-100/72 dark:bg-base-100/10 backdrop-blur-xl border border-base-200/48 dark:border-base-200/10"
+            class="list-none cursor-pointer flex items-center justify-between px-4 py-2.5 rounded-2xl font-semibold mobile-category-trigger bg-base-100/72 dark:bg-base-100/10 backdrop-blur-xl border border-base-200/30 dark:border-base-200/8"
           >
             <span class="mobile-category-trigger">{activeCategoryLabel}</span>
             <Icon
               icon="lucide:chevron-down"
-              class={`size-4 text-black dark:text-white transition-transform duration-200 ${isMobileCategoryMenuOpen ? "rotate-180" : ""}`}
+              class={`size-4 transition-transform duration-200 ${isMobileCategoryMenuOpen ? "rotate-180" : ""}`}
+              style="color: var(--ishos-teal);"
               aria-hidden="true"
             />
           </summary>
           <ul
-            class="menu absolute left-0 right-0 top-[calc(100%+0.4rem)] z-40 p-2 rounded-2xl bg-base-100/90 dark:bg-base-100/18 backdrop-blur-xl border border-base-200/70 dark:border-base-200/12 shadow-[0_16px_40px_-20px_rgba(15,23,42,0.45)]"
+            class="menu absolute left-0 right-0 top-[calc(100%+0.4rem)] z-40 p-2 rounded-2xl bg-base-100/90 dark:bg-base-100/18 backdrop-blur-xl border border-base-200/40 dark:border-base-200/10 shadow-[var(--menu-dropdown-shadow)] max-w-[calc(100vw-2rem)]"
             bind:this={mobileMenuPanelRef}
           >
             {#each categoryTabs as tab (tab.id)}
               <li>
                 <button
                   type="button"
-                  class={activeCategory === tab.id
-                    ? "font-semibold mobile-category-option mobile-category-option-active bg-base-200/75 dark:bg-base-200/25 rounded-xl"
-                    : "mobile-category-option rounded-xl"}
+                  class="w-full text-center {activeCategory === tab.id
+                    ? 'font-semibold mobile-category-option mobile-category-option-active menu-mobile-active rounded-xl'
+                    : 'mobile-category-option rounded-xl'}"
                   onclick={() => selectCategoryFromMobileMenu(tab.id)}
                 >
                   {tab.label}
@@ -422,18 +444,18 @@
     {#if !useMobileDropdown}
       <div class="flex justify-center overflow-x-auto pb-2 hide-scrollbar px-1">
         <div
-          class="rounded-[1.15rem] p-0.5 bg-linear-to-r from-primary/18 via-secondary/16 to-primary/18 border border-primary/18 dark:border-primary/20 shadow-[0_1px_0_rgba(255,255,255,0.35)_inset,0_10px_20px_-18px_rgba(37,99,235,0.45)]"
+          class="rounded-[1.15rem] p-0.5 menu-desktop-ring border border-primary/18 dark:border-primary/20 shadow-[var(--menu-tab-shadow)]"
         >
           <div
             role="tablist"
             aria-label="Categorias del menu"
-            class="relative inline-flex items-center gap-1 bg-base-100/72 dark:bg-base-100/10 backdrop-blur-xl border border-base-200/48 dark:border-base-200/10 p-1.5 rounded-2xl flex-nowrap min-w-min"
+            class="relative inline-flex items-center gap-1 bg-base-100/72 dark:bg-base-100/10 backdrop-blur-xl border border-base-200/30 dark:border-base-200/8 p-1.5 rounded-2xl flex-nowrap min-w-min"
             bind:this={tabsListRef}
             tabindex="0"
             onkeydown={handleTabsKeydown}
           >
             <span
-              class="pointer-events-none absolute left-0 top-0 rounded-xl bg-base-100/55 dark:bg-base-100/14 backdrop-blur-lg border border-white/55 dark:border-white/16 shadow-[0_6px_14px_-10px_rgba(15,23,42,0.35),0_0_0_1px_rgba(255,255,255,0.24)_inset] opacity-0"
+              class="pointer-events-none absolute left-0 top-0 rounded-xl bg-base-100/70 dark:bg-base-100/20 backdrop-blur-lg border border-white/70 dark:border-white/20 shadow-[var(--menu-tab-blob-shadow)] opacity-0"
               bind:this={activeTabBubbleRef}
               aria-hidden="true"
             ></span>
@@ -465,7 +487,7 @@
 
     {#if loading}
       <div
-        class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-4"
+        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-4"
       >
         {#each catalogSkeletonCards as cardIndex (cardIndex)}
           <article
@@ -494,7 +516,7 @@
       </div>
     {:else}
       <div
-        class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-1"
+        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-1"
         bind:this={catalogGridRef}
       >
         {#each visibleProducts as product (product.id)}
@@ -510,6 +532,11 @@
             showSelectButton={true}
             onOpen={() => openProductModal(product)}
             onAdd={() => {
+              if (isProductConfigurable(product)) {
+                openProductModal(product);
+                return;
+              }
+
               addCartItem({
                 product_id: product.id,
                 name: product.name,
@@ -528,41 +555,17 @@
 
 <ProductModal
   product={selectedProduct}
-  quantity={modalQty}
-  displayPrice={modalDisplayPrice}
   {ordersEnabled}
-  {showImageDetails}
+  initialDraft={selectedDraft}
   imageUrl={selectedProduct
     ? toSafeImageUrl(selectedProduct.image_url)
     : undefined}
   onClose={() => {
     selectedProduct = null;
-    showImageDetails = false;
+    selectedDraft = null;
   }}
-  onToggleImageDetails={() => {
-    showImageDetails = !showImageDetails;
+  onConfirm={(draft) => {
+    if (!selectedProduct) return;
+    addConfiguredProduct(selectedProduct, draft);
   }}
-  onDecreaseQty={decreaseModalQty}
-  onIncreaseQty={increaseModalQty}
-  onAdd={() => addSelectedToCart(false)}
-  onCheckout={() => addSelectedToCart(true)}
 />
-
-<style>
-  .category-tab-label,
-  .mobile-category-trigger,
-  .mobile-category-option {
-    color: inherit;
-    opacity: 0.8;
-    transition:
-      color 0.2s ease,
-      opacity 0.2s ease;
-  }
-
-  .category-tab-label-active,
-  .category-tab-label:hover,
-  .mobile-category-option-active,
-  .mobile-category-option:hover {
-    opacity: 1;
-  }
-</style>

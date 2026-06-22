@@ -216,25 +216,53 @@
         quantity: snapshot.orderForm.quantity ?? 1,
       };
       manualItems = Array.isArray(snapshot.manualItems)
-        ? snapshot.manualItems.map((item) => ({
-            product_id: item.product_id,
-            quantity: Number(item.quantity) || 1,
-            flavor_id: item.flavor_id,
-            included_addon_ids: normalizeIdList(item.included_addon_ids ?? []),
-            extra_addon_ids: normalizeIdList(item.extra_addon_ids ?? []),
-            topping_selection:
+        ? snapshot.manualItems.map((item) => {
+            const includedIds = normalizeIdList(item.included_addon_ids ?? []);
+            const product = products.find((p) => p.id === item.product_id);
+            const toppingAddons = (product?.addons ?? []).filter(
+              (a) =>
+                a.is_active &&
+                normalizeAddonGroupName(a.group_name) === "toppings",
+            );
+            const jaleaAddons = (product?.addons ?? []).filter(
+              (a) =>
+                a.is_active &&
+                normalizeAddonGroupName(a.group_name) === "jalea",
+            );
+            const hasToppingIncluded = includedIds.some((id) =>
+              toppingAddons.some((a) => a.id === id),
+            );
+            const hasJaleaIncluded = includedIds.some((id) =>
+              jaleaAddons.some((a) => a.id === id),
+            );
+            let toppingSelection =
               item.topping_selection === "none"
                 ? "none"
                 : item.topping_selection === "selected"
                   ? "selected"
-                  : undefined,
-            jalea_selection:
+                  : undefined;
+            if (toppingSelection === "selected" && !hasToppingIncluded) {
+              toppingSelection = toppingAddons.length > 0 ? "none" : undefined;
+            }
+            let jaleaSelection =
               item.jalea_selection === "none"
                 ? "none"
                 : item.jalea_selection === "selected"
                   ? "selected"
-                  : undefined,
-          }))
+                  : undefined;
+            if (jaleaSelection === "selected" && !hasJaleaIncluded) {
+              jaleaSelection = jaleaAddons.length > 0 ? "none" : undefined;
+            }
+            return {
+              product_id: item.product_id,
+              quantity: Number(item.quantity) || 1,
+              flavor_id: item.flavor_id,
+              included_addon_ids: includedIds,
+              extra_addon_ids: normalizeIdList(item.extra_addon_ids ?? []),
+              topping_selection: toppingSelection,
+              jalea_selection: jaleaSelection,
+            };
+          })
         : [];
       selectedFlavorId = snapshot.selectedFlavorId ?? "";
       includedToppingId = snapshot.includedToppingId ?? "";
@@ -474,7 +502,7 @@
   function buildCustomizationsFromDraft(
     item: ManualOrderItemDraft,
   ): Record<string, unknown> | undefined {
-    return ManualItemHelpers.buildCustomizationsFromDraft(item);
+    return ManualItemHelpers.buildCustomizationsFromDraft(item, products);
   }
 
   function buildCurrentDraftItem(): ManualOrderItemDraft | null {
@@ -820,6 +848,7 @@
       const items = OrderSubmission.prepareOrderItems(
         manualItems,
         fallbackItem,
+        products,
       );
       if (!items) {
         editError = "Agrega al menos un producto a la orden";
@@ -854,7 +883,11 @@
 
     const fallbackItem =
       manualItems.length === 0 ? buildCurrentDraftItem() : null;
-    const items = OrderSubmission.prepareOrderItems(manualItems, fallbackItem);
+    const items = OrderSubmission.prepareOrderItems(
+      manualItems,
+      fallbackItem,
+      products,
+    );
 
     if (!items) {
       editError = "Agrega al menos un producto a la orden";
