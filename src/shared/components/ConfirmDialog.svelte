@@ -1,4 +1,7 @@
 <script lang="ts">
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
+
   interface Props {
     open: boolean;
     title?: string;
@@ -31,29 +34,20 @@
   });
 </script>
 
-<dialog
-  class="modal"
-  bind:this={dialogRef}
-  onclose={() => {
-    if (open) onCancel();
-  }}
+<AdminModalShell
+  bind:dialogRef
+  {title}
+  icon={variant === "error" ? "lucide:alert-triangle" : "lucide:help-circle"}
+  widthClass="max-w-md"
+  onClose={onCancel}
 >
-  <div class="modal-box">
-    <h3 class="font-bold text-lg">{title}</h3>
-    <p class="py-2 text-sm text-base-content/70">{message}</p>
-    <div class="modal-action">
-      <button class="btn btn-ghost" type="button" onclick={onCancel}
-        >Cancelar</button
-      >
-      <button
-        class={`btn btn-${variant}`}
-        type="button"
-        onclick={onConfirm}
-        disabled={busy}>Confirmar</button
-      >
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={onCancel}>close</button>
-  </form>
-</dialog>
+  <p class="text-sm text-base-content/70">{message}</p>
+  <AdminFormActions
+    submitLabel="Confirmar"
+    submitType="button"
+    submitVariant={variant}
+    onSubmit={onConfirm}
+    {onCancel}
+    {busy}
+  />
+</AdminModalShell>

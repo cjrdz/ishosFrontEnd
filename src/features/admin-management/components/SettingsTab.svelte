@@ -1,5 +1,7 @@
 <script lang="ts">
   import Icon from "@shared/components/AppIcon.svelte";
+  import AdminModalShell from "./shared/AdminModalShell.svelte";
+  import AdminFormActions from "./shared/AdminFormActions.svelte";
   import type { RowsPerTableConfig } from "../lib/local-settings";
   import type { PanelConfigValues } from "../types/settings";
 
@@ -505,26 +507,23 @@
   </div>
 </section>
 
-<dialog bind:this={confirmPauseDialog} class="modal">
-  <div class="modal-box">
-    <h3 class="text-lg font-bold">Pausar pedidos publicos</h3>
-    <p class="py-4">
-      Los clientes podran seguir viendo el catalogo, pero no podran crear
-      pedidos nuevos hasta reactivar la tienda.
-    </p>
-    <div class="modal-action">
-      <form method="dialog">
-        <button class="btn">Cancelar</button>
-      </form>
-      <button
-        class="btn btn-error"
-        type="button"
-        onclick={confirmPauseOrders}
-        disabled={busy}>Pausar pedidos</button
-      >
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button>close</button>
-  </form>
-</dialog>
+<AdminModalShell
+  bind:dialogRef={confirmPauseDialog}
+  title="Pausar pedidos publicos"
+  icon="lucide:pause-circle"
+  widthClass="max-w-md"
+  onClose={() => {}}
+>
+  <p>
+    Los clientes podran seguir viendo el catalogo, pero no podran crear pedidos
+    nuevos hasta reactivar la tienda.
+  </p>
+  <AdminFormActions
+    submitLabel="Pausar pedidos"
+    submitType="button"
+    submitVariant="error"
+    onSubmit={confirmPauseOrders}
+    onCancel={() => confirmPauseDialog?.close()}
+    {busy}
+  />
+</AdminModalShell>

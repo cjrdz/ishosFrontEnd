@@ -1,4 +1,7 @@
 <script lang="ts">
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
+
   interface Props {
     open: boolean;
     busy: boolean;
@@ -30,38 +33,33 @@
   });
 </script>
 
-<dialog class="modal" bind:this={dialogRef} onclose={onClose}>
-  <div class="modal-box">
-    <h3 class="font-bold text-lg">Rechazar orden</h3>
-    <p class="text-sm text-base-content/70">
-      Indica el motivo del rechazo para dejar registro.
-    </p>
-    <textarea
-      class="textarea textarea-bordered w-full mt-3"
-      rows="4"
-      placeholder="Motivo"
-      value={rejectReason}
-      oninput={(event) =>
-        onRejectReasonChange(
-          (event.currentTarget as HTMLTextAreaElement).value,
-        )}
-    ></textarea>
-    {#if rejectError}
-      <p class="mt-2 text-sm text-error">{rejectError}</p>
-    {/if}
-    <div class="modal-action">
-      <button class="btn btn-ghost" type="button" onclick={onClose}
-        >Cancelar</button
-      >
-      <button
-        class="btn btn-error"
-        type="button"
-        onclick={onConfirm}
-        disabled={busy}>Rechazar</button
-      >
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={onClose}>close</button>
-  </form>
-</dialog>
+<AdminModalShell
+  bind:dialogRef
+  title="Rechazar orden"
+  icon="lucide:x-circle"
+  widthClass="max-w-md"
+  {onClose}
+>
+  <p class="text-sm text-base-content/70">
+    Indica el motivo del rechazo para dejar registro.
+  </p>
+  <textarea
+    class="textarea textarea-bordered w-full"
+    rows="4"
+    placeholder="Motivo"
+    value={rejectReason}
+    oninput={(event) =>
+      onRejectReasonChange((event.currentTarget as HTMLTextAreaElement).value)}
+  ></textarea>
+  {#if rejectError}
+    <p class="text-sm text-error">{rejectError}</p>
+  {/if}
+  <AdminFormActions
+    submitLabel="Rechazar"
+    submitType="button"
+    submitVariant="error"
+    onSubmit={onConfirm}
+    onCancel={onClose}
+    {busy}
+  />
+</AdminModalShell>

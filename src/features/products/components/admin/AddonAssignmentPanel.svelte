@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Addon } from "@features/admin-management";
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
   import {
     addonGroupLabel,
     groupAddonsByGroup,
@@ -113,152 +114,147 @@
   }
 </script>
 
-<dialog class="modal" bind:this={dialogRef} onclose={onClose}>
-  <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <h3 class="font-bold text-lg">Complementos: {productName}</h3>
-      {#if availableInactiveAddonsCount > 0}
-        <span class="badge badge-ghost"
-          >{availableInactiveAddonsCount} inactivos no disponibles</span
-        >
-      {/if}
-    </div>
-
-    <div class="mt-5 grid gap-4 md:grid-cols-[1fr_auto_1fr] items-start">
-      <div class="space-y-2">
-        <h4
-          class="px-1 font-semibold text-sm uppercase tracking-wide text-base-content/70"
-        >
-          No asignados
-        </h4>
-        <section class="rounded-box bg-base-200/60 p-3">
-          {#if availableActiveAddons.length === 0}
-            <p
-              class="flex min-h-[50vh] items-center justify-center text-sm text-base-content/70"
-            >
-              No hay complementos disponibles
-            </p>
-          {:else}
-            <div class="max-h-[50vh] overflow-y-auto space-y-3">
-              {#each availableGroups as group}
-                <section class="space-y-2">
-                  <h5
-                    class="text-xs font-semibold uppercase tracking-wide text-base-content/70"
-                  >
-                    {group.label}
-                  </h5>
-                  <ul class="space-y-2">
-                    {#each group.items as addon}
-                      <li
-                        class="flex items-center gap-2 rounded-lg bg-base-100 px-3 py-2"
-                      >
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          checked={selectedAvailableAddonIds.includes(addon.id)}
-                          onchange={() => {
-                            selectedAvailableAddonIds = toggleSelection(
-                              selectedAvailableAddonIds,
-                              addon.id,
-                            );
-                          }}
-                          disabled={busy || actionBusy}
-                        />
-                        <div class="flex-1 truncate">
-                          {addon.name}
-                          <span class="text-xs text-base-content/70 ml-2"
-                            >{formatCurrency(addon.price)}</span
-                          >
-                        </div>
-                        <span class="badge badge-outline badge-sm"
-                          >{group.label}</span
-                        >
-                      </li>
-                    {/each}
-                  </ul>
-                </section>
-              {/each}
-            </div>
-          {/if}
-        </section>
-      </div>
-
-      <section
-        class="flex flex-col items-center justify-center gap-2 self-stretch"
+<AdminModalShell
+  bind:dialogRef
+  title={`Complementos: ${productName}`}
+  icon="lucide:puzzle"
+  widthClass="max-w-5xl"
+  {onClose}
+>
+  {#if availableInactiveAddonsCount > 0}
+    <div class="flex justify-end">
+      <span class="badge badge-ghost"
+        >{availableInactiveAddonsCount} inactivos no disponibles</span
       >
-        <button
-          class="btn btn-sm btn-primary"
-          type="button"
-          onclick={moveSelectedAddonsToAssigned}
-          disabled={busy ||
-            actionBusy ||
-            selectedAvailableAddonIds.length === 0}
-        >
-          &gt;&gt;
-        </button>
-        <div class="divider md:divider-horizontal m-0"></div>
-        <button
-          class="btn btn-sm btn-outline"
-          type="button"
-          onclick={moveSelectedAddonsToAvailable}
-          disabled={busy || actionBusy || selectedAssignedAddonIds.length === 0}
-        >
-          &lt;&lt;
-        </button>
-      </section>
+    </div>
+  {/if}
 
-      <div class="space-y-2">
-        <h4
-          class="px-1 font-semibold text-sm uppercase tracking-wide text-base-content/70"
-        >
-          Asignados
-        </h4>
-        <section class="rounded-box bg-base-200/60 p-3">
-          {#if assignedAddons.length === 0}
-            <p
-              class="flex min-h-[50vh] items-center justify-center text-sm text-base-content/70"
-            >
-              No hay complementos asignados
-            </p>
-          {:else}
-            <ul class="space-y-2 max-h-[50vh] overflow-y-auto">
-              {#each assignedAddons as addon}
-                <li
-                  class="flex items-center gap-2 rounded-lg bg-base-100 px-3 py-2"
+  <div class="grid gap-4 md:grid-cols-[1fr_auto_1fr] items-start">
+    <div class="space-y-2">
+      <h4
+        class="px-1 font-semibold text-sm uppercase tracking-wide text-base-content/70"
+      >
+        No asignados
+      </h4>
+      <section class="rounded-box bg-base-200/60 p-3">
+        {#if availableActiveAddons.length === 0}
+          <p
+            class="flex min-h-[50vh] items-center justify-center text-sm text-base-content/70"
+          >
+            No hay complementos disponibles
+          </p>
+        {:else}
+          <div class="max-h-[50vh] overflow-y-auto space-y-3">
+            {#each availableGroups as group}
+              <section class="space-y-2">
+                <h5
+                  class="text-xs font-semibold uppercase tracking-wide text-base-content/70"
                 >
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm"
-                    checked={selectedAssignedAddonIds.includes(addon.id)}
-                    onchange={() => {
-                      selectedAssignedAddonIds = toggleSelection(
-                        selectedAssignedAddonIds,
-                        addon.id,
-                      );
-                    }}
-                    disabled={busy || actionBusy}
-                  />
-                  <div class="flex-1 truncate">
-                    {addon.name}
-                    <span class="text-xs text-base-content/70 ml-2"
-                      >{formatCurrency(addon.price)}</span
+                  {group.label}
+                </h5>
+                <ul class="space-y-2">
+                  {#each group.items as addon}
+                    <li
+                      class="flex items-center gap-2 rounded-lg bg-base-100 px-3 py-2"
                     >
-                  </div>
-                  <span class="badge badge-outline badge-sm"
-                    >{addonGroupLabel(addon.group_name)}</span
-                  >
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </section>
-      </div>
+                      <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm"
+                        checked={selectedAvailableAddonIds.includes(addon.id)}
+                        onchange={() => {
+                          selectedAvailableAddonIds = toggleSelection(
+                            selectedAvailableAddonIds,
+                            addon.id,
+                          );
+                        }}
+                        disabled={busy || actionBusy}
+                      />
+                      <div class="flex-1 truncate">
+                        {addon.name}
+                        <span class="text-xs text-base-content/70 ml-2"
+                          >{formatCurrency(addon.price)}</span
+                        >
+                      </div>
+                      <span class="badge badge-outline badge-sm"
+                        >{group.label}</span
+                      >
+                    </li>
+                  {/each}
+                </ul>
+              </section>
+            {/each}
+          </div>
+        {/if}
+      </section>
     </div>
 
-    <div class="modal-action mt-5">
-      <button type="button" class="btn btn-ghost" onclick={onClose}
-        >Cerrar</button
+    <section
+      class="flex flex-col items-center justify-center gap-2 self-stretch"
+    >
+      <button
+        class="btn btn-sm btn-primary"
+        type="button"
+        onclick={moveSelectedAddonsToAssigned}
+        disabled={busy || actionBusy || selectedAvailableAddonIds.length === 0}
       >
+        &gt;&gt;
+      </button>
+      <div class="divider md:divider-horizontal m-0"></div>
+      <button
+        class="btn btn-sm btn-outline"
+        type="button"
+        onclick={moveSelectedAddonsToAvailable}
+        disabled={busy || actionBusy || selectedAssignedAddonIds.length === 0}
+      >
+        &lt;&lt;
+      </button>
+    </section>
+
+    <div class="space-y-2">
+      <h4
+        class="px-1 font-semibold text-sm uppercase tracking-wide text-base-content/70"
+      >
+        Asignados
+      </h4>
+      <section class="rounded-box bg-base-200/60 p-3">
+        {#if assignedAddons.length === 0}
+          <p
+            class="flex min-h-[50vh] items-center justify-center text-sm text-base-content/70"
+          >
+            No hay complementos asignados
+          </p>
+        {:else}
+          <ul class="space-y-2 max-h-[50vh] overflow-y-auto">
+            {#each assignedAddons as addon}
+              <li
+                class="flex items-center gap-2 rounded-lg bg-base-100 px-3 py-2"
+              >
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-sm"
+                  checked={selectedAssignedAddonIds.includes(addon.id)}
+                  onchange={() => {
+                    selectedAssignedAddonIds = toggleSelection(
+                      selectedAssignedAddonIds,
+                      addon.id,
+                    );
+                  }}
+                  disabled={busy || actionBusy}
+                />
+                <div class="flex-1 truncate">
+                  {addon.name}
+                  <span class="text-xs text-base-content/70 ml-2"
+                    >{formatCurrency(addon.price)}</span
+                  >
+                </div>
+                <span class="badge badge-outline badge-sm"
+                  >{addonGroupLabel(addon.group_name)}</span
+                >
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
     </div>
   </div>
-</dialog>
+</AdminModalShell>

@@ -1,5 +1,7 @@
 <script lang="ts">
   import Icon from "@shared/components/AppIcon.svelte";
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
   import type {
     ContainerType,
     InventoryItem,
@@ -133,218 +135,170 @@
   }
 </script>
 
-<dialog class="modal" bind:this={dialogRef} onclose={onClose}>
-  <div
-    class="modal-box w-11/12 md:max-w-xl max-h-[90vh] overflow-y-auto p-0 animate-scaleIn"
-  >
-    <div
-      class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4"
-    >
-      <div class="flex items-center gap-2.5">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"
+<AdminModalShell
+  bind:dialogRef
+  title="Nueva entrada de inventario"
+  icon="lucide:package-plus"
+  widthClass="max-w-xl"
+  {onClose}
+>
+  <form class="space-y-4" onsubmit={handleSubmit}>
+    <!-- Type toggle -->
+    <div class="form-control">
+      <span class="label-text text-xs mb-1">Tipo de entrada</span>
+      <div class="join w-full">
+        <button
+          type="button"
+          class="btn btn-sm join-item flex-1"
+          class:btn-neutral={entryType === "flavor"}
+          class:btn-ghost={entryType !== "flavor"}
+          onclick={() => (entryType = "flavor")}
         >
-          <Icon
-            icon="lucide:package-plus"
-            width="16"
-            height="16"
-            class="text-primary"
-          />
-        </div>
-        <h3 class="font-bold text-base leading-tight">
-          Nueva entrada de inventario
-        </h3>
+          <Icon icon="lucide:ice-cream-cone" width="14" height="14" />
+          Sabor
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm join-item flex-1"
+          class:btn-neutral={entryType === "unit"}
+          class:btn-ghost={entryType !== "unit"}
+          onclick={() => (entryType = "unit")}
+        >
+          <Icon icon="lucide:box" width="14" height="14" />
+          Unitario
+        </button>
       </div>
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        type="button"
-        onclick={onClose}
-        aria-label="Cerrar"
-      >
-        <Icon icon="lucide:x" width="16" height="16" />
-      </button>
     </div>
 
-    <form class="p-5 space-y-5" onsubmit={handleSubmit}>
-      <!-- Type toggle -->
-      <div class="form-control w-full">
-        <span class="label-text mb-1">Tipo de entrada</span>
-        <div class="join w-full">
-          <button
-            type="button"
-            class="btn btn-sm join-item flex-1"
-            class:btn-neutral={entryType === "flavor"}
-            class:btn-ghost={entryType !== "flavor"}
-            onclick={() => (entryType = "flavor")}
+    {#if entryType === "flavor"}
+      <div class="space-y-3 rounded-lg border border-base-300/70 p-3">
+        <div class="form-control">
+          <span class="label-text text-xs mb-1">Sabor</span>
+          <select
+            class="select select-bordered select-sm w-full"
+            bind:value={flavorForm.flavor_id}
+            required
           >
-            <Icon icon="lucide:ice-cream-cone" width="14" height="14" />
-            Sabor
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm join-item flex-1"
-            class:btn-neutral={entryType === "unit"}
-            class:btn-ghost={entryType !== "unit"}
-            onclick={() => (entryType = "unit")}
-          >
-            <Icon icon="lucide:box" width="14" height="14" />
-            Unitario
-          </button>
+            <option value="">Seleccionar sabor...</option>
+            {#each flavorItems as item (item.id)}
+              <option value={item.flavor_id ?? item.id}>
+                {item.name}
+              </option>
+            {/each}
+          </select>
         </div>
-      </div>
 
-      {#if entryType === "flavor"}
-        <div class="space-y-3 rounded-lg border border-base-300/70 p-3">
-          <div class="form-control w-full">
-            <span class="label-text mb-1">Sabor</span>
-            <select
-              class="select select-bordered w-full"
-              bind:value={flavorForm.flavor_id}
-              required
+        {#if isUnregisteredFlavor}
+          <div class="alert alert-info text-sm py-2">
+            <Icon icon="lucide:info" width="16" height="16" />
+            <span
+              >Este sabor aún no está en inventario. Se registrará
+              automáticamente.</span
             >
-              <option value="">Seleccionar sabor...</option>
-              {#each flavorItems as item (item.id)}
-                <option value={item.flavor_id ?? item.id}>
-                  {item.name}
-                </option>
-              {/each}
-            </select>
           </div>
+        {/if}
 
-          {#if isUnregisteredFlavor}
-            <div class="alert alert-info text-sm py-2">
-              <Icon icon="lucide:info" width="16" height="16" />
-              <span
-                >Este sabor aún no está en inventario. Se registrará
-                automáticamente.</span
-              >
-            </div>
-          {/if}
-
-          <div class="form-control w-full">
-            <div class="flex items-center justify-between">
-              <span class="label-text mb-1">Tipo de recipiente</span>
-              <button
-                type="button"
-                class="btn btn-xs btn-outline"
-                onclick={handleOpenContainerTypes}
-              >
-                <Icon icon="lucide:settings" width="12" height="12" />
-                Gestionar contenedores
-              </button>
-            </div>
-            <select
-              class="select select-bordered w-full mt-1"
-              bind:value={flavorForm.container_type_id}
-              required
+        <div class="form-control">
+          <div class="flex items-center justify-between">
+            <span class="label-text text-xs mb-1">Tipo de recipiente</span>
+            <button
+              type="button"
+              class="btn btn-xs btn-outline"
+              onclick={handleOpenContainerTypes}
             >
-              <option value="">Seleccionar...</option>
-              {#each containerTypes as ct (ct.id)}
-                <option value={ct.id}>
-                  {ct.name}
-                  {#if !ct.is_custom}
-                    ({ct.balls_per_container} bolas)
-                  {:else}
-                    (custom)
-                  {/if}
-                </option>
-              {/each}
-            </select>
+              <Icon icon="lucide:settings" width="12" height="12" />
+              Gestionar contenedores
+            </button>
           </div>
+          <select
+            class="select select-bordered select-sm w-full mt-1"
+            bind:value={flavorForm.container_type_id}
+            required
+          >
+            <option value="">Seleccionar...</option>
+            {#each containerTypes as ct (ct.id)}
+              <option value={ct.id}>
+                {ct.name}
+                {#if !ct.is_custom}
+                  ({ct.balls_per_container} bolas)
+                {:else}
+                  (custom)
+                {/if}
+              </option>
+            {/each}
+          </select>
+        </div>
 
-          {#if isCustom}
-            <div class="form-control w-full">
-              <span class="label-text mb-1">Bolas por recipiente</span>
-              <input
-                type="number"
-                class="input input-bordered w-full"
-                bind:value={flavorForm.balls_per_container}
-                min="1"
-                placeholder="Ej: 50"
-                required
-              />
-            </div>
-          {/if}
-
-          <div class="form-control w-full">
-            <span class="label-text mb-1">Cantidad de recipientes</span>
+        {#if isCustom}
+          <div class="form-control">
+            <span class="label-text text-xs mb-1">Bolas por recipiente</span>
             <input
               type="number"
-              class="input input-bordered w-full"
-              bind:value={flavorForm.quantity_containers}
+              class="input input-bordered input-sm w-full"
+              bind:value={flavorForm.balls_per_container}
               min="1"
-              placeholder="Ej: 5"
+              placeholder="Ej: 50"
               required
             />
           </div>
+        {/if}
 
-          {#if flavorForm.container_type_id && flavorForm.quantity_containers > 0}
-            <div class="alert alert-info text-sm py-2">
-              <span>
-                Total: <strong>{totalBalls.toLocaleString()}</strong> bolas
-              </span>
-            </div>
-          {/if}
+        <div class="form-control">
+          <span class="label-text text-xs mb-1">Cantidad de recipientes</span>
+          <input
+            type="number"
+            class="input input-bordered input-sm w-full"
+            bind:value={flavorForm.quantity_containers}
+            min="1"
+            placeholder="Ej: 5"
+            required
+          />
         </div>
-      {/if}
 
-      {#if entryType === "unit"}
-        <div class="space-y-3 rounded-lg border border-base-300/70 p-3">
-          <div class="form-control w-full">
-            <span class="label-text mb-1">Producto</span>
-            <select
-              class="select select-bordered w-full"
-              bind:value={unitForm.inventory_item_id}
-              required
-            >
-              <option value="">Seleccionar producto...</option>
-              {#each unitItems as item (item.id)}
-                <option value={item.id}>{item.name}</option>
-              {/each}
-            </select>
+        {#if flavorForm.container_type_id && flavorForm.quantity_containers > 0}
+          <div class="alert alert-info text-sm py-2">
+            <span>
+              Total: <strong>{totalBalls.toLocaleString()}</strong> bolas
+            </span>
           </div>
-
-          <div class="form-control w-full">
-            <span class="label-text mb-1">Cantidad</span>
-            <input
-              type="number"
-              class="input input-bordered w-full"
-              bind:value={unitForm.quantity}
-              min="1"
-              placeholder="Ej: 20"
-              required
-            />
-          </div>
-        </div>
-      {/if}
-
-      <div class="flex flex-wrap gap-2 pt-1">
-        <button class="btn btn-primary" type="submit" disabled={!canSubmit}>
-          Registrar Entrada
-        </button>
-        <button type="button" class="btn btn-ghost" onclick={onClose}>
-          Cancelar
-        </button>
+        {/if}
       </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={onClose}>close</button>
+    {/if}
+
+    {#if entryType === "unit"}
+      <div class="space-y-3 rounded-lg border border-base-300/70 p-3">
+        <div class="form-control">
+          <span class="label-text text-xs mb-1">Producto</span>
+          <select
+            class="select select-bordered select-sm w-full"
+            bind:value={unitForm.inventory_item_id}
+            required
+          >
+            <option value="">Seleccionar producto...</option>
+            {#each unitItems as item (item.id)}
+              <option value={item.id}>{item.name}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="form-control">
+          <span class="label-text text-xs mb-1">Cantidad</span>
+          <input
+            type="number"
+            class="input input-bordered input-sm w-full"
+            bind:value={unitForm.quantity}
+            min="1"
+            placeholder="Ej: 20"
+            required
+          />
+        </div>
+      </div>
+    {/if}
+
+    <AdminFormActions
+      submitLabel="Registrar Entrada"
+      onCancel={onClose}
+      disabled={!canSubmit}
+    />
   </form>
-</dialog>
-
-<style>
-  @keyframes scaleIn {
-    from {
-      opacity: 0;
-      transform: scale(0.97);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-  .animate-scaleIn {
-    animation: scaleIn 0.2s ease-out;
-  }
-</style>
+</AdminModalShell>

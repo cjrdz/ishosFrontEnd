@@ -1,4 +1,7 @@
 <script lang="ts">
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
+
   interface Props {
     open: boolean;
     busy: boolean;
@@ -30,38 +33,35 @@
   });
 </script>
 
-<dialog class="modal" bind:this={dialogRef} onclose={onClose}>
-  <div class="modal-box">
-    <h3 class="font-bold text-lg">Aceptar orden rechazada</h3>
-    <p class="text-sm text-base-content/70">
-      Indica el motivo de reactivacion para dejar registro.
-    </p>
-    <textarea
-      class="textarea textarea-bordered w-full mt-3"
-      rows="4"
-      placeholder="Motivo de reactivacion"
-      value={reactivateReason}
-      oninput={(event) =>
-        onReactivateReasonChange(
-          (event.currentTarget as HTMLTextAreaElement).value,
-        )}
-    ></textarea>
-    {#if reactivateError}
-      <p class="mt-2 text-sm text-error">{reactivateError}</p>
-    {/if}
-    <div class="modal-action">
-      <button class="btn btn-ghost" type="button" onclick={onClose}
-        >Cancelar</button
-      >
-      <button
-        class="btn btn-success"
-        type="button"
-        onclick={onConfirm}
-        disabled={busy}>Aceptar</button
-      >
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={onClose}>close</button>
-  </form>
-</dialog>
+<AdminModalShell
+  bind:dialogRef
+  title="Aceptar orden rechazada"
+  icon="lucide:check-circle"
+  widthClass="max-w-md"
+  {onClose}
+>
+  <p class="text-sm text-base-content/70">
+    Indica el motivo de reactivacion para dejar registro.
+  </p>
+  <textarea
+    class="textarea textarea-bordered w-full"
+    rows="4"
+    placeholder="Motivo de reactivacion"
+    value={reactivateReason}
+    oninput={(event) =>
+      onReactivateReasonChange(
+        (event.currentTarget as HTMLTextAreaElement).value,
+      )}
+  ></textarea>
+  {#if reactivateError}
+    <p class="text-sm text-error">{reactivateError}</p>
+  {/if}
+  <AdminFormActions
+    submitLabel="Aceptar"
+    submitType="button"
+    submitVariant="success"
+    onSubmit={onConfirm}
+    onCancel={onClose}
+    {busy}
+  />
+</AdminModalShell>

@@ -5,6 +5,7 @@
   import { formatCurrency } from "@shared/utils/formatters";
   import "../../../../styles/product-modal.css";
   import type { PublicProduct } from "@features/catalog/lib/api";
+  import ProductAddonChipGroup from "./ProductAddonChipGroup.svelte";
   import {
     activeFlavors,
     addonsForGroup,
@@ -50,14 +51,21 @@
   );
   const jaleaOptions = $derived(addonsForGroup(product ?? undefined, "jalea"));
   const extraGroups = $derived(paidAddonGroups(product ?? undefined));
-  const hasExtras = $derived(extraGroups.length > 0);
-  const selectedExtraCount = $derived((draft.extra_addon_ids ?? []).length);
 
   const selectedToppingId = $derived(
     selectedIncludedAddonForGroup(product ?? undefined, draft, "toppings"),
   );
   const selectedJaleaId = $derived(
     selectedIncludedAddonForGroup(product ?? undefined, draft, "jalea"),
+  );
+
+  const toppingIds = $derived(new Set(toppingOptions.map((addon) => addon.id)));
+  const jaleaIds = $derived(new Set(jaleaOptions.map((addon) => addon.id)));
+  const toppingExtraIds = $derived(
+    (draft.extra_addon_ids ?? []).filter((id) => toppingIds.has(id)),
+  );
+  const jaleaExtraIds = $derived(
+    (draft.extra_addon_ids ?? []).filter((id) => jaleaIds.has(id)),
   );
 
   const flavorRequired = $derived(
@@ -70,6 +78,22 @@
     requiresGroupSelection(product ?? undefined, draft, "jalea"),
   );
 
+  // Mixed flavors support
+  const hasMixedFlavors = $derived(
+    !!(
+      product?.allows_mixed_flavors &&
+      product?.ball_quantity &&
+      product.ball_quantity > 1
+    ),
+  );
+  const ballQuantity = $derived(product?.ball_quantity ?? 1);
+  const flavorSelections = $derived(
+    hasMixedFlavors ? (draft.flavor_ids ?? Array(ballQuantity).fill("")) : [],
+  );
+  const mixedFlavorsRequired = $derived(
+    hasMixedFlavors && flavorSelections.some((id) => !id),
+  );
+
   const totalPrice = $derived(computeTotalPrice(product ?? undefined, draft));
   const addDisabled = $derived(
     !ordersEnabled ||
@@ -78,20 +102,6 @@
       mixedFlavorsRequired ||
       toppingRequired ||
       jaleaRequired,
-  );
-
-  // Mixed flavors support
-  const hasMixedFlavors = $derived(
-    product?.allows_mixed_flavors &&
-      product?.ball_quantity &&
-      product.ball_quantity > 1,
-  );
-  const ballQuantity = $derived(product?.ball_quantity ?? 1);
-  const flavorSelections = $derived(
-    hasMixedFlavors ? (draft.flavor_ids ?? Array(ballQuantity).fill("")) : [],
-  );
-  const mixedFlavorsRequired = $derived(
-    hasMixedFlavors && flavorSelections.some((id) => !id),
   );
 
   function buildInitialDraft(): ProductCustomizationDraft {
@@ -143,33 +153,55 @@
     draft = { ...draft, flavor_ids: nextIds };
   }
 
-  function selectIncluded(group: "toppings" | "jalea", addonId: string) {
-    const groupOptions = group === "toppings" ? toppingOptions : jaleaOptions;
-    const groupIds = new Set(groupOptions.map((addon) => addon.id));
-    const nextIncluded = (draft.included_addon_ids ?? []).filter(
-      (id) => !groupIds.has(id),
-    );
+  function updateToppingSelection(
+    nextIncludedId: string | null,
+    nextExtraIds: string[],
+  ) {
+    const currentIncluded = draft.included_addon_ids ?? [];
+    const currentExtras = draft.extra_addon_ids ?? [];
 
-    if (addonId) {
-      nextIncluded.push(addonId);
-      nextIncluded.sort();
+    const newIncluded = currentIncluded.filter((id) => !toppingIds.has(id));
+    if (nextIncludedId && nextIncludedId !== "none") {
+      newIncluded.push(nextIncludedId);
+    }
+
+    const newExtras = currentExtras.filter((id) => !toppingIds.has(id));
+    for (const id of nextExtraIds) {
+      if (toppingIds.has(id)) newExtras.push(id);
     }
 
     draft = {
       ...draft,
-      included_addon_ids: normalizeSelectionIds(nextIncluded),
+      included_addon_ids: normalizeSelectionIds(newIncluded),
+      extra_addon_ids: normalizeSelectionIds(newExtras),
       topping_selection:
-        group === "toppings"
-          ? addonId
-            ? "selected"
-            : "none"
-          : draft.topping_selection,
+        nextIncludedId && nextIncludedId !== "none" ? "selected" : "none",
+    };
+  }
+
+  function updateJaleaSelection(
+    nextIncludedId: string | null,
+    nextExtraIds: string[],
+  ) {
+    const currentIncluded = draft.included_addon_ids ?? [];
+    const currentExtras = draft.extra_addon_ids ?? [];
+
+    const newIncluded = currentIncluded.filter((id) => !jaleaIds.has(id));
+    if (nextIncludedId && nextIncludedId !== "none") {
+      newIncluded.push(nextIncludedId);
+    }
+
+    const newExtras = currentExtras.filter((id) => !jaleaIds.has(id));
+    for (const id of nextExtraIds) {
+      if (jaleaIds.has(id)) newExtras.push(id);
+    }
+
+    draft = {
+      ...draft,
+      included_addon_ids: normalizeSelectionIds(newIncluded),
+      extra_addon_ids: normalizeSelectionIds(newExtras),
       jalea_selection:
-        group === "jalea"
-          ? addonId
-            ? "selected"
-            : "none"
-          : draft.jalea_selection,
+        nextIncludedId && nextIncludedId !== "none" ? "selected" : "none",
     };
   }
 
@@ -283,6 +315,7 @@
             { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
           );
           void tick().then(() => {
+            if (!modalBoxRef) return;
             const details = modalBoxRef.querySelectorAll("details");
             if (details.length === 0) return;
             void animate(
@@ -472,7 +505,7 @@
                 {#if hasMixedFlavors}
                   <details
                     class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                    open={mixedFlavorsRequired}
+                    open={!!mixedFlavorsRequired}
                   >
                     <summary
                       class="collapse-title font-bold flex items-center gap-2"
@@ -578,36 +611,23 @@
                   <summary
                     class="collapse-title font-bold flex items-center gap-2"
                   >
-                    Topping <span class="badge badge-warning badge-sm"
-                      >requerido</span
-                    >
+                    Topping
                   </summary>
                   <div class="collapse-content pt-1">
-                    <div class="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        class={chipClass(
-                          draft.topping_selection === "none" &&
-                            !selectedToppingId,
-                          "required",
-                        )}
-                        onclick={() => selectIncluded("toppings", "")}
-                      >
-                        Sin topping
-                      </button>
-                      {#each toppingOptions as addon (addon.id)}
-                        <button
-                          type="button"
-                          class={chipClass(
-                            selectedToppingId === addon.id,
-                            "required",
-                          )}
-                          onclick={() => selectIncluded("toppings", addon.id)}
-                        >
-                          {addon.name}
-                        </button>
-                      {/each}
-                    </div>
+                    <ProductAddonChipGroup
+                      items={toppingOptions}
+                      includedId={selectedToppingId}
+                      selectedIds={toppingExtraIds}
+                      noneLabel="Sin topping"
+                      label="Topping"
+                      helperText="El primer Topping es gratis. Los siguientes tienen costo."
+                      required={true}
+                      error={toppingRequired
+                        ? "Selecciona un topping o 'Sin topping'"
+                        : ""}
+                      {chipClass}
+                      onChange={updateToppingSelection}
+                    />
                   </div>
                 </details>
               {/if}
@@ -620,93 +640,68 @@
                   <summary
                     class="collapse-title font-bold flex items-center gap-2"
                   >
-                    Jalea <span class="badge badge-warning badge-sm"
-                      >requerida</span
-                    >
+                    Jalea
+                  </summary>
+                  <div class="collapse-content pt-1">
+                    <ProductAddonChipGroup
+                      items={jaleaOptions}
+                      includedId={selectedJaleaId}
+                      selectedIds={jaleaExtraIds}
+                      noneLabel="Sin jalea"
+                      label="Jalea"
+                      helperText="La primera Jalea es gratis. Las siguientes tienen costo."
+                      required={true}
+                      error={jaleaRequired
+                        ? "Selecciona una jalea o 'Sin jalea'"
+                        : ""}
+                      {chipClass}
+                      onChange={updateJaleaSelection}
+                    />
+                  </div>
+                </details>
+              {/if}
+
+              {#each extraGroups as group (group.key)}
+                {@const groupSelectedCount = (
+                  draft.extra_addon_ids ?? []
+                ).filter((id) =>
+                  group.items.some((item) => item.id === id),
+                ).length}
+                <details
+                  class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
+                  open={groupSelectedCount > 0}
+                >
+                  <summary
+                    class="collapse-title font-bold flex items-center gap-2"
+                  >
+                    {group.label}
+                    <span class="badge badge-ghost badge-sm">opcional</span>
                   </summary>
                   <div class="collapse-content pt-1">
                     <div class="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        class={chipClass(
-                          draft.jalea_selection === "none" && !selectedJaleaId,
-                          "required",
-                        )}
-                        onclick={() => selectIncluded("jalea", "")}
-                      >
-                        Sin jalea
-                      </button>
-                      {#each jaleaOptions as addon (addon.id)}
+                      {#each group.items as addon (addon.id)}
+                        {@const checked = (
+                          draft.extra_addon_ids ?? []
+                        ).includes(addon.id)}
                         <button
                           type="button"
-                          class={chipClass(
-                            selectedJaleaId === addon.id,
-                            "required",
-                          )}
-                          onclick={() => selectIncluded("jalea", addon.id)}
+                          class={chipClass(checked)}
+                          onclick={() => toggleExtra(addon.id, !checked)}
                         >
                           {addon.name}
+                          {#if Number(addon.price ?? 0) > 0}
+                            <span class="ml-1" style="color: var(--ishos-teal);"
+                              >+{formatCurrency(Number(addon.price))}</span
+                            >
+                          {/if}
                         </button>
                       {/each}
                     </div>
                   </div>
                 </details>
-              {/if}
+              {/each}
 
-              <div
-                class="rounded-2xl border border-base-200 bg-base-100/70 px-4 py-3"
-              >
-                <div class="flex items-center justify-between gap-3">
-                  <h5 class="font-bold">Extras opcionales</h5>
-                  <span class="badge badge-ghost badge-sm"
-                    >{selectedExtraCount} seleccionados</span
-                  >
-                </div>
-              </div>
-              {#if hasExtras}
-                {#each extraGroups as group (group.key)}
-                  <details
-                    class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                    open={selectedExtraCount > 0}
-                  >
-                    <summary
-                      class="collapse-title font-bold flex items-center gap-2"
-                    >
-                      {group.label}
-                      <span class="badge badge-ghost badge-sm">opcional</span>
-                    </summary>
-                    <div class="collapse-content pt-1">
-                      <div class="flex flex-wrap gap-2">
-                        {#each group.items as addon (addon.id)}
-                          {@const checked = (
-                            draft.extra_addon_ids ?? []
-                          ).includes(addon.id)}
-                          <button
-                            type="button"
-                            class={chipClass(checked)}
-                            onclick={() => toggleExtra(addon.id, !checked)}
-                          >
-                            {addon.name}
-                            {#if Number(addon.price ?? 0) > 0}
-                              <span
-                                class="ml-1"
-                                style="color: var(--ishos-teal);"
-                                >+{formatCurrency(Number(addon.price))}</span
-                              >
-                            {/if}
-                          </button>
-                        {/each}
-                      </div>
-                    </div>
-                  </details>
-                {/each}
-              {:else}
-                <div class="text-sm text-base-content/60 px-2 py-2">
-                  No hay extras disponibles para este producto.
-                </div>
-              {/if}
-
-              {#if flavorOptions.length === 0 && toppingOptions.length === 0 && jaleaOptions.length === 0 && !hasExtras}
+              {#if flavorOptions.length === 0 && toppingOptions.length === 0 && jaleaOptions.length === 0 && extraGroups.length === 0}
                 <div
                   class="rounded-2xl border border-base-200 bg-base-100 p-4 text-sm text-base-content/70"
                 >
@@ -723,13 +718,11 @@
   <form
     method="dialog"
     class="modal-backdrop bg-base-300/60 backdrop-blur-sm"
-    onclick={(event) => {
+    onsubmit={(event) => {
       event.preventDefault();
       closeDialog();
     }}
   >
-    <button type="button" class="sr-only" onclick={() => closeDialog()}>
-      Cerrar
-    </button>
+    <button type="submit" class="sr-only"> Cerrar </button>
   </form>
 </dialog>

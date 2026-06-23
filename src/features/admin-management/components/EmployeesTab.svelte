@@ -3,6 +3,8 @@
   import { getCurrentRowsPerTable } from "@features/admin-management";
   import Icon from "@shared/components/AppIcon.svelte";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import AdminModalShell from "./shared/AdminModalShell.svelte";
+  import AdminFormActions from "./shared/AdminFormActions.svelte";
 
   interface Props {
     employees: Employee[];
@@ -44,8 +46,8 @@
     resetLoginLockout,
   }: Props = $props();
 
-  let employeeEditorDialog: HTMLDialogElement | null = null;
-  let lockoutResetDialog: HTMLDialogElement | null = null;
+  let employeeEditorDialog = $state<HTMLDialogElement | null>(null);
+  let lockoutResetDialog = $state<HTMLDialogElement | null>(null);
   let confirmOpen = $state(false);
   let confirmTitle = $state("Confirmar accion");
   let confirmMessage = $state("");
@@ -439,191 +441,156 @@
   </div>
 </section>
 
-<dialog class="modal" bind:this={employeeEditorDialog} onclose={resetForm}>
-  <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto p-0">
-    <div
-      class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4"
-    >
-      <div class="flex items-center gap-2.5">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"
-        >
-          <Icon
-            icon="lucide:user-check"
-            width="16"
-            height="16"
-            class="text-primary"
-          />
-        </div>
-        <h3 class="font-bold text-base leading-tight">
-          {isEditing ? "Editar empleado" : "Crear empleado"}
-        </h3>
-      </div>
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        type="button"
-        onclick={closeEmployeeEditor}
-        aria-label="Cerrar"
+<AdminModalShell
+  bind:dialogRef={employeeEditorDialog}
+  title={isEditing ? "Editar empleado" : "Crear empleado"}
+  icon="lucide:user-check"
+  widthClass="max-w-3xl"
+  onClose={closeEmployeeEditor}
+>
+  <form class="grid gap-3 md:grid-cols-2" onsubmit={submit}>
+    <div class="form-control">
+      <span id="employee-email-label" class="label-text text-xs mb-1"
+        >Correo</span
       >
-        <Icon icon="lucide:x" width="16" height="16" />
-      </button>
+      <input
+        id="employee-email"
+        class="input input-bordered input-sm w-full"
+        type="email"
+        bind:value={form.email}
+        required
+        aria-labelledby="employee-email-label"
+      />
     </div>
 
-    <form class="p-5 grid gap-6" onsubmit={submit}>
-      <div class="grid items-start gap-5 md:grid-cols-2">
-        <div class="form-control w-full">
-          <span id="employee-email-label" class="label-text mb-1">Correo</span>
-          <input
-            id="employee-email"
-            class="input input-bordered w-full"
-            type="email"
-            bind:value={form.email}
-            required
-            aria-labelledby="employee-email-label"
-          />
-        </div>
-
-        <div class="form-control w-full">
-          <span id="employee-password-label" class="label-text mb-1"
-            >Contrasena {isEditing ? "(opcional)" : ""}</span
-          >
-          <input
-            id="employee-password"
-            class="input input-bordered w-full"
-            type="password"
-            bind:value={form.password}
-            required={!isEditing}
-            minlength={isEditing ? undefined : 8}
-            aria-labelledby="employee-password-label"
-          />
-        </div>
-
-        <div class="form-control w-full">
-          <span id="employee-name-label" class="label-text mb-1">Nombre</span>
-          <input
-            id="employee-name"
-            class="input input-bordered w-full"
-            bind:value={form.name}
-            aria-labelledby="employee-name-label"
-          />
-        </div>
-
-        <div class="form-control w-full">
-          <span id="employee-phone-label" class="label-text mb-1">Telefono</span
-          >
-          <input
-            id="employee-phone"
-            class="input input-bordered w-full"
-            bind:value={form.phone}
-            aria-labelledby="employee-phone-label"
-          />
-        </div>
-
-        <div class="form-control w-full">
-          <span id="employee-role-label" class="label-text mb-1">Rol</span>
-          <select
-            id="employee-role"
-            class="select select-bordered w-full"
-            bind:value={form.role}
-            aria-labelledby="employee-role-label"
-          >
-            <option value="employee">employee</option>
-            <option value="admin">admin</option>
-          </select>
-        </div>
-
-        <div class="form-control w-full">
-          <span class="label-text mb-1">Estado</span>
-          <label
-            class="label h-12 w-full cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-3"
-          >
-            <input
-              class="toggle toggle-sm"
-              type="checkbox"
-              checked={form.state === "active"}
-              onchange={(event) =>
-                (form.state = (event.currentTarget as HTMLInputElement).checked
-                  ? "active"
-                  : "inactive")}
-              aria-label="Estado del empleado"
-            />
-            <span class="label-text"
-              >{form.state === "active" ? "Activo" : "Inactivo"}</span
-            >
-          </label>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap gap-2 pt-1">
-        <button class="btn btn-primary" type="submit" disabled={busy}>
-          {isEditing ? "Actualizar" : "Crear"}
-        </button>
-        <button
-          class="btn btn-ghost"
-          type="button"
-          onclick={closeEmployeeEditor}>Cancelar</button
-        >
-      </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={closeEmployeeEditor}>close</button>
-  </form>
-</dialog>
-
-<dialog class="modal" bind:this={lockoutResetDialog}>
-  <div class="modal-box max-w-lg p-0">
-    <div class="border-b border-base-200 px-5 py-4">
-      <h3 class="font-bold text-base">Restablecer bloqueo de usuario</h3>
-      <p class="mt-1 text-sm text-base-content/70">
-        Selecciona el empleado que quieres desbloquear.
-      </p>
+    <div class="form-control">
+      <span id="employee-password-label" class="label-text text-xs mb-1"
+        >Contrasena {isEditing ? "(opcional)" : ""}</span
+      >
+      <input
+        id="employee-password"
+        class="input input-bordered input-sm w-full"
+        type="password"
+        bind:value={form.password}
+        required={!isEditing}
+        minlength={isEditing ? undefined : 8}
+        aria-labelledby="employee-password-label"
+      />
     </div>
 
-    <form class="grid gap-4 px-5 py-5" onsubmit={submitLockoutReset}>
-      <div class="form-control">
-        <span class="label-text mb-1">Empleado</span>
-        <select
-          class="select select-bordered"
-          bind:value={lockoutResetForm.employeeID}
-          required
-        >
-          {#if lockoutCandidateEmployees.length === 0}
-            <option value="" disabled selected>No hay empleados</option>
-          {:else}
-            {#each lockoutCandidateEmployees as employee}
-              <option value={employee.id}>
-                {employee.email} ({employee.role})
-              </option>
-            {/each}
-          {/if}
-        </select>
-      </div>
+    <div class="form-control">
+      <span id="employee-name-label" class="label-text text-xs mb-1"
+        >Nombre</span
+      >
+      <input
+        id="employee-name"
+        class="input input-bordered input-sm w-full"
+        bind:value={form.name}
+        aria-labelledby="employee-name-label"
+      />
+    </div>
 
-      <p class="text-xs text-base-content/60">
-        Por seguridad, los identificadores sensibles del empleado no se muestran
-        aqui.
-      </p>
+    <div class="form-control">
+      <span id="employee-phone-label" class="label-text text-xs mb-1"
+        >Telefono</span
+      >
+      <input
+        id="employee-phone"
+        class="input input-bordered input-sm w-full"
+        bind:value={form.phone}
+        aria-labelledby="employee-phone-label"
+      />
+    </div>
 
-      <div class="flex justify-end gap-2 pt-1">
-        <button
-          class="btn btn-ghost"
-          type="button"
-          onclick={closeLockoutResetModal}>Cancelar</button
-        >
-        <button
-          class="btn btn-warning"
-          type="submit"
-          disabled={busy || !selectedLockoutEmployee}>Restablecer</button
-        >
-      </div>
-    </form>
-  </div>
+    <div class="form-control">
+      <span id="employee-role-label" class="label-text text-xs mb-1">Rol</span>
+      <select
+        id="employee-role"
+        class="select select-bordered select-sm w-full"
+        bind:value={form.role}
+        aria-labelledby="employee-role-label"
+      >
+        <option value="employee">employee</option>
+        <option value="admin">admin</option>
+      </select>
+    </div>
 
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={closeLockoutResetModal}>close</button>
+    <div class="form-control">
+      <span class="label-text text-xs mb-1">Estado</span>
+      <label
+        class="label h-9 w-full cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-3"
+      >
+        <input
+          class="toggle toggle-sm"
+          type="checkbox"
+          checked={form.state === "active"}
+          onchange={(event) =>
+            (form.state = (event.currentTarget as HTMLInputElement).checked
+              ? "active"
+              : "inactive")}
+          aria-label="Estado del empleado"
+        />
+        <span class="label-text text-sm"
+          >{form.state === "active" ? "Activo" : "Inactivo"}</span
+        >
+      </label>
+    </div>
+
+    <div class="md:col-span-2">
+      <AdminFormActions
+        submitLabel={isEditing ? "Actualizar" : "Crear"}
+        onCancel={closeEmployeeEditor}
+        {busy}
+      />
+    </div>
   </form>
-</dialog>
+</AdminModalShell>
+
+<AdminModalShell
+  bind:dialogRef={lockoutResetDialog}
+  title="Restablecer bloqueo de usuario"
+  icon="lucide:unlock"
+  widthClass="max-w-lg"
+  onClose={closeLockoutResetModal}
+>
+  <p class="text-sm text-base-content/70">
+    Selecciona el empleado que quieres desbloquear.
+  </p>
+
+  <form class="grid gap-3" onsubmit={submitLockoutReset}>
+    <div class="form-control">
+      <span class="label-text text-xs mb-1">Empleado</span>
+      <select
+        class="select select-bordered select-sm w-full"
+        bind:value={lockoutResetForm.employeeID}
+        required
+      >
+        {#if lockoutCandidateEmployees.length === 0}
+          <option value="" disabled selected>No hay empleados</option>
+        {:else}
+          {#each lockoutCandidateEmployees as employee}
+            <option value={employee.id}>
+              {employee.email} ({employee.role})
+            </option>
+          {/each}
+        {/if}
+      </select>
+    </div>
+
+    <p class="text-xs text-base-content/60">
+      Por seguridad, los identificadores sensibles del empleado no se muestran
+      aqui.
+    </p>
+
+    <AdminFormActions
+      submitLabel="Restablecer"
+      submitVariant="warning"
+      onCancel={closeLockoutResetModal}
+      disabled={!selectedLockoutEmployee}
+      {busy}
+    />
+  </form>
+</AdminModalShell>
 
 <ConfirmDialog
   open={confirmOpen}

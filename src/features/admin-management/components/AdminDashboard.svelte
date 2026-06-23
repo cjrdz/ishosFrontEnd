@@ -464,6 +464,7 @@
         await runLazyModuleLoad("categorias", loadCategories);
       } else if (tab === "productos") {
         await Promise.allSettled([
+          runLazyModuleLoad("productos-core", loadProducts),
           runLazyModuleLoad("categorias", loadCategories),
           runLazyModuleLoad("flavors", loadFlavors),
           runLazyModuleLoad("addons", loadAddons),
@@ -517,6 +518,7 @@
     stopOrdersPolling();
     ordersPollingController = createPollingInterval(async () => {
       if (!session) return;
+      if (typeof document !== "undefined" && document.hidden) return;
       console.debug("[admin-polling] orders", new Date().toISOString());
       void loadOrders({ silent: true });
     }, ORDERS_POLLING_INTERVAL_MS);

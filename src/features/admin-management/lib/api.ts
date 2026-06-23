@@ -65,6 +65,7 @@ export interface AdminImage {
 export interface Order {
   id: string;
   order_number: string;
+  customer_id?: string | null;
   customer_name: string;
   customer_phone: string;
   customer_email?: string | null;
@@ -523,6 +524,23 @@ export async function createUser(
   },
 ): Promise<User> {
   return apiRequest<User>("/users", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function upsertUser(
+  token: string,
+  payload: {
+    name: string;
+    user_type: "user" | "company";
+    phone: string;
+    email?: string;
+    status: "active" | "inactive";
+  },
+): Promise<User> {
+  return apiRequest<User>("/users/upsert", {
     method: "POST",
     token,
     body: payload,

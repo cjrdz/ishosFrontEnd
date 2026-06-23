@@ -1,5 +1,7 @@
 <script lang="ts">
   import Icon from "@shared/components/AppIcon.svelte";
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
   import {
     exportOrders,
     purgeOrdersByStatuses,
@@ -17,7 +19,7 @@
   let lastExportedEndDate = $state("");
   let lastExportFormat = $state<"csv" | "json" | null>(null);
   let selectedPurgeStatuses = $state<OrderStatus[]>(["entregada", "cancelada"]);
-  let purgeConfirmDialog: HTMLDialogElement | null = null;
+  let purgeConfirmDialog = $state<HTMLDialogElement | null>(null);
 
   const purgeStatusOptions: Array<{
     value: OrderStatus;
@@ -345,95 +347,56 @@
 </section>
 
 <!-- Purge modal -->
-<dialog
-  class="modal modal-bottom sm:modal-middle"
-  bind:this={purgeConfirmDialog}
+<AdminModalShell
+  bind:dialogRef={purgeConfirmDialog}
+  title="Confirmar eliminación"
+  icon="lucide:triangle-alert"
+  widthClass="max-w-lg"
+  onClose={() => {}}
 >
-  <div class="modal-box max-w-lg">
-    <div class="flex items-center gap-3 mb-5">
-      <div
-        class="w-11 h-11 rounded-full bg-error/10 flex items-center justify-center shrink-0"
+  <p class="text-xs text-base-content/55">
+    {formatDateDisplay(startDate)} – {formatDateDisplay(endDate)} · Esta acción no
+    se puede deshacer
+  </p>
+
+  <p class="text-sm font-medium">Estados a eliminar:</p>
+  <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    {#each purgeStatusOptions as opt}
+      <label
+        class={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${selectedPurgeStatuses.includes(opt.value) ? "border-error bg-error/5" : "border-base-300"}`}
       >
-        <Icon icon="lucide:triangle-alert" class="h-6 w-6 text-error" />
-      </div>
-      <div>
-        <h3 class="font-bold text-base">Confirmar eliminación</h3>
-        <p class="text-xs text-base-content/55">
-          {formatDateDisplay(startDate)} – {formatDateDisplay(endDate)} · Esta acción
-          no se puede deshacer
-        </p>
-      </div>
-    </div>
-
-    <p class="text-sm font-medium mb-3">Estados a eliminar:</p>
-    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 mb-5">
-      {#each purgeStatusOptions as opt}
-        <label
-          class={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${selectedPurgeStatuses.includes(opt.value) ? "border-error bg-error/5" : "border-base-300"}`}
-        >
-          <input
-            type="checkbox"
-            class="checkbox checkbox-sm checkbox-error"
-            checked={selectedPurgeStatuses.includes(opt.value)}
-            onchange={(e) =>
-              toggleStatus(
-                opt.value,
-                (e.currentTarget as HTMLInputElement).checked,
-              )}
-          />
-          <Icon icon={opt.icon} class="h-4 w-4 text-base-content/40 shrink-0" />
-          <span class="text-sm">{opt.label}</span>
-        </label>
-      {/each}
-    </div>
-
-    {#if lastExportFormat}
-      <div class="alert bg-success/10 border-success/25 mb-4 py-2.5">
-        <Icon
-          icon="lucide:circle-check"
-          class="text-success h-4 w-4 shrink-0"
+        <input
+          type="checkbox"
+          class="checkbox checkbox-sm checkbox-error"
+          checked={selectedPurgeStatuses.includes(opt.value)}
+          onchange={(e) =>
+            toggleStatus(
+              opt.value,
+              (e.currentTarget as HTMLInputElement).checked,
+            )}
         />
-        <span class="text-sm"
-          >Tienes respaldo {lastExportFormat.toUpperCase()} de este rango.</span
-        >
-      </div>
-    {/if}
-
-    <div class="modal-action">
-      <button
-        class="btn btn-ghost btn-sm"
-        type="button"
-        onclick={() => purgeConfirmDialog?.close()}>Cancelar</button
-      >
-      <button
-        class="btn btn-error btn-sm gap-2"
-        type="button"
-        disabled={deleting || selectedPurgeStatuses.length === 0}
-        onclick={confirmPurge}
-      >
-        {#if deleting}<span class="loading loading-spinner loading-xs"
-          ></span>{/if}
-        Eliminar órdenes
-      </button>
-    </div>
+        <Icon icon={opt.icon} class="h-4 w-4 text-base-content/40 shrink-0" />
+        <span class="text-sm">{opt.label}</span>
+      </label>
+    {/each}
   </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="submit">close</button>
-  </form>
-</dialog>
 
-<style>
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  .animate-fadeIn {
-    animation: fadeIn 0.18s ease-out;
-  }
-</style>
+  {#if lastExportFormat}
+    <div class="alert bg-success/10 border-success/25 py-2.5">
+      <Icon icon="lucide:circle-check" class="text-success h-4 w-4 shrink-0" />
+      <span class="text-sm"
+        >Tienes respaldo {lastExportFormat.toUpperCase()} de este rango.</span
+      >
+    </div>
+  {/if}
+
+  <AdminFormActions
+    submitLabel="Eliminar órdenes"
+    submitType="button"
+    submitVariant="error"
+    onSubmit={confirmPurge}
+    onCancel={() => purgeConfirmDialog?.close()}
+    disabled={selectedPurgeStatuses.length === 0}
+    busy={deleting}
+  />
+</AdminModalShell>

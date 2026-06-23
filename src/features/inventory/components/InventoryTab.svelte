@@ -30,8 +30,8 @@
     type InventoryStats,
     type StockMovement,
     type ContainerType,
-    type Flavor,
   } from "@features/admin-management/lib/bff";
+  import { type Flavor } from "@features/admin-management/lib/api";
   import InventoryEntryDialog from "./InventoryEntryDialog.svelte";
   import InventoryAdjustmentDialog from "./InventoryAdjustmentDialog.svelte";
   import ContainerTypesDialog from "./ContainerTypesDialog.svelte";

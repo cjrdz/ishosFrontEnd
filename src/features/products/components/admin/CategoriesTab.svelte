@@ -6,6 +6,8 @@
   import Icon from "@shared/components/AppIcon.svelte";
   import { toSlug } from "@shared/utils/formatters";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
 
   interface Props {
     categories: Category[];
@@ -33,7 +35,7 @@
 
   let { categories, busy, moduleError, onCreate, onUpdate, onDelete }: Props =
     $props();
-  let categoryEditorDialog: HTMLDialogElement | null = null;
+  let categoryEditorDialog = $state<HTMLDialogElement | null>(null);
   let confirmOpen = $state(false);
   let confirmTitle = $state("Confirmar accion");
   let confirmMessage = $state("");
@@ -336,141 +338,108 @@
   </div>
 </section>
 
-<dialog class="modal" bind:this={categoryEditorDialog} onclose={resetForm}>
-  <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto p-0">
-    <div
-      class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4"
-    >
-      <div class="flex items-center gap-2.5">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"
-        >
-          <Icon
-            icon="lucide:folder"
-            width="16"
-            height="16"
-            class="text-primary"
-          />
-        </div>
-        <h3 class="font-bold text-base leading-tight">
-          {isEditing ? "Editar categoria" : "Crear categoria"}
-        </h3>
-      </div>
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        type="button"
-        onclick={closeCategoryEditor}
-        aria-label="Cerrar"
+<AdminModalShell
+  bind:dialogRef={categoryEditorDialog}
+  title={isEditing ? "Editar categoria" : "Crear categoria"}
+  icon="lucide:folder"
+  widthClass="max-w-3xl"
+  onClose={closeCategoryEditor}
+>
+  <form class="grid gap-3 md:grid-cols-2" onsubmit={submit}>
+    <div class="form-control md:col-span-2">
+      <span id="category-name-label" class="label-text text-xs mb-1"
+        >Nombre</span
       >
-        <Icon icon="lucide:x" width="16" height="16" />
-      </button>
+      <input
+        id="category-name"
+        class="input input-bordered input-sm w-full"
+        placeholder="Bebidas frias"
+        bind:value={form.name}
+        required
+        aria-labelledby="category-name-label"
+      />
     </div>
 
-    <form
-      class="p-5 grid items-start gap-6 md:grid-cols-[1.15fr_0.85fr]"
-      onsubmit={submit}
-    >
-      <div class="grid gap-5">
-        <div class="grid items-start gap-5 md:grid-cols-2">
-          <div class="form-control w-full md:col-span-2">
-            <span id="category-name-label" class="label-text mb-1">Nombre</span>
-            <input
-              id="category-name"
-              class="input input-bordered w-full"
-              placeholder="Bebidas frias"
-              bind:value={form.name}
-              required
-              aria-labelledby="category-name-label"
-            />
-          </div>
+    <div class="form-control">
+      <span id="category-slug-label" class="label-text text-xs mb-1"
+        >Slug (URL)</span
+      >
+      <input
+        id="category-slug"
+        class="input input-bordered input-sm w-full"
+        placeholder="bebidas-frias (opcional)"
+        bind:value={form.slug}
+        aria-labelledby="category-slug-label"
+      />
+    </div>
 
-          <div class="form-control w-full">
-            <span id="category-slug-label" class="label-text mb-1"
-              >Slug (URL)</span
-            >
-            <input
-              id="category-slug"
-              class="input input-bordered w-full"
-              placeholder="bebidas-frias (opcional)"
-              bind:value={form.slug}
-              aria-labelledby="category-slug-label"
-            />
-          </div>
+    <div class="form-control">
+      <span class="label-text text-xs mb-1">Generar slug</span>
+      <button
+        class="btn btn-outline btn-sm w-full"
+        type="button"
+        onclick={() => (form.slug = toSlug(form.name))}
+        >Auto desde nombre</button
+      >
+    </div>
 
-          <div class="form-control w-full">
-            <span class="label-text mb-1">Generar slug</span>
-            <button
-              class="btn btn-outline h-12 w-full"
-              type="button"
-              onclick={() => (form.slug = toSlug(form.name))}
-              >Auto desde nombre</button
-            >
-          </div>
+    <div class="form-control">
+      <span id="category-order-label" class="label-text text-xs mb-1"
+        >Orden</span
+      >
+      <input
+        id="category-order"
+        class="input input-bordered input-sm w-full"
+        type="number"
+        min="0"
+        bind:value={form.display_order}
+        aria-labelledby="category-order-label"
+      />
+    </div>
 
-          <div class="form-control w-full">
-            <span id="category-order-label" class="label-text mb-1">Orden</span>
-            <input
-              id="category-order"
-              class="input input-bordered h-12 w-full"
-              type="number"
-              min="0"
-              bind:value={form.display_order}
-              aria-labelledby="category-order-label"
-            />
-          </div>
-
-          <div class="form-control w-full">
-            <span class="label-text mb-1">Estado</span>
-            <label
-              class="label h-12 w-full cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-3"
-            >
-              <input
-                id="category-is-active"
-                class="toggle toggle-sm"
-                type="checkbox"
-                bind:checked={form.is_active}
-                aria-labelledby="category-is-active-label"
-              />
-              <span id="category-is-active-label" class="label-text"
-                >Activa</span
-              >
-            </label>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap gap-2 pt-1">
-          <button class="btn btn-primary" type="submit" disabled={busy}>
-            {isEditing ? "Actualizar" : "Crear"}
-          </button>
-          <button
-            class="btn btn-ghost"
-            type="button"
-            onclick={closeCategoryEditor}>Cancelar</button
-          >
-        </div>
-      </div>
-
-      <div class="form-control w-full self-start pt-0">
-        <span id="category-description-label" class="label-text mb-1"
-          >Descripcion</span
+    <div class="form-control">
+      <span class="label-text text-xs mb-1">Estado</span>
+      <label
+        class="label h-9 w-full cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-3"
+      >
+        <input
+          id="category-is-active"
+          class="toggle toggle-sm"
+          type="checkbox"
+          bind:checked={form.is_active}
+          aria-labelledby="category-is-active-label"
+        />
+        <span id="category-is-active-label" class="label-text text-sm"
+          >Activa</span
         >
-        <textarea
-          id="category-description"
-          class="textarea textarea-bordered w-full h-50 resize-none"
-          placeholder="Descripcion"
-          bind:value={form.description}
-          aria-labelledby="category-description-label"
-        ></textarea>
-        <p class="mt-2 text-xs text-base-content/60">
-          El slug identifica la categoria en URLs y rutas internas.
-        </p>
-      </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={closeCategoryEditor}>close</button>
+      </label>
+    </div>
+
+    <div class="form-control md:col-span-2">
+      <span id="category-description-label" class="label-text text-xs mb-1"
+        >Descripcion</span
+      >
+      <textarea
+        id="category-description"
+        class="textarea textarea-bordered textarea-sm w-full h-32 resize-none"
+        placeholder="Descripcion"
+        bind:value={form.description}
+        aria-labelledby="category-description-label"
+      ></textarea>
+      <p class="mt-1 text-xs text-base-content/60">
+        El slug identifica la categoria en URLs y rutas internas.
+      </p>
+    </div>
+
+    <div class="md:col-span-2">
+      <AdminFormActions
+        submitLabel={isEditing ? "Actualizar" : "Crear"}
+        onCancel={closeCategoryEditor}
+        {busy}
+      />
+    </div>
   </form>
-</dialog>
+</AdminModalShell>
 
 <ConfirmDialog
   open={confirmOpen}

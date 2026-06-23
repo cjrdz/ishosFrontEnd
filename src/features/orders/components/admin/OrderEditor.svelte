@@ -1,5 +1,7 @@
 <script lang="ts">
   import Icon from "@shared/components/AppIcon.svelte";
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
   import type {
     Addon,
     Flavor,
@@ -142,412 +144,287 @@
   const displayTotal = $derived(
     manualItems.length > 0 ? manualOrderTotal : totalPreview,
   );
+  const hasNotes = $derived(orderForm.notes.trim().length > 0);
+  const requiresEditNote = $derived(isEditing && !hasNotes);
 </script>
 
 <!-- Main order editor dialog -->
-<dialog class="modal" bind:this={dialogRef} onclose={onClose}>
-  <div class="modal-box w-11/12 max-w-4xl max-h-[92vh] overflow-y-auto p-0">
-    <!-- Sticky header -->
-    <div
-      class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4"
-    >
-      <div class="flex flex-wrap items-center gap-2.5">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"
-        >
-          <Icon
-            icon={isEditing ? "lucide:pencil" : "lucide:clipboard-list"}
-            class="text-primary"
-            width="16"
-            height="16"
+<AdminModalShell
+  bind:dialogRef
+  title={`${isEditing ? "Editar orden" : "Crear orden manual"}${isEditing && selectedOrder ? ` · ${selectedOrder.order_number}` : ""}`}
+  icon={isEditing ? "lucide:pencil" : "lucide:clipboard-list"}
+  widthClass="max-w-3xl"
+  {onClose}
+>
+  <form class="space-y-4" onsubmit={onSubmit}>
+    <!-- Customer + order details compact strip -->
+    <div class="space-y-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+        <div class="form-control">
+          <span id="order-customer-name-label" class="label-text text-xs mb-1">
+            Nombre
+          </span>
+          <input
+            id="order-customer-name"
+            class="input input-bordered input-sm w-full"
+            placeholder="Nombre completo"
+            bind:value={orderForm.customer_name}
+            required
+            aria-labelledby="order-customer-name-label"
           />
         </div>
-        <div>
-          <h3 class="font-bold text-base leading-tight">
-            {isEditing ? "Editar orden" : "Crear orden manual"}
-          </h3>
-          {#if isEditing && selectedOrder}
-            <p class="text-xs text-base-content/50 leading-tight">
-              {selectedOrder.order_number}
-            </p>
-          {/if}
+        <div class="form-control">
+          <span id="order-customer-phone-label" class="label-text text-xs mb-1">
+            Teléfono
+          </span>
+          <input
+            id="order-customer-phone"
+            class="input input-bordered input-sm w-full"
+            placeholder="Ej. 7000-0000"
+            bind:value={orderForm.customer_phone}
+            required
+            aria-labelledby="order-customer-phone-label"
+          />
+        </div>
+        <div class="form-control sm:col-span-2 md:col-span-1">
+          <span id="order-customer-email-label" class="label-text text-xs mb-1">
+            Correo <span class="text-base-content/40 font-normal"
+              >(opcional)</span
+            >
+          </span>
+          <input
+            id="order-customer-email"
+            class="input input-bordered input-sm w-full"
+            type="email"
+            placeholder="correo@ejemplo.com"
+            bind:value={orderForm.customer_email}
+            aria-labelledby="order-customer-email-label"
+          />
         </div>
       </div>
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        type="button"
-        onclick={onClose}
-        aria-label="Cerrar"
-      >
-        <Icon icon="lucide:x" width="16" height="16" />
-      </button>
+
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
+        <div class="form-control">
+          <span id="order-payment-method-label" class="label-text text-xs mb-1">
+            Pago
+          </span>
+          <select
+            id="order-payment-method"
+            class="select select-bordered select-sm w-full"
+            bind:value={orderForm.payment_method}
+            aria-labelledby="order-payment-method-label"
+          >
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-control">
+          <span id="order-type-label" class="label-text text-xs mb-1">
+            Tipo
+          </span>
+          <select
+            id="order-type"
+            class="select select-bordered select-sm w-full"
+            bind:value={orderForm.order_type}
+            aria-labelledby="order-type-label"
+          >
+            <option value="para_llevar">Para llevar</option>
+            <option value="en_local">En local</option>
+          </select>
+        </div>
+        <div class="form-control sm:col-span-2 md:col-span-1">
+          <span id="order-table-number-label" class="label-text text-xs mb-1">
+            Mesa
+          </span>
+          <input
+            id="order-table-number"
+            class="input input-bordered input-sm w-full"
+            type="number"
+            min="1"
+            placeholder={orderForm.order_type === "en_local"
+              ? "Número"
+              : "No aplica"}
+            bind:value={orderForm.table_number}
+            required={orderForm.order_type === "en_local"}
+            disabled={orderForm.order_type !== "en_local"}
+            aria-labelledby="order-table-number-label"
+          />
+        </div>
+      </div>
     </div>
 
-    <!-- Form body -->
-    <form class="p-5 space-y-5" onsubmit={onSubmit}>
-      <!-- Customer info section -->
-      <section class="space-y-4">
-        <div class="flex items-center gap-2">
+    <div class="divider my-0"></div>
+
+    <!-- Products section -->
+    <OrderItemBuilder
+      {products}
+      {orderForm}
+      {manualItems}
+      {draftItemEditIndex}
+      {selectedProductFlavors}
+      {toppingAddons}
+      {jaleaAddons}
+      {selectedProductAddons}
+      {paidAddonGroups}
+      {selectedFlavorId}
+      {selectedFlavorIds}
+      {includedToppingId}
+      {includedJaleaId}
+      {selectedExtraAddonIds}
+      {hasCustomizationOptions}
+      {totalPreview}
+      {manualOrderTotal}
+      {addItemError}
+      {busy}
+      {onProductChange}
+      {onQuantityChange}
+      {onFlavorChange}
+      {onFlavorIdsChange}
+      {onChangeIncludedTopping}
+      {onChangeIncludedJalea}
+      {onToggleExtraAddonSelection}
+      {onAddDraftItem}
+      {onEditDraftItem}
+      {onCancelDraftItemEdit}
+      {onRemoveDraftItem}
+      {onUpdateDraftItemQuantity}
+      {onProductById}
+      {onResolveFlavorName}
+      {onResolveAddonNames}
+      {onManualItemSubtotal}
+      {onDraftItemKey}
+    />
+
+    <span class="hidden" aria-hidden="true">{draftItemEditIndex ?? ""}</span>
+
+    {#if isEditing}
+      <div class="alert alert-info py-2 text-sm">
+        <Icon icon="lucide:info" width="16" height="16" />
+        <span>
+          Puedes editar productos, cantidades y configuraciones. Debes agregar
+          una nota explicando los cambios antes de guardar.
+        </span>
+      </div>
+    {/if}
+
+    <!-- Total preview with note trigger -->
+    <div
+      class="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+    >
+      <div class="flex items-center gap-2">
+        <Icon
+          icon="lucide:calculator"
+          width="15"
+          height="15"
+          class="text-primary/70"
+        />
+        <span class="text-sm font-medium text-base-content/80"
+          >Total estimado</span
+        >
+      </div>
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          class={`btn btn-xs gap-1 ${requiresEditNote ? "btn-error btn-outline" : "btn-ghost"}`}
+          onclick={openNotesDialog}
+          aria-label={hasNotes ? "Editar nota" : "Agregar nota"}
+          title={hasNotes ? orderForm.notes : "Agregar nota"}
+        >
           <Icon
-            icon="lucide:user"
-            width="14"
-            height="14"
-            class="text-base-content/50"
+            icon={hasNotes ? "lucide:pencil" : "lucide:plus"}
+            width="12"
+            height="12"
           />
-          <p
-            class="text-xs font-semibold uppercase tracking-wide text-base-content/50"
-          >
-            Informacion del cliente
-          </p>
-        </div>
-
-        <div class="grid md:grid-cols-2 gap-4">
-          <div class="form-control">
-            <span id="order-customer-name-label" class="label-text mb-1.5"
-              >Nombre del cliente</span
-            >
-            <input
-              id="order-customer-name"
-              class="input input-bordered w-full"
-              placeholder="Nombre completo"
-              bind:value={orderForm.customer_name}
-              required
-              aria-labelledby="order-customer-name-label"
-            />
-          </div>
-          <div class="form-control">
-            <span id="order-customer-phone-label" class="label-text mb-1.5"
-              >Telefono</span
-            >
-            <input
-              id="order-customer-phone"
-              class="input input-bordered w-full"
-              placeholder="Ej. 7000-0000"
-              bind:value={orderForm.customer_phone}
-              required
-              aria-labelledby="order-customer-phone-label"
-            />
-          </div>
-          <div class="form-control md:col-span-2">
-            <span id="order-customer-email-label" class="label-text mb-1.5">
-              Correo
-              <span class="text-base-content/40 font-normal">(opcional)</span>
-            </span>
-            <input
-              id="order-customer-email"
-              class="input input-bordered w-full"
-              type="email"
-              placeholder="correo@ejemplo.com"
-              bind:value={orderForm.customer_email}
-              aria-labelledby="order-customer-email-label"
-            />
-          </div>
-        </div>
-      </section>
-
-      <div class="divider my-0"></div>
-
-      <!-- Order details section -->
-      <section class="space-y-4">
-        <div class="flex items-center gap-2">
-          <Icon
-            icon="lucide:receipt"
-            width="14"
-            height="14"
-            class="text-base-content/50"
-          />
-          <p
-            class="text-xs font-semibold uppercase tracking-wide text-base-content/50"
-          >
-            Detalles de la orden
-          </p>
-        </div>
-
-        <div class="grid md:grid-cols-3 gap-4">
-          <div class="form-control">
-            <span id="order-payment-method-label" class="label-text mb-1.5"
-              >Metodo de pago</span
-            >
-            <select
-              id="order-payment-method"
-              class="select select-bordered w-full"
-              bind:value={orderForm.payment_method}
-              aria-labelledby="order-payment-method-label"
-            >
-              <option value="efectivo">Efectivo</option>
-              <option value="tarjeta">Tarjeta</option>
-              <option value="transferencia">Transferencia</option>
-              <option value="otro">Otro</option>
-            </select>
-          </div>
-          <div class="form-control">
-            <span id="order-type-label" class="label-text mb-1.5"
-              >Tipo de orden</span
-            >
-            <select
-              id="order-type"
-              class="select select-bordered w-full"
-              bind:value={orderForm.order_type}
-              aria-labelledby="order-type-label"
-            >
-              <option value="para_llevar">Para llevar</option>
-              <option value="en_local">En local</option>
-            </select>
-          </div>
-          <div class="form-control">
-            <span id="order-table-number-label" class="label-text mb-1.5"
-              >Mesa</span
-            >
-            <input
-              id="order-table-number"
-              class="input input-bordered w-full"
-              type="number"
-              min="1"
-              placeholder={orderForm.order_type === "en_local"
-                ? "Numero de mesa"
-                : "No aplica"}
-              bind:value={orderForm.table_number}
-              required={orderForm.order_type === "en_local"}
-              disabled={orderForm.order_type !== "en_local"}
-              aria-labelledby="order-table-number-label"
-            />
-          </div>
-        </div>
-      </section>
-
-      <div class="divider my-0"></div>
-
-      <!-- Products section -->
-      <OrderItemBuilder
-        {products}
-        {orderForm}
-        {manualItems}
-        {draftItemEditIndex}
-        {selectedProductFlavors}
-        {toppingAddons}
-        {jaleaAddons}
-        {selectedProductAddons}
-        {paidAddonGroups}
-        {selectedFlavorId}
-        {selectedFlavorIds}
-        {includedToppingId}
-        {includedJaleaId}
-        {selectedExtraAddonIds}
-        {hasCustomizationOptions}
-        {totalPreview}
-        {manualOrderTotal}
-        {addItemError}
-        {busy}
-        {onProductChange}
-        {onQuantityChange}
-        {onFlavorChange}
-        {onFlavorIdsChange}
-        {onChangeIncludedTopping}
-        {onChangeIncludedJalea}
-        {onToggleExtraAddonSelection}
-        {onAddDraftItem}
-        {onEditDraftItem}
-        {onCancelDraftItemEdit}
-        {onRemoveDraftItem}
-        {onUpdateDraftItemQuantity}
-        {onProductById}
-        {onResolveFlavorName}
-        {onResolveAddonNames}
-        {onManualItemSubtotal}
-        {onDraftItemKey}
-      />
-
-      <span class="hidden" aria-hidden="true">{draftItemEditIndex ?? ""}</span>
-
-      {#if isEditing}
-        <div class="alert alert-info py-2.5 text-sm">
-          <Icon icon="lucide:info" width="16" height="16" />
-          <span>
-            Puedes editar productos, cantidades y configuraciones. Debes agregar
-            una nota explicando los cambios antes de guardar.
-          </span>
-        </div>
-      {/if}
-
-      <!-- Notes section -->
-      <section>
-        <div class="rounded-xl border border-base-300 bg-base-100 p-4">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-start gap-3">
-              <div
-                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-base-200 mt-0.5"
-              >
-                <Icon
-                  icon="lucide:sticky-note"
-                  width="14"
-                  height="14"
-                  class="text-base-content/60"
-                />
-              </div>
-              <div class="min-w-0">
-                <p class="font-medium text-sm leading-tight">
-                  Nota de la orden
-                </p>
-                <p class="text-sm text-base-content/60 mt-0.5 line-clamp-2">
-                  {orderForm.notes.trim()
-                    ? orderForm.notes
-                    : "Sin nota agregada"}
-                </p>
-              </div>
-            </div>
-            <button
-              class="btn btn-sm btn-outline shrink-0"
-              type="button"
-              onclick={openNotesDialog}
-            >
-              <Icon
-                icon={orderForm.notes.trim() ? "lucide:pencil" : "lucide:plus"}
-                width="13"
-                height="13"
-              />
-              {orderForm.notes.trim() ? "Editar nota" : "Agregar nota"}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <!-- Total preview -->
-      <div
-        class="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex flex-wrap items-center justify-between gap-2"
-      >
-        <div class="flex items-center gap-2">
-          <Icon
-            icon="lucide:calculator"
-            width="15"
-            height="15"
-            class="text-primary/70"
-          />
-          <span class="text-sm font-medium text-base-content/80"
-            >Total estimado de la orden</span
-          >
-        </div>
+          {requiresEditNote
+            ? "Falta nota"
+            : hasNotes
+              ? "Editar nota"
+              : "Agregar nota"}
+        </button>
         <span class="text-base font-bold text-primary">
           {formatCurrency(displayTotal)}
         </span>
       </div>
+    </div>
 
-      {#if isEditing && selectedOrder}
-        <p class="text-xs text-base-content/60 -mt-2">
-          Total previo: {formatCurrency(selectedOrder.total_amount)}
-        </p>
-      {/if}
+    {#if isEditing && selectedOrder}
+      <p class="text-xs text-base-content/60 -mt-2">
+        Total previo: {formatCurrency(selectedOrder.total_amount)}
+      </p>
+    {/if}
 
-      <!-- Feedback messages -->
-      {#if editError}
-        <div class="alert alert-error py-2.5 text-sm">
-          <Icon icon="lucide:circle-alert" width="16" height="16" />
-          <span>{editError}</span>
-        </div>
-      {/if}
-      {#if editNotice}
-        <div class="alert alert-success py-2.5 text-sm">
-          <Icon icon="lucide:circle-check" width="16" height="16" />
-          <span>{editNotice}</span>
-        </div>
-      {/if}
-
-      <!-- Action buttons -->
-      <div class="flex flex-wrap gap-2 pt-1">
-        <button class="btn btn-primary" type="submit" disabled={busy}>
-          {#if busy}
-            <span class="loading loading-spinner loading-xs"></span>
-          {/if}
-          {isEditing ? "Guardar cambios" : "Crear orden"}
-        </button>
-        {#if !isEditing}
-          <button class="btn btn-outline" type="button" onclick={onClearForm}>
-            Limpiar
-          </button>
-        {/if}
-        <button class="btn btn-ghost" type="button" onclick={onCancelEdit}>
-          {isEditing ? "Cancelar edicion" : "Cancelar"}
-        </button>
+    <!-- Feedback messages -->
+    {#if editError}
+      <div class="alert alert-error py-2 text-sm">
+        <Icon icon="lucide:circle-alert" width="16" height="16" />
+        <span>{editError}</span>
       </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={onClose}>close</button>
+    {/if}
+    {#if editNotice}
+      <div class="alert alert-success py-2 text-sm">
+        <Icon icon="lucide:circle-check" width="16" height="16" />
+        <span>{editNotice}</span>
+      </div>
+    {/if}
+
+    <!-- Action buttons -->
+    <div class="flex flex-wrap gap-2 pt-1">
+      {#if !isEditing}
+        <button class="btn btn-outline" type="button" onclick={onClearForm}>
+          Limpiar
+        </button>
+      {/if}
+      <AdminFormActions
+        submitLabel={isEditing ? "Guardar cambios" : "Crear orden"}
+        cancelLabel={isEditing ? "Cancelar edición" : "Cancelar"}
+        onCancel={onCancelEdit}
+        {busy}
+      />
+    </div>
   </form>
-</dialog>
+</AdminModalShell>
 
 <!-- Notes sub-dialog -->
-<dialog class="modal" bind:this={noteDialogRef}>
-  <div class="modal-box max-w-lg p-0">
-    <div
-      class="flex items-center justify-between gap-3 border-b border-base-200 px-5 py-4"
-    >
-      <div class="flex items-center gap-2.5">
-        <div
-          class="flex h-7 w-7 items-center justify-center rounded-lg bg-base-200"
-        >
-          <Icon
-            icon="lucide:sticky-note"
-            width="14"
-            height="14"
-            class="text-base-content/60"
-          />
-        </div>
-        <h3 class="font-bold text-base">Nota de la orden</h3>
-      </div>
-      <div class="flex items-center gap-1">
-        {#if orderForm.notes.trim()}
-          <button
-            class="btn btn-ghost btn-xs text-error"
-            type="button"
-            onclick={() => (orderForm.notes = "")}
-          >
-            <Icon icon="lucide:trash-2" width="12" height="12" />
-            Limpiar
-          </button>
-        {/if}
-        <button
-          class="btn btn-ghost btn-sm btn-circle"
-          type="button"
-          onclick={closeNotesDialog}
-          aria-label="Cerrar"
-        >
-          <Icon icon="lucide:x" width="15" height="15" />
-        </button>
-      </div>
-    </div>
+<AdminModalShell
+  bind:dialogRef={noteDialogRef}
+  title="Nota de la orden"
+  icon="lucide:sticky-note"
+  widthClass="max-w-lg"
+  onClose={closeNotesDialog}
+>
+  <p class="text-sm text-base-content/60">
+    Agrega una observación general para esta orden. El cliente puede verla en su
+    seguimiento.
+  </p>
 
-    <div class="p-5 space-y-3">
-      <p class="text-sm text-base-content/60">
-        Agrega una observacion general para esta orden. El cliente puede verla
-        en su seguimiento.
-      </p>
-      <textarea
-        id="order-notes"
-        class="textarea textarea-bordered w-full min-h-36"
-        rows="6"
-        placeholder="Ej: Sin hielo, entregar en planta baja, alergico a nueces..."
-        bind:value={orderForm.notes}
-        aria-label="Notas de la orden"
-      ></textarea>
-    </div>
-
-    <div class="flex justify-end gap-2 border-t border-base-200 px-5 py-4">
+  {#if orderForm.notes.trim()}
+    <div class="flex justify-end">
       <button
-        class="btn btn-ghost btn-sm"
+        class="btn btn-ghost btn-xs text-error"
         type="button"
-        onclick={closeNotesDialog}>Cancelar</button
+        onclick={() => (orderForm.notes = "")}
       >
-      <button
-        class="btn btn-primary btn-sm"
-        type="button"
-        onclick={closeNotesDialog}
-      >
-        <Icon icon="lucide:check" width="14" height="14" />
-        Guardar nota
+        <Icon icon="lucide:trash-2" width="12" height="12" />
+        Limpiar
       </button>
     </div>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={closeNotesDialog}>close</button>
-  </form>
-</dialog>
+  {/if}
+
+  <textarea
+    id="order-notes"
+    class="textarea textarea-bordered w-full min-h-36"
+    rows="6"
+    placeholder="Ej: Sin hielo, entregar en planta baja, alérgico a nueces..."
+    bind:value={orderForm.notes}
+    aria-label="Notas de la orden"
+  ></textarea>
+
+  <AdminFormActions
+    submitLabel="Guardar nota"
+    submitType="button"
+    onSubmit={closeNotesDialog}
+    onCancel={closeNotesDialog}
+  />
+</AdminModalShell>

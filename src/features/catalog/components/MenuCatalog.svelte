@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { fade, fly } from "svelte/transition";
   import { animate } from "motion";
   import Icon from "@shared/components/AppIcon.svelte";
   import ProductCard from "./shared/ProductCard.svelte";
@@ -33,13 +34,9 @@
   let isCategoryTransitioning = $state(false);
   let pendingCategory = $state<string | null>(null);
   let catalogGridRef = $state<HTMLElement | null>(null);
-  let tabsListRef = $state<HTMLElement | null>(null);
-  let activeTabBubbleRef = $state<HTMLElement | null>(null);
-  let mobileTabsMeasureRef = $state<HTMLElement | null>(null);
-  let mobileCategoryDetailsRef = $state<HTMLDetailsElement | null>(null);
-  let mobileMenuPanelRef = $state<HTMLElement | null>(null);
-  let useMobileDropdown = $state(false);
-  let isMobileCategoryMenuOpen = $state(false);
+  let sidebarTabsRef = $state<HTMLElement | null>(null);
+  let showSidebar = $state(true);
+  let isMobileDrawerOpen = $state(false);
 
   let selectedProduct = $state<PublicProduct | null>(null);
   let selectedDraft = $state<ProductCustomizationDraft | null>(null);
@@ -56,6 +53,65 @@
       "Categorias",
   );
 
+  const SIDEBAR_VISIBILITY_KEY = "ishos:menu-sidebar-visible";
+
+  const CATEGORY_ICON_MAP: Record<string, string> = {
+    all: "lucide:layout-grid",
+    extras: "lucide:plus",
+    "vasos y tarrinas": "lucide:glass-water",
+    "conos y barquillos": "lucide:ice-cream-cone",
+    bowls: "lucide:soup",
+    "para compartir": "lucide:users",
+    "para llevar": "lucide:shopping-bag",
+    chocobananos: "lucide:banana",
+    especiales: "lucide:star",
+    bebidas: "lucide:cup-soda",
+  };
+
+  function getCategoryIcon(tab: { id: string; label: string }): string {
+    const normalizedId = tab.id.toLowerCase().trim();
+    const normalizedLabel = tab.label.toLowerCase().trim();
+    return (
+      CATEGORY_ICON_MAP[normalizedId] ??
+      CATEGORY_ICON_MAP[normalizedLabel] ??
+      "lucide:circle-dot"
+    );
+  }
+
+  function toggleSidebar() {
+    showSidebar = !showSidebar;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SIDEBAR_VISIBILITY_KEY, String(showSidebar));
+    }
+  }
+
+  function openMobileDrawer() {
+    isMobileDrawerOpen = true;
+  }
+
+  function closeMobileDrawer() {
+    isMobileDrawerOpen = false;
+  }
+
+  function selectCategoryFromDrawer(categoryId: string) {
+    setActiveCategory(categoryId);
+    closeMobileDrawer();
+  }
+
+  function handleDrawerKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape") {
+      closeMobileDrawer();
+    }
+  }
+
+  $effect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.overflow = isMobileDrawerOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  });
+
   const visibleProducts = $derived(
     displayedCategory === "all"
       ? products
@@ -65,28 +121,12 @@
   onMount(() => {
     void loadStoreData();
 
-    const handleWindowResize = () => {
-      evaluateCategoryLayoutMode();
-      moveActiveTabBubble(true);
-    };
-
-    window.addEventListener("resize", handleWindowResize);
-
-    void tick().then(() => {
-      evaluateCategoryLayoutMode();
-      moveActiveTabBubble(true);
-    });
-
-    return () => {
-      window.removeEventListener("resize", handleWindowResize);
-    };
-  });
-
-  $effect(() => {
-    activeCategory;
-    categoryTabs.length;
-    void syncTabBubble();
-    void tick().then(evaluateCategoryLayoutMode);
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(SIDEBAR_VISIBILITY_KEY);
+      if (stored !== null) {
+        showSidebar = stored === "true";
+      }
+    }
   });
 
   async function loadStoreData() {
@@ -139,68 +179,18 @@
     );
   }
 
-  function prefersReducedMotion(): boolean {
-    return (
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
-  }
-
-  function getActiveTabButton(): HTMLButtonElement | null {
-    if (!tabsListRef) return null;
-
-    const tabButtons =
-      tabsListRef.querySelectorAll<HTMLButtonElement>("[data-tab-id]");
-    for (const button of tabButtons) {
-      if (button.dataset.tabId === activeCategory) return button;
-    }
-
-    return null;
-  }
-
-  function moveActiveTabBubble(immediate = false) {
-    if (!tabsListRef || !activeTabBubbleRef) return;
-
-    const activeButton = getActiveTabButton();
-    if (!activeButton) return;
-
-    const listRect = tabsListRef.getBoundingClientRect();
-    const buttonRect = activeButton.getBoundingClientRect();
-    const x = buttonRect.left - listRect.left;
-    const y = buttonRect.top - listRect.top;
-    const width = buttonRect.width;
-    const height = buttonRect.height;
-
-    const shouldReduceMotion = immediate || prefersReducedMotion();
-
-    if (shouldReduceMotion) {
-      activeTabBubbleRef.style.transform = `translate(${x}px, ${y}px)`;
-      activeTabBubbleRef.style.width = `${width}px`;
-      activeTabBubbleRef.style.height = `${height}px`;
-      activeTabBubbleRef.style.opacity = "1";
-      return;
-    }
-
-    void animate(
-      activeTabBubbleRef,
-      { x, y, width, height, opacity: 1 },
-      { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
-    );
-  }
-
-  async function syncTabBubble() {
-    await tick();
-    moveActiveTabBubble();
-  }
-
   function handleTabsKeydown(event: KeyboardEvent) {
-    if (!tabsListRef) return;
+    const tablist = event.currentTarget as HTMLElement | null;
+    if (!tablist) return;
 
-    const horizontalKeys = ["ArrowRight", "ArrowLeft", "Home", "End"];
-    if (!horizontalKeys.includes(event.key)) return;
+    const isVertical = tablist.getAttribute("aria-orientation") === "vertical";
+    const nextKeys = isVertical ? ["ArrowDown"] : ["ArrowRight"];
+    const prevKeys = isVertical ? ["ArrowUp"] : ["ArrowLeft"];
+
+    if (![...nextKeys, ...prevKeys, "Home", "End"].includes(event.key)) return;
 
     const tabButtons = Array.from(
-      tabsListRef.querySelectorAll<HTMLButtonElement>("[role='tab']"),
+      tablist.querySelectorAll<HTMLButtonElement>("[role='tab']"),
     );
 
     if (!tabButtons.length) return;
@@ -211,9 +201,9 @@
     const currentIndex = focusedIndex >= 0 ? focusedIndex : 0;
 
     let targetIndex = currentIndex;
-    if (event.key === "ArrowRight")
+    if (nextKeys.includes(event.key))
       targetIndex = (currentIndex + 1) % tabButtons.length;
-    if (event.key === "ArrowLeft") {
+    if (prevKeys.includes(event.key)) {
       targetIndex = (currentIndex - 1 + tabButtons.length) % tabButtons.length;
     }
     if (event.key === "Home") targetIndex = 0;
@@ -277,34 +267,7 @@
       return;
     }
 
-    void tick().then(() => moveActiveTabBubble());
     void runCategoryTransition(categoryId);
-  }
-
-  function evaluateCategoryLayoutMode() {
-    if (typeof window === "undefined") return;
-
-    const requiredWidth = mobileTabsMeasureRef?.scrollWidth ?? 0;
-    const availableWidth = window.innerWidth - 16;
-    useMobileDropdown = requiredWidth > availableWidth;
-  }
-
-  function selectCategoryFromMobileMenu(categoryId: string) {
-    mobileCategoryDetailsRef?.removeAttribute("open");
-    isMobileCategoryMenuOpen = false;
-    setActiveCategory(categoryId);
-  }
-
-  async function animateMobileMenuOpen() {
-    await tick();
-    if (!mobileMenuPanelRef) return;
-    if (prefersReducedMotion()) return;
-
-    void animate(
-      mobileMenuPanelRef,
-      { opacity: [0, 1], transform: ["scale(0.985)", "scale(1)"] },
-      { duration: 0.2, ease: [0.22, 1, 0.36, 1] },
-    );
   }
 
   function addConfiguredProduct(
@@ -351,7 +314,7 @@
     </div>
     <div class="relative mx-auto max-w-2xl mb-1 lg:mb-2 fade-up fade-up-1">
       <div class="section-pill mb-4">Nuestro Menú</div>
-      <h1
+      <h2
         class="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight"
       >
         <span
@@ -360,7 +323,7 @@
         >
           Sabores Artesanales
         </span>
-      </h1>
+      </h2>
     </div>
   </section>
 
@@ -378,179 +341,233 @@
     </svg>
   </div>
 
-  <section id="menu" class="max-w-7xl mx-auto px-2 space-y-4 md:space-y-5">
-    <div class="px-2 relative overflow-hidden" aria-hidden="true">
-      <div class="absolute -z-10 pointer-events-none opacity-0 left-0 top-0">
-        <div
-          class="inline-flex items-center gap-1 p-1.5"
-          bind:this={mobileTabsMeasureRef}
+  {#snippet categoryList(onselect: (categoryId: string) => void)}
+    <div
+      role="tablist"
+      aria-label="Categorias del menu"
+      aria-orientation="vertical"
+      class="flex flex-col gap-1"
+      tabindex="0"
+      bind:this={sidebarTabsRef}
+      onkeydown={handleTabsKeydown}
+    >
+      {#each categoryTabs as tab (tab.id)}
+        <button
+          type="button"
+          role="tab"
+          data-tab-id={tab.id}
+          class="w-full text-left rounded-xl px-3 py-2.5 text-sm font-medium transition-colors flex items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-primary/30 {activeCategory ===
+          tab.id
+            ? 'menu-category-active'
+            : 'hover:bg-base-200/50'}"
+          aria-selected={activeCategory === tab.id}
+          tabindex={activeCategory === tab.id ? 0 : -1}
+          onclick={() => onselect(tab.id)}
+          style="-webkit-tap-highlight-color: transparent;"
         >
-          {#each categoryTabs as tab (tab.id)}
-            <span
-              class="h-9 px-3.5 rounded-xl text-sm md:text-[0.95rem] font-semibold whitespace-nowrap inline-flex items-center"
+          <Icon
+            icon={getCategoryIcon(tab)}
+            class="size-4 flex-shrink-0"
+            aria-hidden="true"
+          />
+          <span class="truncate">{tab.label}</span>
+        </button>
+      {/each}
+    </div>
+  {/snippet}
+
+  <section id="menu" class="max-w-7xl mx-auto px-2 space-y-4 md:space-y-5">
+    {#snippet catalogContent()}
+      {#if loading}
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-4 md:pt-0"
+        >
+          {#each catalogSkeletonCards as cardIndex (cardIndex)}
+            <article
+              class="card bg-base-100 w-full shadow-sm border border-base-200/50 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
+              aria-hidden="true"
             >
-              {tab.label}
-            </span>
+              <div class="skeleton w-full aspect-4/3"></div>
+              <div class="card-body p-3 sm:p-4 md:p-5 space-y-2">
+                <div class="skeleton h-4 w-3/4"></div>
+                <div class="skeleton h-5 w-16"></div>
+              </div>
+            </article>
           {/each}
         </div>
-      </div>
-    </div>
-
-    {#if useMobileDropdown}
-      <div class="px-2 relative z-30">
-        <details
-          class="group relative w-full mx-auto rounded-[1.15rem] p-0.5 menu-mobile-ring border border-primary/18 dark:border-primary/20 shadow-[var(--menu-tab-shadow)]"
-          bind:this={mobileCategoryDetailsRef}
-          ontoggle={() => {
-            isMobileCategoryMenuOpen = !!mobileCategoryDetailsRef?.open;
-            if (isMobileCategoryMenuOpen) {
-              void animateMobileMenuOpen();
-            }
-          }}
-        >
-          <summary
-            class="list-none cursor-pointer flex items-center justify-between px-4 py-2.5 rounded-2xl font-semibold mobile-category-trigger bg-base-100/72 dark:bg-base-100/10 backdrop-blur-xl border border-base-200/30 dark:border-base-200/8"
-          >
-            <span class="mobile-category-trigger">{activeCategoryLabel}</span>
-            <Icon
-              icon="lucide:chevron-down"
-              class={`size-4 transition-transform duration-200 ${isMobileCategoryMenuOpen ? "rotate-180" : ""}`}
-              style="color: var(--ishos-teal);"
-              aria-hidden="true"
-            />
-          </summary>
-          <ul
-            class="menu absolute left-0 right-0 top-[calc(100%+0.4rem)] z-40 p-2 rounded-2xl bg-base-100/90 dark:bg-base-100/18 backdrop-blur-xl border border-base-200/40 dark:border-base-200/10 shadow-[var(--menu-dropdown-shadow)] max-w-[calc(100vw-2rem)]"
-            bind:this={mobileMenuPanelRef}
-          >
-            {#each categoryTabs as tab (tab.id)}
-              <li>
-                <button
-                  type="button"
-                  class="w-full text-center {activeCategory === tab.id
-                    ? 'font-semibold mobile-category-option mobile-category-option-active menu-mobile-active rounded-xl'
-                    : 'mobile-category-option rounded-xl'}"
-                  onclick={() => selectCategoryFromMobileMenu(tab.id)}
-                >
-                  {tab.label}
-                </button>
-              </li>
-            {/each}
-          </ul>
-        </details>
-      </div>
-    {/if}
-
-    {#if !useMobileDropdown}
-      <div class="flex justify-center overflow-x-auto pb-2 hide-scrollbar px-1">
+      {:else if loadingError}
         <div
-          class="rounded-[1.15rem] p-0.5 menu-desktop-ring border border-primary/18 dark:border-primary/20 shadow-[var(--menu-tab-shadow)]"
+          class="alert alert-error max-w-xl mx-auto rounded-xl shadow-sm mt-8"
         >
-          <div
-            role="tablist"
-            aria-label="Categorias del menu"
-            class="relative inline-flex items-center gap-1 bg-base-100/72 dark:bg-base-100/10 backdrop-blur-xl border border-base-200/30 dark:border-base-200/8 p-1.5 rounded-2xl flex-nowrap min-w-min"
-            bind:this={tabsListRef}
-            tabindex="0"
-            onkeydown={handleTabsKeydown}
+          {loadingError}
+        </div>
+      {:else if visibleProducts.length === 0}
+        <div
+          class="alert max-w-xl mx-auto rounded-xl shadow-sm mt-8 text-center bg-base-100 border border-base-200"
+        >
+          <span class="w-full font-medium text-base-content/80"
+            >No hay productos disponibles en esta categoría.</span
           >
-            <span
-              class="pointer-events-none absolute left-0 top-0 rounded-xl bg-base-100/70 dark:bg-base-100/20 backdrop-blur-lg border border-white/70 dark:border-white/20 shadow-[var(--menu-tab-blob-shadow)] opacity-0"
-              bind:this={activeTabBubbleRef}
-              aria-hidden="true"
-            ></span>
+        </div>
+      {:else}
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-1"
+          bind:this={catalogGridRef}
+        >
+          {#each visibleProducts as product (product.id)}
+            {@const offer = getOffer(product)}
+            <ProductCard
+              {product}
+              {offer}
+              imageUrl={toSafeImageUrl(product.image_url)}
+              {ordersEnabled}
+              variant="menu"
+              clickable={true}
+              showSeasonalBadge={hasSeasonalFlavors(product)}
+              showSelectButton={true}
+              onOpen={() => openProductModal(product)}
+              onAdd={() => {
+                if (isProductConfigurable(product)) {
+                  openProductModal(product);
+                  return;
+                }
 
-            {#each categoryTabs as tab (tab.id)}
-              <button
-                type="button"
-                role="tab"
-                data-tab-id={tab.id}
-                class="relative z-10 h-9 md:h-10 px-3.5 md:px-4.5 rounded-xl text-sm md:text-[0.95rem] font-semibold tracking-[0.01em] whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-primary/30 transition-[transform,color,opacity] duration-200 hover:scale-[1.01] active:scale-[0.99]"
-                aria-selected={activeCategory === tab.id}
-                tabindex={activeCategory === tab.id ? 0 : -1}
-                onclick={() => setActiveCategory(tab.id)}
-                style="-webkit-tap-highlight-color: transparent;"
-              >
-                <span
-                  class={activeCategory === tab.id
-                    ? "category-tab-label category-tab-label-active"
-                    : "category-tab-label"}
-                >
-                  {tab.label}
-                </span>
-              </button>
-            {/each}
-          </div>
+                addCartItem({
+                  product_id: product.id,
+                  name: product.name,
+                  image_url: toSafeImageUrl(product.image_url),
+                  unit_price: product.price,
+                  quantity: 1,
+                });
+              }}
+              onSelect={() => openProductModal(product)}
+            />
+          {/each}
+        </div>
+      {/if}
+    {/snippet}
+
+    {#if !loading}
+      <div class="md:hidden flex flex-col gap-2 mb-4">
+        <button
+          type="button"
+          class="btn btn-outline btn-sm w-fit"
+          onclick={openMobileDrawer}
+        >
+          <Icon icon="lucide:panel-left" class="size-4" aria-hidden="true" />
+          Categorías
+        </button>
+        <div>
+          <h2 class="text-2xl font-bold leading-tight">
+            {activeCategory === "all"
+              ? "Todos los productos"
+              : activeCategoryLabel}
+          </h2>
         </div>
       </div>
     {/if}
 
     {#if loading}
-      <div
-        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-4"
-      >
-        {#each catalogSkeletonCards as cardIndex (cardIndex)}
-          <article
-            class="card bg-base-100 w-full shadow-sm border border-base-200/50 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
-            aria-hidden="true"
-          >
-            <div class="skeleton w-full aspect-4/3"></div>
-            <div class="card-body p-3 sm:p-4 md:p-5 space-y-2">
-              <div class="skeleton h-4 w-3/4"></div>
-              <div class="skeleton h-5 w-16"></div>
-            </div>
-          </article>
-        {/each}
-      </div>
-    {:else if loadingError}
-      <div class="alert alert-error max-w-xl mx-auto rounded-xl shadow-sm mt-8">
-        {loadingError}
-      </div>
-    {:else if visibleProducts.length === 0}
-      <div
-        class="alert max-w-xl mx-auto rounded-xl shadow-sm mt-8 text-center bg-base-100 border border-base-200"
-      >
-        <span class="w-full font-medium text-base-content/80"
-          >No hay productos disponibles en esta categoría.</span
-        >
-      </div>
+      {@render catalogContent()}
     {:else}
-      <div
-        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-1"
-        bind:this={catalogGridRef}
-      >
-        {#each visibleProducts as product (product.id)}
-          {@const offer = getOffer(product)}
-          <ProductCard
-            {product}
-            {offer}
-            imageUrl={toSafeImageUrl(product.image_url)}
-            {ordersEnabled}
-            variant="menu"
-            clickable={true}
-            showSeasonalBadge={hasSeasonalFlavors(product)}
-            showSelectButton={true}
-            onOpen={() => openProductModal(product)}
-            onAdd={() => {
-              if (isProductConfigurable(product)) {
-                openProductModal(product);
-                return;
-              }
+      <div class="flex flex-col md:flex-row gap-0 items-start">
+        {#if showSidebar}
+          <aside
+            class="hidden md:block w-56 flex-shrink-0 sticky top-4 self-start mr-6"
+          >
+            <div class="flex items-center justify-between mb-3 px-1">
+              <h3 class="text-xs font-bold uppercase tracking-wider opacity-60">
+                Categorías
+              </h3>
+              <button
+                type="button"
+                class="btn btn-ghost btn-xs btn-square"
+                onclick={toggleSidebar}
+                aria-label="Ocultar categorías"
+              >
+                <Icon
+                  icon="lucide:panel-left-close"
+                  class="size-4"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+            {@render categoryList(setActiveCategory)}
+          </aside>
+        {/if}
 
-              addCartItem({
-                product_id: product.id,
-                name: product.name,
-                image_url: toSafeImageUrl(product.image_url),
-                unit_price: product.price,
-                quantity: 1,
-              });
-            }}
-            onSelect={() => openProductModal(product)}
-          />
-        {/each}
+        <div class="flex-1 min-w-0 w-full">
+          <div class="hidden md:flex items-center justify-between mb-4 gap-4">
+            <div class="flex items-center gap-4">
+              {#if !showSidebar}
+                <button
+                  type="button"
+                  class="btn btn-outline btn-sm"
+                  onclick={toggleSidebar}
+                >
+                  <Icon
+                    icon="lucide:panel-left"
+                    class="size-4"
+                    aria-hidden="true"
+                  />
+                  Categorías
+                </button>
+              {/if}
+              <div>
+                <h2 class="text-2xl font-bold leading-tight">
+                  {activeCategory === "all"
+                    ? "Todos los productos"
+                    : activeCategoryLabel}
+                </h2>
+              </div>
+            </div>
+          </div>
+
+          {@render catalogContent()}
+        </div>
       </div>
     {/if}
   </section>
+
+  {#if isMobileDrawerOpen}
+    <div
+      class="fixed inset-0 z-50 md:hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Categorías"
+      tabindex="-1"
+      onkeydown={handleDrawerKeydown}
+    >
+      <button
+        type="button"
+        class="absolute inset-0 bg-black/40 backdrop-blur-sm border-0 p-0 m-0"
+        aria-label="Cerrar categorías"
+        onclick={closeMobileDrawer}
+        transition:fade={{ duration: 200 }}
+      ></button>
+      <aside
+        class="absolute left-0 top-0 bottom-0 w-[280px] bg-base-100 shadow-xl p-4 flex flex-col"
+        transition:fly={{ x: -280, duration: 300 }}
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xs font-bold uppercase tracking-wider opacity-60">
+            Categorías
+          </h3>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm btn-square"
+            onclick={closeMobileDrawer}
+            aria-label="Cerrar categorías"
+          >
+            <Icon icon="lucide:x" class="size-5" aria-hidden="true" />
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto">
+          {@render categoryList(selectCategoryFromDrawer)}
+        </div>
+      </aside>
+    </div>
+  {/if}
 </div>
 
 <ProductModal

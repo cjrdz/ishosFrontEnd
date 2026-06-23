@@ -158,7 +158,8 @@ async function bffRequest<T>(
 
 // Orders
 export async function listOrders(status?: string) {
-  const query = status ? { status } : undefined;
+  const query: Record<string, string> = { lite: "true" };
+  if (status) query.status = status;
   const res = await bffRequest<any>("/api/admin/orders", { query });
   const data = Array.isArray(res) ? res : (res?.data ?? []);
   const pg = res?.pagination;
@@ -443,6 +444,13 @@ export async function getUser(id: string) {
 
 export async function createUser(payload: any) {
   return bffRequest<any>("/api/admin/users", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function upsertUser(payload: any) {
+  return bffRequest<any>("/api/admin/users/upsert", {
     method: "POST",
     body: payload,
   });

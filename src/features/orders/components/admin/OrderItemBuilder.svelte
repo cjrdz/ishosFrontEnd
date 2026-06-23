@@ -5,6 +5,9 @@
     ManualOrderItemDraft,
     OrderFormState,
   } from "../../types/orders-tab";
+  import FlavorSelector from "./FlavorSelector.svelte";
+  import AddonChipGroup from "./AddonChipGroup.svelte";
+  import AddedItemsList from "./AddedItemsList.svelte";
 
   interface AddonGroup {
     key: string;
@@ -71,9 +74,7 @@
     selectedExtraAddonIds,
     hasCustomizationOptions,
     totalPreview,
-    manualOrderTotal,
     addItemError,
-    busy,
     onProductChange,
     onQuantityChange,
     onFlavorChange,
@@ -93,7 +94,6 @@
     onDraftItemKey,
   }: Props = $props();
 
-  const UNSELECTED_CUSTOMIZATION = "";
   const NONE_CUSTOMIZATION = "none";
 
   const selectedProduct = $derived(onProductById(orderForm.product_id));
@@ -101,9 +101,19 @@
   const allowsMixedFlavors = $derived(
     (selectedProduct?.allows_mixed_flavors ?? false) && ballQuantity > 1,
   );
+  const flavorMode = $derived(
+    selectedProductFlavors.length === 0
+      ? "none"
+      : allowsMixedFlavors
+        ? ballQuantity <= 3
+          ? "multi"
+          : "fill"
+        : "single",
+  );
+
   const requiresFlavorSelection = $derived(
-    selectedProductFlavors.length > 0 &&
-      (allowsMixedFlavors
+    flavorMode !== "none" &&
+      (flavorMode === "multi" || flavorMode === "fill"
         ? selectedFlavorIds.length !== ballQuantity ||
           selectedFlavorIds.some((id) => !id)
         : !selectedFlavorId),
@@ -120,36 +130,17 @@
       !requiresToppingSelection &&
       !requiresJaleaSelection,
   );
-  const hasIncludedAddonSelectors = $derived(
-    toppingAddons.length > 0 || jaleaAddons.length > 0,
-  );
-  const extrasSelectionCount = $derived(selectedExtraAddonIds.length);
-  const extrasSelectionTotal = $derived(
-    selectedExtraAddonIds.reduce((sum, addonId) => {
-      const addon = selectedProductAddons.find(
-        (candidate) => candidate.id === addonId,
-      );
-      return sum + Number(addon?.price ?? 0);
-    }, 0),
-  );
 
-  function isExtraSelected(addonId: string): boolean {
-    return selectedExtraAddonIds.includes(addonId);
-  }
-
-  const currentConfiguredProduct = $derived(
-    onProductById(orderForm.product_id) ?? null,
-  );
-  const currentQuantity = $derived(
-    Math.max(1, Number(orderForm.quantity || 1)),
-  );
   const currentFlavorName = $derived(
     selectedProductFlavors.find((flavor) => flavor.id === selectedFlavorId)
       ?.name ?? null,
   );
   const currentIncludedAddonNames = $derived(
     [includedToppingId, includedJaleaId]
-      .filter((addonId): addonId is string => Boolean(addonId))
+      .filter(
+        (addonId): addonId is string =>
+          Boolean(addonId) && addonId !== NONE_CUSTOMIZATION,
+      )
       .map(
         (addonId) =>
           selectedProductAddons.find((addon) => addon.id === addonId)?.name ??
@@ -166,36 +157,36 @@
       )
       .filter((name): name is string => Boolean(name)),
   );
-  const currentUnitPrice = $derived(
-    Number(currentConfiguredProduct?.price ?? 0) + extrasSelectionTotal,
-  );
-  const currentLineTotal = $derived(currentUnitPrice * currentQuantity);
+
+  function handleFlavorChange(value: string | string[]) {
+    if (flavorMode === "single") {
+      onFlavorChange(value as string);
+    } else {
+      onFlavorIdsChange(value as string[]);
+    }
+  }
+
+  function isExtraInGroup(group: AddonGroup): string[] {
+    const groupIds = new Set(group.items.map((item) => item.id));
+    return selectedExtraAddonIds.filter((id) => groupIds.has(id));
+  }
+
+  function isExtraInAddons(addons: Addon[]): string[] {
+    const addonIds = new Set(addons.map((addon) => addon.id));
+    return selectedExtraAddonIds.filter((id) => addonIds.has(id));
+  }
 </script>
 
-<section
-  class="rounded-2xl border border-base-300 bg-base-200/50 p-4 space-y-4"
->
-  <div class="flex flex-wrap items-center justify-between gap-2">
-    <div>
-      <h4 class="font-semibold">Productos de la orden</h4>
-      <p class="text-sm text-base-content/70">
-        Agrega una o varias configuraciones del mismo producto o de productos
-        distintos antes de crear la orden.
-      </p>
-    </div>
-    <div class="text-sm text-base-content/70">
-      {manualItems.length} item(s) agregados
-    </div>
-  </div>
-
-  <div
-    class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,180px)] md:items-end"
-  >
+<section class="rounded-xl border border-base-300 bg-base-100 p-4 space-y-4">
+  <!-- Product + Quantity -->
+  <div class="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
     <div class="form-control">
-      <span id="order-product-label" class="label-text mb-1">Producto</span>
+      <span id="order-product-label" class="label-text text-xs mb-1"
+        >Producto</span
+      >
       <select
         id="order-product"
-        class="select select-bordered w-full"
+        class="select select-bordered select-sm w-full"
         value={orderForm.product_id}
         required
         aria-labelledby="order-product-label"
@@ -211,11 +202,13 @@
         {/if}
       </select>
     </div>
-    <div class="form-control">
-      <span id="order-quantity-label" class="label-text mb-1">Cantidad</span>
+    <div class="form-control w-20">
+      <span id="order-quantity-label" class="label-text text-xs mb-1"
+        >Cantidad</span
+      >
       <input
         id="order-quantity"
-        class="input input-bordered w-full"
+        class="input input-bordered input-sm w-full text-center"
         type="number"
         min="1"
         value={orderForm.quantity}
@@ -229,370 +222,87 @@
     </div>
   </div>
 
+  <!-- Customizations -->
   {#if hasCustomizationOptions}
-    <section
-      class="rounded-2xl border border-base-300 bg-base-100 p-4 space-y-4"
-    >
-      {#if selectedProductFlavors.length > 0 || hasIncludedAddonSelectors}
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {#if selectedProductFlavors.length > 0}
-            {#if allowsMixedFlavors}
-              <div class="form-control md:col-span-2 xl:col-span-3">
-                <span id="order-flavor-label" class="label-text mb-1">
-                  Sabores
-                  <span class="text-error">*</span>
-                </span>
-                <div
-                  class="grid gap-3"
-                  style="grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));"
-                >
-                  {#each Array(ballQuantity) as _, index (index)}
-                    <div class="form-control">
-                      <span class="text-xs text-base-content/70 mb-1"
-                        >Bola {index + 1}</span
-                      >
-                      <select
-                        id={`order-flavor-${index}`}
-                        class="select select-bordered select-sm w-full"
-                        value={selectedFlavorIds[index]}
-                        aria-labelledby="order-flavor-label"
-                        onchange={(event) => {
-                          const nextIds = [...selectedFlavorIds];
-                          nextIds[index] = (
-                            event.currentTarget as HTMLSelectElement
-                          ).value;
-                          onFlavorIdsChange(nextIds);
-                        }}
-                      >
-                        <option value="">Seleccion sabor</option>
-                        {#each selectedProductFlavors as flavor}
-                          <option value={flavor.id}>{flavor.name}</option>
-                        {/each}
-                      </select>
-                    </div>
-                  {/each}
-                </div>
-                <p class="text-xs text-base-content/60 mt-2">
-                  Selecciona un sabor para cada bola.
-                </p>
-              </div>
-            {:else}
-              <div class="form-control">
-                <span id="order-flavor-label" class="label-text mb-1">
-                  Sabor
-                  <span class="text-error">*</span>
-                </span>
-                <select
-                  id="order-flavor"
-                  class="select select-bordered w-full"
-                  value={selectedFlavorId}
-                  aria-labelledby="order-flavor-label"
-                  onchange={(event) =>
-                    onFlavorChange(
-                      (event.currentTarget as HTMLSelectElement).value,
-                    )}
-                >
-                  <option value="">Selecciona un sabor</option>
-                  {#each selectedProductFlavors as flavor}
-                    <option value={flavor.id}>{flavor.name}</option>
-                  {/each}
-                </select>
-              </div>
-            {/if}
-          {/if}
+    <div class="space-y-4">
+      {#if flavorMode !== "none"}
+        <FlavorSelector
+          flavors={selectedProductFlavors}
+          mode={flavorMode}
+          {ballQuantity}
+          selectedId={selectedFlavorId}
+          selectedIds={selectedFlavorIds}
+          label={flavorMode === "single" ? "Sabor" : "Sabores"}
+          required={true}
+          error={requiresFlavorSelection ? "Selecciona un sabor" : ""}
+          onChange={handleFlavorChange}
+        />
+      {/if}
 
+      {#if toppingAddons.length > 0 || jaleaAddons.length > 0}
+        <div class="grid gap-4 md:grid-cols-2">
           {#if toppingAddons.length > 0}
-            <div class="form-control">
-              <span id="order-included-topping-label" class="label-text mb-1"
-                >Topping <span class="text-error">*</span></span
-              >
-              <select
-                id="order-included-topping"
-                class="select select-bordered w-full"
-                value={includedToppingId}
-                onchange={(event) =>
-                  onChangeIncludedTopping(
-                    (event.currentTarget as HTMLSelectElement).value,
-                  )}
-                aria-labelledby="order-included-topping-label"
-              >
-                <option value={UNSELECTED_CUSTOMIZATION}>
-                  Selecciona un topping
-                </option>
-                <option value={NONE_CUSTOMIZATION}>Sin topping</option>
-                {#each toppingAddons as addon}
-                  <option value={addon.id}>{addon.name}</option>
-                {/each}
-              </select>
-            </div>
+            <AddonChipGroup
+              items={toppingAddons}
+              includedId={includedToppingId}
+              selectedIds={isExtraInAddons(toppingAddons)}
+              noneId={NONE_CUSTOMIZATION}
+              noneLabel="Sin topping"
+              label="Topping"
+              required={true}
+              error={requiresToppingSelection
+                ? "Selecciona un topping o 'Sin topping'"
+                : ""}
+              onIncludedChange={onChangeIncludedTopping}
+              onToggleExtra={onToggleExtraAddonSelection}
+            />
           {/if}
 
           {#if jaleaAddons.length > 0}
-            <div class="form-control">
-              <span id="order-included-jalea-label" class="label-text mb-1"
-                >Jalea <span class="text-error">*</span></span
-              >
-              <select
-                id="order-included-jalea"
-                class="select select-bordered w-full"
-                value={includedJaleaId}
-                onchange={(event) =>
-                  onChangeIncludedJalea(
-                    (event.currentTarget as HTMLSelectElement).value,
-                  )}
-                aria-labelledby="order-included-jalea-label"
-              >
-                <option value={UNSELECTED_CUSTOMIZATION}>
-                  Selecciona una jalea
-                </option>
-                <option value={NONE_CUSTOMIZATION}>Sin jalea</option>
-                {#each jaleaAddons as addon}
-                  <option value={addon.id}>{addon.name}</option>
-                {/each}
-              </select>
-            </div>
+            <AddonChipGroup
+              items={jaleaAddons}
+              includedId={includedJaleaId}
+              selectedIds={isExtraInAddons(jaleaAddons)}
+              noneId={NONE_CUSTOMIZATION}
+              noneLabel="Sin jalea"
+              label="Jalea"
+              required={true}
+              error={requiresJaleaSelection
+                ? "Selecciona una jalea o 'Sin jalea'"
+                : ""}
+              onIncludedChange={onChangeIncludedJalea}
+              onToggleExtra={onToggleExtraAddonSelection}
+            />
           {/if}
         </div>
       {/if}
-      {#if selectedProductAddons.length > 0}
-        <div class="form-control">
-          <span class="label-text mb-2">Extras con costo</span>
-          <p class="text-xs text-base-content/60 mb-1">
-            Usa estos toggles para agregar toppings, jaleas u otros extras
-            adicionales que si deben cobrarse.
-          </p>
-          <div class="mb-2 text-xs text-base-content/70">
-            {#if extrasSelectionCount > 0}
-              {extrasSelectionCount} extra(s) seleccionado(s) · +{formatCurrency(
-                extrasSelectionTotal,
-              )}
-            {:else}
-              Sin extras seleccionados
-            {/if}
-          </div>
-          <div class="grid gap-2 md:grid-cols-2">
-            {#if toppingAddons.length > 0}
-              <details
-                class="w-full rounded-xl border border-base-300 bg-base-100"
-              >
-                <summary class="btn btn-outline w-full justify-between">
-                  Toppings extra
-                  <span class="text-xs text-base-content/70">
-                    {toppingAddons.filter((addon) => isExtraSelected(addon.id))
-                      .length} seleccionados
-                  </span>
-                </summary>
-                <div class="p-2">
-                  <div class="space-y-1 max-h-56 overflow-auto">
-                    {#each toppingAddons as addon}
-                      <label
-                        class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2"
-                      >
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          checked={isExtraSelected(addon.id)}
-                          onchange={(event) =>
-                            onToggleExtraAddonSelection(
-                              addon.id,
-                              (event.currentTarget as HTMLInputElement).checked,
-                            )}
-                        />
-                        <span class="label-text flex-1">{addon.name}</span>
-                        <span class="text-xs font-medium text-base-content/70"
-                          >+{formatCurrency(addon.price)}</span
-                        >
-                      </label>
-                    {/each}
-                  </div>
-                </div>
-              </details>
-            {/if}
 
-            {#if jaleaAddons.length > 0}
-              <details
-                class="w-full rounded-xl border border-base-300 bg-base-100"
-              >
-                <summary class="btn btn-outline w-full justify-between">
-                  Jalea extra
-                  <span class="text-xs text-base-content/70">
-                    {jaleaAddons.filter((addon) => isExtraSelected(addon.id))
-                      .length} seleccionados
-                  </span>
-                </summary>
-                <div class="p-2">
-                  <div class="space-y-1 max-h-56 overflow-auto">
-                    {#each jaleaAddons as addon}
-                      <label
-                        class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2"
-                      >
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          checked={isExtraSelected(addon.id)}
-                          onchange={(event) =>
-                            onToggleExtraAddonSelection(
-                              addon.id,
-                              (event.currentTarget as HTMLInputElement).checked,
-                            )}
-                        />
-                        <span class="label-text flex-1">{addon.name}</span>
-                        <span class="text-xs font-medium text-base-content/70"
-                          >+{formatCurrency(addon.price)}</span
-                        >
-                      </label>
-                    {/each}
-                  </div>
-                </div>
-              </details>
-            {/if}
-
-            {#each paidAddonGroups as group}
-              <details
-                class="w-full rounded-xl border border-base-300 bg-base-100"
-              >
-                <summary class="btn btn-outline w-full justify-between">
-                  {group.label}
-                  <span class="text-xs text-base-content/70">
-                    {group.items.filter((addon) => isExtraSelected(addon.id))
-                      .length} seleccionados
-                  </span>
-                </summary>
-                <div class="p-2">
-                  <div class="space-y-1 max-h-56 overflow-auto">
-                    {#each group.items as addon}
-                      <label
-                        class="label w-full cursor-pointer justify-start gap-3 rounded-lg border border-base-300/70 px-3 py-2"
-                      >
-                        <input
-                          type="checkbox"
-                          class="checkbox checkbox-sm"
-                          checked={isExtraSelected(addon.id)}
-                          onchange={(event) =>
-                            onToggleExtraAddonSelection(
-                              addon.id,
-                              (event.currentTarget as HTMLInputElement).checked,
-                            )}
-                        />
-                        <span class="label-text flex-1">{addon.name}</span>
-                        <span class="text-xs font-medium text-base-content/70"
-                          >+{formatCurrency(addon.price)}</span
-                        >
-                      </label>
-                    {/each}
-                  </div>
-                </div>
-              </details>
-            {/each}
-          </div>
-        </div>
-      {/if}
-    </section>
-  {/if}
-
-  <div
-    class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-base-300 bg-base-100 px-4 py-3"
-  >
-    <div class="text-sm text-base-content/70 space-y-1">
-      <p>
-        Subtotal de esta configuracion: <strong
-          >{formatCurrency(totalPreview)}</strong
-        >
-      </p>
-      <p>
-        Total acumulado en la orden: <strong
-          >{formatCurrency(manualOrderTotal)}</strong
-        >
-      </p>
-    </div>
-    <div class="space-y-1 md:text-right">
-      <div class="flex items-center gap-2 md:justify-end">
-        {#if draftItemEditIndex !== null}
-          <button
-            class="btn btn-ghost btn-sm"
-            type="button"
-            onclick={onCancelDraftItemEdit}
-          >
-            Cancelar edicion de item
-          </button>
-        {/if}
-        <button
-          class="btn btn-outline btn-primary"
-          type="button"
-          onclick={onAddDraftItem}
-          disabled={!canAddCurrentItem}
-        >
-          {draftItemEditIndex !== null
-            ? "Guardar edicion de producto"
-            : "Confirmar producto"}
-        </button>
-      </div>
-      {#if addItemError}
-        <p class="text-xs text-error">{addItemError}</p>
-      {:else if requiresFlavorSelection}
-        <p class="text-xs text-warning">
-          Selecciona un sabor para habilitar la accion.
-        </p>
-      {:else if requiresToppingSelection}
-        <p class="text-xs text-warning">
-          Selecciona un topping o marca "Sin topping" para habilitar la accion.
-        </p>
-      {:else if requiresJaleaSelection}
-        <p class="text-xs text-warning">
-          Selecciona una jalea o marca "Sin jalea" para habilitar la accion.
-        </p>
-      {:else}
-        <p class="text-xs text-base-content/60">
-          La configuracion actual se agrega a la orden solo cuando presionas
-          este boton.
-        </p>
-      {/if}
-    </div>
-  </div>
-
-  {#if draftItemEditIndex !== null}
-    <div class="rounded-xl border border-warning/30 bg-warning/10 px-4 py-2">
-      <p class="text-xs font-medium text-warning-content">
-        Editando el item #{draftItemEditIndex + 1}. Cambia la configuracion y
-        presiona "Guardar edicion de producto".
-      </p>
+      {#each paidAddonGroups as group}
+        <AddonChipGroup
+          items={group.items}
+          selectedIds={isExtraInGroup(group)}
+          label={group.label}
+          variant="multi"
+          onToggleExtra={onToggleExtraAddonSelection}
+        />
+      {/each}
     </div>
   {/if}
 
-  <section class="space-y-3">
-    <div class="flex items-center justify-between gap-2">
-      <h5 class="font-semibold">Items agregados</h5>
-      <span class="text-xs text-base-content/60"
-        >Puedes repetir el mismo producto con diferentes sabores o extras.</span
-      >
-    </div>
-    {#if currentConfiguredProduct}
-      <div
-        class="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2"
-      >
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <p
-              class="text-xs font-semibold uppercase tracking-wide text-primary/80"
-            >
-              Vista previa actual
-            </p>
-            <p class="font-medium leading-tight">
-              {currentConfiguredProduct.name}
-            </p>
-          </div>
-          <div class="text-right">
-            <p class="text-sm text-base-content/70">
-              Cantidad: {currentQuantity}
-            </p>
-            <p class="font-semibold text-primary">
-              {formatCurrency(currentLineTotal)}
-            </p>
-          </div>
-        </div>
-        {#if allowsMixedFlavors && selectedFlavorIds.some((id) => id)}
-          <p class="text-xs text-base-content/70">
-            Sabores: {selectedFlavorIds
+  <!-- Preview + Confirm -->
+  {#if selectedProduct}
+    <div
+      class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-base-200/50 px-3 py-2.5"
+    >
+      <div class="min-w-0">
+        <p class="text-sm font-medium truncate">
+          {selectedProduct.name}
+        </p>
+        <div
+          class="flex flex-wrap items-center gap-1 text-xs text-base-content/70"
+        >
+          {#if allowsMixedFlavors && selectedFlavorIds.some((id) => id)}
+            {@const names = selectedFlavorIds
               .map(
                 (id) =>
                   selectedProductFlavors.find((flavor) => flavor.id === id)
@@ -600,118 +310,80 @@
               )
               .filter(Boolean)
               .join(", ")}
-          </p>
-        {:else if currentFlavorName}
-          <p class="text-xs text-base-content/70">Sabor: {currentFlavorName}</p>
-        {/if}
-        {#if currentIncludedAddonNames.length > 0}
-          <p class="text-xs text-base-content/70">
-            Incluidos: {currentIncludedAddonNames.join(", ")}
-          </p>
-        {/if}
-        {#if currentExtraAddonNames.length > 0}
-          <p class="text-xs text-base-content/70">
-            Extras: {currentExtraAddonNames.join(", ")}
-          </p>
-        {/if}
+            <span class="truncate max-w-[12rem]" title={names}>
+              {names}
+            </span>
+          {:else if currentFlavorName}
+            <span>{currentFlavorName}</span>
+          {/if}
+          {#if currentIncludedAddonNames.length > 0}
+            <span
+              class="truncate max-w-[12rem]"
+              title={currentIncludedAddonNames.join(", ")}
+            >
+              · {currentIncludedAddonNames.join(", ")}
+            </span>
+          {/if}
+          {#if currentExtraAddonNames.length > 0}
+            <span
+              class="truncate max-w-[12rem]"
+              title={currentExtraAddonNames.join(", ")}
+            >
+              + {currentExtraAddonNames.join(", ")}
+            </span>
+          {/if}
+        </div>
       </div>
-    {/if}
-    {#if manualItems.length === 0}
-      <div
-        class="rounded-xl border border-base-300 bg-base-100 px-4 py-5 text-sm text-base-content/70"
-      >
-        No has agregado productos todavia.
-      </div>
-    {:else}
-      <div class="space-y-3">
-        {#each manualItems as item, index (onDraftItemKey(item, index))}
-          <div
-            class={`rounded-xl border bg-base-100 p-4 space-y-3 ${draftItemEditIndex === index ? "border-primary/40 ring-1 ring-primary/20" : "border-base-300"}`}
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <p class="text-xs text-base-content/60">Subtotal</p>
+          <p class="text-sm font-semibold">{formatCurrency(totalPreview)}</p>
+        </div>
+        <div class="flex items-center gap-1.5">
+          {#if draftItemEditIndex !== null}
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              onclick={onCancelDraftItemEdit}
+            >
+              Cancelar
+            </button>
+          {/if}
+          <button
+            class="btn btn-primary btn-sm"
+            type="button"
+            onclick={onAddDraftItem}
+            disabled={!canAddCurrentItem}
           >
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="space-y-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <h6 class="font-medium">
-                    {onProductById(item.product_id)?.name ?? "Producto"}
-                  </h6>
-                  {#if item.flavor_ids && item.flavor_ids.length > 0}
-                    {#each item.flavor_ids as flavorId}
-                      {@const name = onResolveFlavorName(
-                        item.product_id,
-                        flavorId,
-                      )}
-                      {#if name}
-                        <span class="badge badge-outline">{name}</span>
-                      {/if}
-                    {/each}
-                  {:else if onResolveFlavorName(item.product_id, item.flavor_id)}
-                    <span class="badge badge-outline"
-                      >{onResolveFlavorName(
-                        item.product_id,
-                        item.flavor_id,
-                      )}</span
-                    >
-                  {/if}
-                </div>
-                {#if onResolveAddonNames(item.product_id, item.included_addon_ids).length > 0}
-                  <p class="text-xs text-base-content/60">
-                    Incluidos: {onResolveAddonNames(
-                      item.product_id,
-                      item.included_addon_ids,
-                    ).join(", ")}
-                  </p>
-                {/if}
-                {#if onResolveAddonNames(item.product_id, item.extra_addon_ids).length > 0}
-                  <p class="text-xs text-base-content/60">
-                    Extras: {onResolveAddonNames(
-                      item.product_id,
-                      item.extra_addon_ids,
-                    ).join(", ")}
-                  </p>
-                {/if}
-              </div>
-              <div class="text-sm font-semibold whitespace-nowrap">
-                {formatCurrency(onManualItemSubtotal(item))}
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div class="join">
-                <button
-                  class="btn btn-sm join-item"
-                  type="button"
-                  onclick={() =>
-                    onUpdateDraftItemQuantity(index, item.quantity - 1)}
-                  >-</button
-                >
-                <span class="btn btn-sm join-item no-animation min-w-14 text-sm"
-                  >{item.quantity}</span
-                >
-                <button
-                  class="btn btn-sm join-item"
-                  type="button"
-                  onclick={() =>
-                    onUpdateDraftItemQuantity(index, item.quantity + 1)}
-                  >+</button
-                >
-              </div>
-              <button
-                class="btn btn-sm btn-outline"
-                type="button"
-                onclick={() => onEditDraftItem(index)}
-              >
-                Editar
-              </button>
-              <button
-                class="btn btn-sm btn-error btn-outline"
-                type="button"
-                onclick={() => onRemoveDraftItem(index)}
-              >
-                Quitar
-              </button>
-            </div>
-          </div>
-        {/each}
+            {draftItemEditIndex !== null ? "Guardar" : "Agregar"}
+          </button>
+        </div>
       </div>
-    {/if}
-  </section>
+    </div>
+  {/if}
+
+  {#if addItemError}
+    <p class="text-xs text-error">{addItemError}</p>
+  {/if}
+
+  {#if draftItemEditIndex !== null}
+    <div class="rounded-lg border border-warning/30 bg-warning/10 px-3 py-1.5">
+      <p class="text-xs font-medium text-warning-content">
+        Editando el item #{draftItemEditIndex + 1}.
+      </p>
+    </div>
+  {/if}
+
+  <AddedItemsList
+    {manualItems}
+    {draftItemEditIndex}
+    onEdit={onEditDraftItem}
+    onRemove={onRemoveDraftItem}
+    onUpdateQuantity={onUpdateDraftItemQuantity}
+    {onProductById}
+    {onResolveFlavorName}
+    {onResolveAddonNames}
+    {onManualItemSubtotal}
+    {onDraftItemKey}
+  />
 </section>

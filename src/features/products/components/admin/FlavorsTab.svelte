@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Flavor } from "@features/admin-management";
-  import AdminCrudFormShell from "./AdminCrudFormShell.svelte";
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
   import {
     closeConfirmDialog,
     confirmDialogNow,
@@ -33,7 +34,7 @@
 
   let { flavors, busy, moduleError, onCreate, onUpdate, onDelete }: Props =
     $props();
-  let flavorEditorDialog: HTMLDialogElement | null = null;
+  let flavorEditorDialog = $state<HTMLDialogElement | null>(null);
   let confirmDialog = $state(createConfirmDialogState());
   let editingFlavorId = $state<string | null>(null);
 
@@ -273,73 +274,73 @@
   </div>
 </section>
 
-<dialog class="modal" bind:this={flavorEditorDialog} onclose={resetForm}>
-  <div class="modal-box w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto p-0">
-    <AdminCrudFormShell
-      title={isEditing ? "Editar sabor" : "Crear sabor"}
-      icon="lucide:ice-cream-bowl"
-      onClose={closeFlavorEditor}
-      onSubmit={submit}
-      submitLabel={isEditing ? "Actualizar" : "Crear"}
-      submitDisabled={busy || !form.name.trim()}
+<AdminModalShell
+  bind:dialogRef={flavorEditorDialog}
+  title={isEditing ? "Editar sabor" : "Crear sabor"}
+  icon="lucide:ice-cream-bowl"
+  widthClass="max-w-2xl"
+  onClose={closeFlavorEditor}
+>
+  <form class="space-y-3" onsubmit={submit}>
+    <div class="form-control">
+      <span id="flavor-name-label" class="label-text text-xs mb-1">Nombre</span>
+      <input
+        id="flavor-name"
+        class="input input-bordered input-sm w-full"
+        placeholder="Vainilla"
+        bind:value={form.name}
+        required
+        aria-labelledby="flavor-name-label"
+      />
+    </div>
+
+    <div class="form-control">
+      <span id="flavor-order-label" class="label-text text-xs mb-1"
+        >Orden de visualizacion</span
+      >
+      <input
+        id="flavor-order"
+        type="number"
+        class="input input-bordered input-sm w-full"
+        placeholder="0"
+        bind:value={form.display_order}
+        aria-labelledby="flavor-order-label"
+      />
+    </div>
+
+    <label
+      class="flex items-center justify-between gap-3 rounded-lg border border-base-300/70 px-3 py-2 cursor-pointer"
     >
-      <div class="form-control w-full">
-        <span id="flavor-name-label" class="label-text mb-1">Nombre</span>
+      <span class="label-text text-sm">Marcar como sabor de temporada</span>
+      <input
+        id="flavor-seasonal"
+        type="checkbox"
+        bind:checked={form.is_seasonal}
+        class="checkbox checkbox-sm"
+      />
+    </label>
+
+    {#if isEditing}
+      <label
+        class="flex items-center justify-between gap-3 rounded-lg border border-base-300/70 px-3 py-2 cursor-pointer"
+      >
+        <span class="label-text text-sm">Activo</span>
         <input
-          id="flavor-name"
-          class="input input-bordered w-full"
-          placeholder="Vainilla"
-          bind:value={form.name}
-          required
-          aria-labelledby="flavor-name-label"
+          id="flavor-active"
+          type="checkbox"
+          bind:checked={form.is_active}
+          class="checkbox checkbox-sm"
         />
-      </div>
+      </label>
+    {/if}
 
-      <div class="form-control w-full">
-        <span id="flavor-order-label" class="label-text mb-1"
-          >Orden de visualizacion</span
-        >
-        <input
-          id="flavor-order"
-          type="number"
-          class="input input-bordered w-full"
-          placeholder="0"
-          bind:value={form.display_order}
-          aria-labelledby="flavor-order-label"
-        />
-      </div>
-
-      <div class="form-control">
-        <label for="flavor-seasonal" class="label cursor-pointer">
-          <span class="label-text">Marcar como sabor de temporada</span>
-          <input
-            id="flavor-seasonal"
-            type="checkbox"
-            bind:checked={form.is_seasonal}
-            class="checkbox"
-          />
-        </label>
-      </div>
-
-      {#if isEditing}
-        <div class="form-control">
-          <label for="flavor-active" class="label cursor-pointer">
-            <span class="label-text">Activo</span>
-            <input
-              id="flavor-active"
-              type="checkbox"
-              bind:checked={form.is_active}
-              class="checkbox"
-            />
-          </label>
-        </div>
-      {/if}
-    </AdminCrudFormShell>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={closeFlavorEditor}>close</button>
+    <AdminFormActions
+      submitLabel={isEditing ? "Actualizar" : "Crear"}
+      onCancel={closeFlavorEditor}
+      {busy}
+    />
   </form>
-</dialog>
+</AdminModalShell>
 
 <ConfirmDialog
   open={confirmDialog.open}

@@ -18,6 +18,7 @@ import {
   updateFlavor,
   updateProduct,
   updateUser,
+  upsertUser,
 } from "./bff";
 import type { RunModuleAction } from "./module-action";
 
@@ -414,7 +415,7 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
       requireAdmin: true,
       errorMessage: "No se pudo guardar usuario desde la orden",
       action: async () => {
-        await createUser(payload);
+        await upsertUser(payload);
         return true;
       },
       defaultValue: false,

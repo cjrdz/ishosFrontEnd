@@ -79,15 +79,10 @@ export function paidAddonGroups(
 
   for (const addon of activeAddons(product)) {
     const key = normalizeAddonGroupName(addon.group_name);
-    const price = toSafeNumber(addon.price);
 
-    // Topping and jalea can be selected as required options and also as paid extras.
+    // Topping and jalea are handled by their own unified selectors in the
+    // product modal; they are not shown as generic paid addon groups.
     if (key === "toppings" || key === "jalea") {
-      if (price <= 0) continue;
-      const extraKey = `extra-${key}`;
-      const current = grouped.get(extraKey) ?? [];
-      current.push(addon);
-      grouped.set(extraKey, current);
       continue;
     }
 
@@ -100,9 +95,7 @@ export function paidAddonGroups(
     .sort((left, right) => left[0].localeCompare(right[0]))
     .map(([key, items]) => ({
       key,
-      label: key.startsWith("extra-")
-        ? `Extra ${addonGroupLabel(key.replace("extra-", ""))}`
-        : addonGroupLabel(key),
+      label: addonGroupLabel(key),
       items,
     }));
 }

@@ -13,8 +13,13 @@ export const prerender = false;
 
 export const GET: APIRoute = async (context) => {
   const status = context.url.searchParams.get("status") || "";
-  const query = status ? { status } : undefined;
-  return proxyToBackend(context, "/orders", { query });
+  const lite = context.url.searchParams.get("lite") || "";
+  const query: Record<string, string> = {};
+  if (status) query.status = status;
+  if (lite) query.lite = lite;
+  return proxyToBackend(context, "/orders", {
+    query: Object.keys(query).length > 0 ? query : undefined,
+  });
 };
 
 export const POST: APIRoute = async (context) => {

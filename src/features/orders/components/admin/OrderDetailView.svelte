@@ -132,7 +132,7 @@
   }
 
   function itemFlavorText(
-    customizations: Order["items"][number]["customizations"],
+    customizations: NonNullable<Order["items"]>[number]["customizations"],
   ): string {
     if (!customizations) return "";
     if (

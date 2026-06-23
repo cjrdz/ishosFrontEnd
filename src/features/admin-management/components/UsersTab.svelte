@@ -7,6 +7,8 @@
   } from "@features/admin-management/lib/api";
   import Icon from "@shared/components/AppIcon.svelte";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import AdminModalShell from "./shared/AdminModalShell.svelte";
+  import AdminFormActions from "./shared/AdminFormActions.svelte";
 
   interface Props {
     users: User[];
@@ -47,8 +49,8 @@
     onLoadOrders,
   }: Props = $props();
 
-  let userEditorDialog: HTMLDialogElement | null = null;
-  let historyDialog: HTMLDialogElement | null = null;
+  let userEditorDialog = $state<HTMLDialogElement | null>(null);
+  let historyDialog = $state<HTMLDialogElement | null>(null);
   let confirmOpen = $state(false);
   let confirmTitle = $state("Confirmar accion");
   let confirmMessage = $state("");
@@ -355,196 +357,137 @@
   </div>
 </section>
 
-<dialog class="modal" bind:this={userEditorDialog} onclose={resetForm}>
-  <div class="modal-box w-11/12 max-w-3xl max-h-[90vh] overflow-y-auto p-0">
-    <div
-      class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4"
-    >
-      <div class="flex items-center gap-2.5">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"
-        >
-          <Icon
-            icon="lucide:user"
-            width="16"
-            height="16"
-            class="text-primary"
-          />
-        </div>
-        <h3 class="font-bold text-base leading-tight">
-          {isEditing ? "Editar usuario" : "Crear usuario"}
-        </h3>
-      </div>
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        type="button"
-        onclick={closeUserEditor}
-        aria-label="Cerrar"
-      >
-        <Icon icon="lucide:x" width="16" height="16" />
-      </button>
+<AdminModalShell
+  bind:dialogRef={userEditorDialog}
+  title={isEditing ? "Editar usuario" : "Crear usuario"}
+  icon="lucide:user"
+  widthClass="max-w-3xl"
+  onClose={closeUserEditor}
+>
+  <form class="grid gap-3 md:grid-cols-2" onsubmit={submit}>
+    <div class="form-control">
+      <span id="user-name-label" class="label-text text-xs mb-1">Nombre</span>
+      <input
+        id="user-name"
+        class="input input-bordered input-sm w-full"
+        bind:value={form.name}
+        required
+        aria-labelledby="user-name-label"
+      />
     </div>
 
-    <form class="p-5 grid gap-6" onsubmit={submit}>
-      <div class="grid items-start gap-5 md:grid-cols-2">
-        <div class="form-control w-full">
-          <span id="user-name-label" class="label-text mb-1">Nombre</span>
-          <input
-            id="user-name"
-            class="input input-bordered w-full"
-            bind:value={form.name}
-            required
-            aria-labelledby="user-name-label"
-          />
-        </div>
+    <div class="form-control">
+      <span id="user-type-label" class="label-text text-xs mb-1"
+        >Tipo de usuario</span
+      >
+      <select
+        id="user-type"
+        class="select select-bordered select-sm w-full"
+        bind:value={form.user_type}
+        aria-labelledby="user-type-label"
+      >
+        <option value="user">usuario</option>
+        <option value="company">empresa</option>
+      </select>
+    </div>
 
-        <div class="form-control w-full">
-          <span id="user-type-label" class="label-text mb-1"
-            >Tipo de usuario</span
-          >
-          <select
-            id="user-type"
-            class="select select-bordered w-full"
-            bind:value={form.user_type}
-            aria-labelledby="user-type-label"
-          >
-            <option value="user">usuario</option>
-            <option value="company">empresa</option>
-          </select>
-        </div>
+    <div class="form-control">
+      <span id="user-phone-label" class="label-text text-xs mb-1">Telefono</span
+      >
+      <input
+        id="user-phone"
+        class="input input-bordered input-sm w-full"
+        bind:value={form.phone}
+        required
+        aria-labelledby="user-phone-label"
+      />
+    </div>
 
-        <div class="form-control w-full">
-          <span id="user-phone-label" class="label-text mb-1">Telefono</span>
-          <input
-            id="user-phone"
-            class="input input-bordered w-full"
-            bind:value={form.phone}
-            required
-            aria-labelledby="user-phone-label"
-          />
-        </div>
+    <div class="form-control">
+      <span id="user-email-label" class="label-text text-xs mb-1"
+        >Correo (opcional)</span
+      >
+      <input
+        id="user-email"
+        class="input input-bordered input-sm w-full"
+        type="email"
+        bind:value={form.email}
+        aria-labelledby="user-email-label"
+      />
+    </div>
 
-        <div class="form-control w-full">
-          <span id="user-email-label" class="label-text mb-1"
-            >Correo (opcional)</span
-          >
-          <input
-            id="user-email"
-            class="input input-bordered w-full"
-            type="email"
-            bind:value={form.email}
-            aria-labelledby="user-email-label"
-          />
-        </div>
-
-        <div class="form-control w-full md:col-span-2">
-          <span class="label-text mb-1">Estado</span>
-          <label
-            class="label h-12 w-full cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-3"
-          >
-            <input
-              class="toggle toggle-sm"
-              type="checkbox"
-              checked={form.status === "active"}
-              onchange={(event) =>
-                (form.status = (event.currentTarget as HTMLInputElement).checked
-                  ? "active"
-                  : "inactive")}
-              aria-label="Estado de usuario"
-            />
-            <span class="label-text"
-              >{form.status === "active" ? "Activo" : "Inactivo"}</span
-            >
-          </label>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap gap-2 pt-1">
-        <button class="btn btn-primary" type="submit" disabled={busy}>
-          {isEditing ? "Actualizar" : "Crear"}
-        </button>
-        <button class="btn btn-ghost" type="button" onclick={closeUserEditor}
-          >Cancelar</button
+    <div class="form-control md:col-span-2">
+      <span class="label-text text-xs mb-1">Estado</span>
+      <label
+        class="label h-9 w-full cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-3"
+      >
+        <input
+          class="toggle toggle-sm"
+          type="checkbox"
+          checked={form.status === "active"}
+          onchange={(event) =>
+            (form.status = (event.currentTarget as HTMLInputElement).checked
+              ? "active"
+              : "inactive")}
+          aria-label="Estado de usuario"
+        />
+        <span class="label-text text-sm"
+          >{form.status === "active" ? "Activo" : "Inactivo"}</span
         >
-      </div>
-    </form>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={closeUserEditor}>close</button>
+      </label>
+    </div>
+
+    <div class="md:col-span-2">
+      <AdminFormActions
+        submitLabel={isEditing ? "Actualizar" : "Crear"}
+        onCancel={closeUserEditor}
+        {busy}
+      />
+    </div>
   </form>
-</dialog>
+</AdminModalShell>
 
-<dialog class="modal" bind:this={historyDialog}>
-  <div class="modal-box max-w-3xl p-0">
-    <div
-      class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100 px-5 py-4"
-    >
-      <div class="flex items-center gap-2.5">
-        <div
-          class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"
-        >
-          <Icon
-            icon="lucide:clock"
-            width="16"
-            height="16"
-            class="text-primary"
-          />
-        </div>
-        <h3 class="font-bold text-base leading-tight">
-          Historial de ordenes: {selectedUserName || "Usuario"}
-        </h3>
-      </div>
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        type="button"
-        onclick={closeHistory}
-        aria-label="Cerrar"
-      >
-        <Icon icon="lucide:x" width="16" height="16" />
-      </button>
-    </div>
-    <div class="p-5 space-y-4">
-      <div class="rounded-box border border-base-300 overflow-x-auto">
-        <table class="table table-sm">
-          <thead>
+<AdminModalShell
+  bind:dialogRef={historyDialog}
+  title={`Historial de ordenes: ${selectedUserName || "Usuario"}`}
+  icon="lucide:clock"
+  widthClass="max-w-3xl"
+  onClose={closeHistory}
+>
+  <div class="rounded-box border border-base-300 overflow-x-auto">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th>Orden</th>
+          <th>Estado</th>
+          <th>Total</th>
+          <th>Fecha</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#if historyBusy}
+          <tr><td colspan="4">Cargando historial...</td></tr>
+        {:else if selectedUserOrders.length === 0}
+          <tr><td colspan="4">Sin ordenes registradas</td></tr>
+        {:else}
+          {#each selectedUserOrders as order}
             <tr>
-              <th>Orden</th>
-              <th>Estado</th>
-              <th>Total</th>
-              <th>Fecha</th>
+              <td>{order.order_number}</td>
+              <td>{order.status}</td>
+              <td>{formatCurrency(order.total_amount)}</td>
+              <td>{new Date(order.created_at).toLocaleString()}</td>
             </tr>
-          </thead>
-          <tbody>
-            {#if historyBusy}
-              <tr><td colspan="4">Cargando historial...</td></tr>
-            {:else if selectedUserOrders.length === 0}
-              <tr><td colspan="4">Sin ordenes registradas</td></tr>
-            {:else}
-              {#each selectedUserOrders as order}
-                <tr>
-                  <td>{order.order_number}</td>
-                  <td>{order.status}</td>
-                  <td>{formatCurrency(order.total_amount)}</td>
-                  <td>{new Date(order.created_at).toLocaleString()}</td>
-                </tr>
-              {/each}
-            {/if}
-          </tbody>
-        </table>
-      </div>
-      <div class="flex justify-end">
-        <button
-          class="btn btn-ghost btn-sm"
-          type="button"
-          onclick={closeHistory}>Cerrar</button
-        >
-      </div>
-    </div>
+          {/each}
+        {/if}
+      </tbody>
+    </table>
   </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={closeHistory}>close</button>
-  </form>
-</dialog>
+  <div class="flex justify-end">
+    <button class="btn btn-ghost btn-sm" type="button" onclick={closeHistory}
+      >Cerrar</button
+    >
+  </div>
+</AdminModalShell>
 
 <ConfirmDialog
   open={confirmOpen}

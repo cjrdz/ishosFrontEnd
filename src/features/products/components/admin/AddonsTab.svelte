@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Addon } from "@features/admin-management";
-  import AdminCrudFormShell from "./AdminCrudFormShell.svelte";
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
   import {
     addonGroupLabel,
     collectAddonGroupOptions,
@@ -48,7 +49,7 @@
 
   let { addons, busy, moduleError, onCreate, onUpdate, onDelete }: Props =
     $props();
-  let addonEditorDialog: HTMLDialogElement | null = null;
+  let addonEditorDialog = $state<HTMLDialogElement | null>(null);
   let confirmDialog = $state(createConfirmDialogState());
   let editingAddonId = $state<string | null>(null);
   let customGroups = $state<string[]>([]);
@@ -362,111 +363,113 @@
   </div>
 </section>
 
-<dialog class="modal" bind:this={addonEditorDialog} onclose={resetForm}>
-  <div class="modal-box w-11/12 max-w-2xl max-h-[90vh] overflow-y-auto p-0">
-    <AdminCrudFormShell
-      title={isEditing ? "Editar complemento" : "Crear complemento"}
-      icon="lucide:puzzle"
-      onClose={closeAddonEditor}
-      onSubmit={submit}
-      submitLabel={isEditing ? "Actualizar" : "Crear"}
-      submitDisabled={busy || !form.name.trim()}
-    >
-      <div class="form-control w-full">
-        <span id="addon-name-label" class="label-text mb-1">Nombre</span>
-        <input
-          id="addon-name"
-          class="input input-bordered w-full"
-          placeholder="Choco sprinkles"
-          bind:value={form.name}
-          required
-          aria-labelledby="addon-name-label"
-        />
-      </div>
+<AdminModalShell
+  bind:dialogRef={addonEditorDialog}
+  title={isEditing ? "Editar complemento" : "Crear complemento"}
+  icon="lucide:puzzle"
+  widthClass="max-w-2xl"
+  onClose={closeAddonEditor}
+>
+  <form class="space-y-3" onsubmit={submit}>
+    <div class="form-control">
+      <span id="addon-name-label" class="label-text text-xs mb-1">Nombre</span>
+      <input
+        id="addon-name"
+        class="input input-bordered input-sm w-full"
+        placeholder="Choco sprinkles"
+        bind:value={form.name}
+        required
+        aria-labelledby="addon-name-label"
+      />
+    </div>
 
-      <div class="form-control w-full">
-        <span id="addon-group-label" class="label-text mb-1">Grupo</span>
-        <select
-          id="addon-group"
-          class="select select-bordered w-full"
-          value={selectingCustomGroup
-            ? CUSTOM_GROUP_OPTION
-            : normalizeAddonGroupName(form.group_name)}
-          onchange={selectAddonGroup}
-          aria-labelledby="addon-group-label"
-        >
-          {#each addonGroupOptions as groupName}
-            <option value={groupName}>{addonGroupLabel(groupName)}</option>
-          {/each}
-          <option value={CUSTOM_GROUP_OPTION}>+ Agregar nuevo grupo</option>
-        </select>
+    <div class="form-control">
+      <span id="addon-group-label" class="label-text text-xs mb-1">Grupo</span>
+      <select
+        id="addon-group"
+        class="select select-bordered select-sm w-full"
+        value={selectingCustomGroup
+          ? CUSTOM_GROUP_OPTION
+          : normalizeAddonGroupName(form.group_name)}
+        onchange={selectAddonGroup}
+        aria-labelledby="addon-group-label"
+      >
+        {#each addonGroupOptions as groupName}
+          <option value={groupName}>{addonGroupLabel(groupName)}</option>
+        {/each}
+        <option value={CUSTOM_GROUP_OPTION}>+ Agregar nuevo grupo</option>
+      </select>
 
-        {#if selectingCustomGroup}
-          <div class="mt-2 flex items-center gap-2">
-            <input
-              class="input input-bordered w-full"
-              placeholder="Ej. Frutas"
-              bind:value={customGroupName}
-            />
-            <button
-              type="button"
-              class="btn btn-outline btn-sm"
-              onclick={addCustomGroup}
-              disabled={!customGroupName.trim()}
-            >
-              Agregar
-            </button>
-          </div>
-        {/if}
-      </div>
-
-      <div class="form-control w-full">
-        <span id="addon-price-label" class="label-text mb-1">Precio ($)</span>
-        <input
-          id="addon-price"
-          type="number"
-          step="0.01"
-          min="0"
-          class="input input-bordered w-full"
-          placeholder="1.50"
-          bind:value={form.price}
-          aria-labelledby="addon-price-label"
-        />
-      </div>
-
-      <div class="form-control w-full">
-        <span id="addon-order-label" class="label-text mb-1"
-          >Orden de visualizacion</span
-        >
-        <input
-          id="addon-order"
-          type="number"
-          class="input input-bordered w-full"
-          placeholder="0"
-          bind:value={form.display_order}
-          aria-labelledby="addon-order-label"
-        />
-      </div>
-
-      {#if isEditing}
-        <div class="form-control">
-          <label for="addon-active" class="label cursor-pointer">
-            <span class="label-text">Activo</span>
-            <input
-              id="addon-active"
-              type="checkbox"
-              bind:checked={form.is_active}
-              class="checkbox"
-            />
-          </label>
+      {#if selectingCustomGroup}
+        <div class="mt-2 flex items-center gap-2">
+          <input
+            class="input input-bordered input-sm w-full"
+            placeholder="Ej. Frutas"
+            bind:value={customGroupName}
+          />
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            onclick={addCustomGroup}
+            disabled={!customGroupName.trim()}
+          >
+            Agregar
+          </button>
         </div>
       {/if}
-    </AdminCrudFormShell>
-  </div>
-  <form method="dialog" class="modal-backdrop">
-    <button type="button" onclick={closeAddonEditor}>close</button>
+    </div>
+
+    <div class="form-control">
+      <span id="addon-price-label" class="label-text text-xs mb-1"
+        >Precio ($)</span
+      >
+      <input
+        id="addon-price"
+        type="number"
+        step="0.01"
+        min="0"
+        class="input input-bordered input-sm w-full"
+        placeholder="1.50"
+        bind:value={form.price}
+        aria-labelledby="addon-price-label"
+      />
+    </div>
+
+    <div class="form-control">
+      <span id="addon-order-label" class="label-text text-xs mb-1"
+        >Orden de visualizacion</span
+      >
+      <input
+        id="addon-order"
+        type="number"
+        class="input input-bordered input-sm w-full"
+        placeholder="0"
+        bind:value={form.display_order}
+        aria-labelledby="addon-order-label"
+      />
+    </div>
+
+    {#if isEditing}
+      <label
+        class="flex items-center justify-between gap-3 rounded-lg border border-base-300/70 px-3 py-2 cursor-pointer"
+      >
+        <span class="label-text text-sm">Activo</span>
+        <input
+          id="addon-active"
+          type="checkbox"
+          bind:checked={form.is_active}
+          class="checkbox checkbox-sm"
+        />
+      </label>
+    {/if}
+
+    <AdminFormActions
+      submitLabel={isEditing ? "Actualizar" : "Crear"}
+      onCancel={closeAddonEditor}
+      {busy}
+    />
   </form>
-</dialog>
+</AdminModalShell>
 
 <ConfirmDialog
   open={confirmDialog.open}

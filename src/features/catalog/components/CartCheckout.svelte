@@ -365,6 +365,7 @@
         { duration: 0.45, ease: [0, 0, 0.2, 1] },
       );
       void tick().then(() => {
+        if (!containerRef) return;
         const cards = containerRef.querySelectorAll("article.card");
         if (cards.length > 0) {
           void animate(

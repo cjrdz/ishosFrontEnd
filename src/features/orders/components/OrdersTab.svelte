@@ -239,7 +239,7 @@
             const hasJaleaIncluded = includedIds.some((id) =>
               jaleaAddons.some((a) => a.id === id),
             );
-            let toppingSelection =
+            let toppingSelection: "none" | "selected" | undefined =
               item.topping_selection === "none"
                 ? "none"
                 : item.topping_selection === "selected"
@@ -248,7 +248,7 @@
             if (toppingSelection === "selected" && !hasToppingIncluded) {
               toppingSelection = toppingAddons.length > 0 ? "none" : undefined;
             }
-            let jaleaSelection =
+            let jaleaSelection: "none" | "selected" | undefined =
               item.jalea_selection === "none"
                 ? "none"
                 : item.jalea_selection === "selected"
