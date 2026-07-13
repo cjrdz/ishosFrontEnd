@@ -7,19 +7,16 @@
     confirmDialogNow,
     createConfirmDialogState,
     openConfirmDialog,
-    sortByDisplayOrderAndName,
-  } from "@features/products";
+  } from "@shared/utils/confirm-dialog";
+  import { sortByDisplayOrderAndName } from "@features/products";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import AdminTableRowActions from "@features/admin-management/components/shared/AdminTableRowActions.svelte";
 
   interface Props {
     flavors: Flavor[];
     busy: boolean;
     moduleError: string;
-    onCreate: (payload: {
-      name: string;
-      display_order: number;
-      is_seasonal: boolean;
-    }) => void;
+    onCreate: (payload: { name: string; is_seasonal: boolean }) => void;
     onUpdate: (
       id: string,
       payload: {
@@ -104,20 +101,18 @@
 
   function submit(event: SubmitEvent) {
     event.preventDefault();
-    const payload = {
-      name: form.name.trim(),
-      display_order: Number(form.display_order),
-      is_seasonal: Boolean(form.is_seasonal),
-      is_active: Boolean(form.is_active),
-    };
 
     if (form.id) {
-      onUpdate(form.id, payload);
+      onUpdate(form.id, {
+        name: form.name.trim(),
+        display_order: Number(form.display_order),
+        is_seasonal: Boolean(form.is_seasonal),
+        is_active: Boolean(form.is_active),
+      });
     } else {
       onCreate({
-        name: payload.name,
-        display_order: payload.display_order,
-        is_seasonal: payload.is_seasonal,
+        name: form.name.trim(),
+        is_seasonal: Boolean(form.is_seasonal),
       });
     }
 
@@ -131,6 +126,28 @@
       `Seguro que deseas eliminar ${flavor.name}?`,
       () => onDelete(flavor.id),
     );
+  }
+
+  async function moveFlavor(flavor: Flavor, direction: -1 | 1) {
+    if (flavorActivityFilter !== "all") return;
+    const index = filteredFlavors.findIndex((f) => f.id === flavor.id);
+    if (index < 0) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= filteredFlavors.length) return;
+
+    const target = filteredFlavors[targetIndex];
+    await onUpdate(flavor.id, {
+      name: flavor.name,
+      display_order: target.display_order,
+      is_seasonal: flavor.is_seasonal,
+      is_active: flavor.is_active,
+    });
+    await onUpdate(target.id, {
+      name: target.name,
+      display_order: flavor.display_order,
+      is_seasonal: target.is_seasonal,
+      is_active: target.is_active,
+    });
   }
 </script>
 
@@ -233,7 +250,7 @@
                     <div class="font-medium">{flavor.name}</div>
                   </td>
                   <td class="text-center align-middle"
-                    >{flavor.display_order}</td
+                    >{flavor.display_order + 1}</td
                   >
                   <td class="text-center align-middle">
                     <span
@@ -250,19 +267,20 @@
                     </span>
                   </td>
                   <td class="text-center align-middle">
-                    <div
-                      class="flex w-full flex-wrap items-center justify-center gap-2"
-                    >
-                      <button
-                        class="btn btn-sm btn-soft btn-accent"
-                        onclick={() => editFlavor(flavor)}>Editar</button
-                      >
-                      <button
-                        class="btn btn-sm btn-soft btn-error"
-                        onclick={() => requestDeleteFlavor(flavor)}
-                        >Eliminar</button
-                      >
-                    </div>
+                    <AdminTableRowActions
+                      itemName={flavor.name}
+                      {busy}
+                      canMoveUp={flavorActivityFilter === "all" &&
+                        filteredFlavors.findIndex((f) => f.id === flavor.id) >
+                          0}
+                      canMoveDown={flavorActivityFilter === "all" &&
+                        filteredFlavors.findIndex((f) => f.id === flavor.id) <
+                          filteredFlavors.length - 1}
+                      onEdit={() => editFlavor(flavor)}
+                      onDelete={() => requestDeleteFlavor(flavor)}
+                      onMoveUp={() => moveFlavor(flavor, -1)}
+                      onMoveDown={() => moveFlavor(flavor, 1)}
+                    />
                   </td>
                 </tr>
               {/each}
@@ -291,20 +309,6 @@
         bind:value={form.name}
         required
         aria-labelledby="flavor-name-label"
-      />
-    </div>
-
-    <div class="form-control">
-      <span id="flavor-order-label" class="label-text text-xs mb-1"
-        >Orden de visualizacion</span
-      >
-      <input
-        id="flavor-order"
-        type="number"
-        class="input input-bordered input-sm w-full"
-        placeholder="0"
-        bind:value={form.display_order}
-        aria-labelledby="flavor-order-label"
       />
     </div>
 

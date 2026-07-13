@@ -69,12 +69,11 @@
   );
   let isUnregisteredFlavor = $derived(
     entryType === "flavor" &&
-      selectedFlavorItem &&
-      selectedFlavorItem.current_stock === 0 &&
-      selectedFlavorItem.low_stock_threshold === 0,
+      !!selectedFlavorItem &&
+      selectedFlavorItem.id === selectedFlavorItem.flavor_id,
   );
 
-  let canSubmit = $derived(
+  let formValid = $derived(
     entryType === "flavor"
       ? flavorForm.flavor_id &&
           flavorForm.container_type_id &&
@@ -108,7 +107,7 @@
 
   function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
-    if (!canSubmit) return;
+    if (!formValid) return;
     if (entryType === "flavor") {
       onSubmit({
         type: "flavor",
@@ -149,22 +148,22 @@
       <div class="join w-full">
         <button
           type="button"
-          class="btn btn-sm join-item flex-1"
+          class="btn btn-md join-item flex-1"
           class:btn-neutral={entryType === "flavor"}
           class:btn-ghost={entryType !== "flavor"}
           onclick={() => (entryType = "flavor")}
         >
-          <Icon icon="lucide:ice-cream-cone" width="14" height="14" />
+          <Icon icon="lucide:ice-cream-cone" width="16" height="16" />
           Sabor
         </button>
         <button
           type="button"
-          class="btn btn-sm join-item flex-1"
+          class="btn btn-md join-item flex-1"
           class:btn-neutral={entryType === "unit"}
           class:btn-ghost={entryType !== "unit"}
           onclick={() => (entryType = "unit")}
         >
-          <Icon icon="lucide:box" width="14" height="14" />
+          <Icon icon="lucide:box" width="16" height="16" />
           Unitario
         </button>
       </div>
@@ -199,19 +198,9 @@
         {/if}
 
         <div class="form-control">
-          <div class="flex items-center justify-between">
-            <span class="label-text text-xs mb-1">Tipo de recipiente</span>
-            <button
-              type="button"
-              class="btn btn-xs btn-outline"
-              onclick={handleOpenContainerTypes}
-            >
-              <Icon icon="lucide:settings" width="12" height="12" />
-              Gestionar contenedores
-            </button>
-          </div>
+          <span class="label-text text-xs mb-1">Tipo de recipiente</span>
           <select
-            class="select select-bordered select-sm w-full mt-1"
+            class="select select-bordered select-sm w-full"
             bind:value={flavorForm.container_type_id}
             required
           >
@@ -253,15 +242,23 @@
             placeholder="Ej: 5"
             required
           />
+          {#if flavorForm.container_type_id && flavorForm.quantity_containers > 0}
+            <p class="text-sm text-base-content/60 mt-1.5">
+              = {totalBalls.toLocaleString()} bolas totales
+            </p>
+          {/if}
         </div>
 
-        {#if flavorForm.container_type_id && flavorForm.quantity_containers > 0}
-          <div class="alert alert-info text-sm py-2">
-            <span>
-              Total: <strong>{totalBalls.toLocaleString()}</strong> bolas
-            </span>
-          </div>
-        {/if}
+        <div class="flex justify-end">
+          <button
+            type="button"
+            class="btn btn-xs btn-ghost gap-1"
+            onclick={handleOpenContainerTypes}
+          >
+            <Icon icon="lucide:settings" width="12" height="12" />
+            Gestionar contenedores
+          </button>
+        </div>
       </div>
     {/if}
 
@@ -298,7 +295,7 @@
     <AdminFormActions
       submitLabel="Registrar Entrada"
       onCancel={onClose}
-      disabled={!canSubmit}
+      disabled={!formValid}
     />
   </form>
 </AdminModalShell>

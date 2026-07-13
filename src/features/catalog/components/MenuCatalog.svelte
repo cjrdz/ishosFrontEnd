@@ -40,7 +40,7 @@
 
   let selectedProduct = $state<PublicProduct | null>(null);
   let selectedDraft = $state<ProductCustomizationDraft | null>(null);
-  const catalogSkeletonCards = Array.from({ length: 10 }, (_, index) => index);
+  const catalogSkeletonCards = Array.from({ length: 8 }, (_, index) => index);
   const categoryTabs = $derived([
     { id: "all", label: "Todos" },
     ...categories.map((category) => ({
@@ -295,35 +295,21 @@
 
 <div class="space-y-5 pb-16 overflow-x-clip">
   <section
-    class="relative overflow-hidden text-center px-4 pt-8 pb-16 md:pt-12 md:pb-20"
+    class="relative overflow-hidden text-center px-4 pt-3 pb-4 md:pt-4 md:pb-5"
   >
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
       <div
-        class="hero-blob-teal absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl"
+        class="hero-blob-teal absolute -top-8 -left-8 w-48 h-48 rounded-full blur-3xl"
         style="background: var(--ishos-teal);"
       ></div>
       <div
-        class="hero-blob-pink absolute -bottom-16 -right-16 w-80 h-80 rounded-full blur-3xl"
+        class="hero-blob-pink absolute -bottom-6 -right-6 w-40 h-40 rounded-full blur-3xl"
         style="background: var(--ishos-pink);"
-      ></div>
-      <div
-        class="hero-blob-blue absolute top-1/3 right-1/4 w-64 h-64 rounded-full blur-3xl"
-        style="background: var(--ishos-yellow);"
       ></div>
       <div class="stripe-bg absolute inset-0 opacity-40"></div>
     </div>
-    <div class="relative mx-auto max-w-2xl mb-1 lg:mb-2 fade-up fade-up-1">
-      <div class="section-pill mb-4">Nuestro Menú</div>
-      <h2
-        class="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight"
-      >
-        <span
-          class="text-transparent bg-clip-text inline-block"
-          style="background-image: var(--brand-gradient);"
-        >
-          Sabores Artesanales
-        </span>
-      </h2>
+    <div class="relative mx-auto max-w-2xl fade-up fade-up-1">
+      <div class="section-pill">Nuestro Menú</div>
     </div>
   </section>
 
@@ -332,7 +318,7 @@
       viewBox="0 0 1440 60"
       xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="none"
-      style="height:40px; width:100%;"
+      style="height:24px; width:100%;"
     >
       <path
         d="M0,30 C240,60 480,0 720,30 C960,60 1200,0 1440,30 L1440,60 L0,60 Z"
@@ -380,17 +366,22 @@
     {#snippet catalogContent()}
       {#if loading}
         <div
-          class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-4 md:pt-0"
+          class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 items-start pt-4 md:pt-0"
         >
           {#each catalogSkeletonCards as cardIndex (cardIndex)}
             <article
-              class="card bg-base-100 w-full shadow-sm border border-base-200/50 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
+              class="card bg-base-100 w-full shadow-sm border border-base-200/50 overflow-hidden h-full rounded-2xl sm:rounded-3xl aspect-[3/4] relative"
               aria-hidden="true"
             >
-              <div class="skeleton w-full aspect-4/3"></div>
-              <div class="card-body p-3 sm:p-4 md:p-5 space-y-2">
-                <div class="skeleton h-4 w-3/4"></div>
-                <div class="skeleton h-5 w-16"></div>
+              <div class="skeleton w-full h-full absolute inset-0"></div>
+              <div
+                class="absolute left-0 right-0 bottom-0 p-2 bg-base-100/40 backdrop-blur-sm border-t border-base-200/50"
+              >
+                <div class="skeleton h-4 w-3/4 mb-1"></div>
+                <div class="flex items-center justify-between">
+                  <div class="skeleton h-4 w-14"></div>
+                  <div class="skeleton h-6 w-16 rounded-full"></div>
+                </div>
               </div>
             </article>
           {/each}
@@ -411,7 +402,7 @@
         </div>
       {:else}
         <div
-          class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 items-start pt-1"
+          class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 items-start pt-1"
           bind:this={catalogGridRef}
         >
           {#each visibleProducts as product (product.id)}
@@ -448,7 +439,7 @@
     {/snippet}
 
     {#if !loading}
-      <div class="md:hidden flex flex-col gap-2 mb-4">
+      <div class="lg:hidden flex flex-col gap-2 mb-4">
         <button
           type="button"
           class="btn btn-outline btn-sm w-fit"
@@ -473,7 +464,7 @@
       <div class="flex flex-col md:flex-row gap-0 items-start">
         {#if showSidebar}
           <aside
-            class="hidden md:block w-56 flex-shrink-0 sticky top-4 self-start mr-6"
+            class="hidden lg:block w-56 flex-shrink-0 sticky top-4 self-start mr-6"
           >
             <div class="flex items-center justify-between mb-3 px-1">
               <h3 class="text-xs font-bold uppercase tracking-wider opacity-60">
@@ -497,7 +488,7 @@
         {/if}
 
         <div class="flex-1 min-w-0 w-full">
-          <div class="hidden md:flex items-center justify-between mb-4 gap-4">
+          <div class="hidden lg:flex items-center justify-between mb-4 gap-4">
             <div class="flex items-center gap-4">
               {#if !showSidebar}
                 <button
@@ -531,7 +522,7 @@
 
   {#if isMobileDrawerOpen}
     <div
-      class="fixed inset-0 z-50 md:hidden"
+      class="fixed inset-0 z-50 lg:hidden"
       role="dialog"
       aria-modal="true"
       aria-label="Categorías"

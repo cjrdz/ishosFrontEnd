@@ -13,11 +13,7 @@
   import { CanvasRenderer } from "echarts/renderers";
   import type { EChartsOption } from "echarts";
   import {
-    listFlavorInventory,
-    listUnitInventory,
-    listFlavors,
-    getInventoryStats,
-    getLowStockItems,
+    getInventoryDashboard,
     recordInventoryEntry,
     recordUnitInventoryEntry,
     recordInventoryAdjustment,
@@ -31,11 +27,23 @@
     type StockMovement,
     type ContainerType,
   } from "@features/admin-management/lib/bff";
-  import { type Flavor } from "@features/admin-management/lib/api";
+  import { type Flavor, type Addon } from "@features/admin-management/lib/api";
   import InventoryEntryDialog from "./InventoryEntryDialog.svelte";
   import InventoryAdjustmentDialog from "./InventoryAdjustmentDialog.svelte";
   import ContainerTypesDialog from "./ContainerTypesDialog.svelte";
   import InventoryMovementsDialog from "./InventoryMovementsDialog.svelte";
+  import GlobalFlavorsManager from "@features/products/components/admin/GlobalFlavorsManager.svelte";
+  import GlobalAddonsManager from "@features/products/components/admin/GlobalAddonsManager.svelte";
+  import {
+    getAdminLocalSettings,
+    getCurrentAdminId,
+    getCurrentRowsPerTable,
+    saveAdminRowsPerTable,
+    getInventoryFilterState,
+    saveInventoryFilterState,
+    type InventoryStockFilter,
+    type InventoryTypeFilter,
+  } from "@features/admin-management/lib/local-settings";
 
   use([
     TitleComponent,
@@ -50,15 +58,61 @@
   interface Props {
     busy?: boolean;
     moduleError?: string;
+    flavors?: Flavor[];
+    addons?: Addon[];
+    flavorBusy?: boolean;
+    addonBusy?: boolean;
+    flavorError?: string;
+    addonError?: string;
+    onCreateFlavor?: (payload: { name: string; is_seasonal: boolean }) => void;
+    onUpdateFlavor?: (
+      id: string,
+      payload: {
+        name: string;
+        display_order: number;
+        is_seasonal: boolean;
+        is_active: boolean;
+      },
+    ) => void;
+    onDeleteFlavor?: (id: string) => void;
+    onCreateAddon?: (payload: {
+      name: string;
+      price: number;
+      group_name: string;
+    }) => void;
+    onUpdateAddon?: (
+      id: string,
+      payload: {
+        name: string;
+        price: number;
+        group_name: string;
+        display_order: number;
+        is_active: boolean;
+      },
+    ) => void;
+    onDeleteAddon?: (id: string) => void;
   }
 
-  let { busy = false, moduleError = "" }: Props = $props();
+  let {
+    busy = false,
+    moduleError = "",
+    flavors = [],
+    addons = [],
+    flavorBusy = false,
+    addonBusy = false,
+    flavorError = "",
+    addonError = "",
+    onCreateFlavor = () => {},
+    onUpdateFlavor = () => {},
+    onDeleteFlavor = () => {},
+    onCreateAddon = () => {},
+    onUpdateAddon = () => {},
+    onDeleteAddon = () => {},
+  }: Props = $props();
 
-  let flavorItems = $state<InventoryItem[]>([]);
+  let inventoryFlavors = $state<InventoryItem[]>([]);
   let unitItems = $state<InventoryItem[]>([]);
-  let globalFlavors = $state<Flavor[]>([]);
   let stats = $state<InventoryStats | null>(null);
-  let lowStock = $state<InventoryItem[]>([]);
   let movements = $state<StockMovement[]>([]);
   let loading = $state(false);
   let error = $state("");
@@ -67,10 +121,45 @@
   let showAdjustment = $state(false);
   let showMovements = $state(false);
   let showContainerTypes = $state(false);
-  let tableFilter = $state<"all" | "low-stock">("all");
+  let showGlobalFlavors = $state(false);
+  let showGlobalAddons = $state(false);
+  let tableFilter = $state<InventoryStockFilter>("all");
+  let tableTypeFilter = $state<InventoryTypeFilter>("all");
+  let searchQuery = $state("");
+
+  const normalizedSearchQuery = $derived(searchQuery.trim().toLowerCase());
+
+  $effect(() => {
+    const adminId = getCurrentAdminId();
+    if (!adminId) return;
+    saveInventoryFilterState(adminId, {
+      stockFilter: tableFilter,
+      typeFilter: tableTypeFilter,
+    });
+  });
 
   let containerTypes = $state<ContainerType[]>([]);
   let containerTypesLoading = $state(false);
+
+  const rowLimitOptions = [5, 10, 25, 50, 100] as const;
+  let rowLimit = $state<number>(getCurrentRowsPerTable("inventario"));
+
+  const rowLimitLabel = $derived(rowLimit <= 0 ? "Todos" : String(rowLimit));
+
+  function setRowLimit(limit: number) {
+    rowLimit = limit;
+    const adminId = getCurrentAdminId();
+    if (!adminId) return;
+    const current = getAdminLocalSettings(adminId);
+    saveAdminRowsPerTable(adminId, {
+      ...current.rows_per_table,
+      inventario: limit,
+    });
+  }
+
+  const visibleItems = $derived(
+    rowLimit <= 0 ? filteredItems() : filteredItems().slice(0, rowLimit),
+  );
 
   // Chart theme colors
   let chartTextColor = $state("#d1d5db");
@@ -103,7 +192,63 @@
   }
 
   // Chart data
+  const flavorItems = $derived<InventoryItem[]>(
+    (() => {
+      const byFlavorId = new Map(
+        inventoryFlavors.map((item) => [item.flavor_id, item]),
+      );
+      return flavors.map((flavor) => {
+        const existing = byFlavorId.get(flavor.id);
+        if (existing) {
+          return { ...existing, name: flavor.name };
+        }
+        return {
+          id: flavor.id,
+          name: flavor.name,
+          type: "ball_based" as const,
+          current_stock: 0,
+          low_stock_threshold: 0,
+          flavor_id: flavor.id,
+          created_at: flavor.created_at ?? new Date().toISOString(),
+          updated_at: flavor.created_at ?? new Date().toISOString(),
+        };
+      });
+    })(),
+  );
+
   const allItems = $derived([...flavorItems, ...unitItems]);
+
+  const okCount = $derived(
+    allItems.filter((item) => getStockStatus(item).label === "OK").length,
+  );
+
+  const lowStockCount = $derived(
+    allItems.filter((item) => getStockStatus(item).label === "Stock bajo")
+      .length,
+  );
+
+  const outOfStockCount = $derived(
+    allItems.filter((item) => getStockStatus(item).label === "Agotado").length,
+  );
+
+  const filteredItems = $derived(() => {
+    return allItems.filter((item) => {
+      const status = getStockStatus(item);
+      const passesSearch =
+        !normalizedSearchQuery ||
+        item.name.toLowerCase().includes(normalizedSearchQuery);
+      const passesStockFilter =
+        tableFilter === "all" ||
+        (tableFilter === "ok" && status.label === "OK") ||
+        (tableFilter === "low-stock" && status.label === "Stock bajo") ||
+        (tableFilter === "out-of-stock" && status.label === "Agotado");
+      const passesTypeFilter =
+        tableTypeFilter === "all" ||
+        (tableTypeFilter === "flavor" && item.type === "ball_based") ||
+        (tableTypeFilter === "unit" && item.type === "unit_based");
+      return passesSearch && passesStockFilter && passesTypeFilter;
+    });
+  });
 
   const statusBreakdown = $derived(() => {
     const result = [
@@ -229,68 +374,25 @@
   }
 
   async function loadInventory() {
+    if (loading) return;
     loading = true;
     error = "";
     try {
-      const [flavorsRes, unitsRes, statsRes, lowRes, globalFlavorsRes] =
-        await Promise.allSettled([
-          listFlavorInventory(),
-          listUnitInventory(),
-          getInventoryStats(),
-          getLowStockItems(),
-          listFlavors(),
-        ]);
+      const dashboard = await getInventoryDashboard();
 
-      let inventoryFlavors: InventoryItem[] = [];
-      if (flavorsRes.status === "fulfilled") {
-        inventoryFlavors = (flavorsRes.value.items ?? []).map((item: any) => ({
-          ...item,
-          current_stock: item.current_stock ?? 0,
-          low_stock_threshold: item.low_stock_threshold ?? 0,
-        }));
-      }
+      inventoryFlavors = (dashboard?.flavor_items ?? []).map((item: any) => ({
+        ...item,
+        current_stock: item.current_stock ?? 0,
+        low_stock_threshold: item.low_stock_threshold ?? 0,
+      }));
 
-      if (unitsRes.status === "fulfilled") {
-        unitItems = (unitsRes.value.items ?? []).map((item: any) => ({
-          ...item,
-          current_stock: item.current_stock ?? 0,
-          low_stock_threshold: item.low_stock_threshold ?? 0,
-        }));
-      }
-      if (statsRes.status === "fulfilled") {
-        stats = statsRes.value;
-      }
-      if (lowRes.status === "fulfilled") {
-        lowStock = (lowRes.value ?? []).map((item: any) => ({
-          ...item,
-          current_stock: item.current_stock ?? 0,
-          low_stock_threshold: item.low_stock_threshold ?? 0,
-        }));
-      }
-      if (globalFlavorsRes.status === "fulfilled") {
-        globalFlavors = globalFlavorsRes.value ?? [];
-      }
+      unitItems = (dashboard?.unit_items ?? []).map((item: any) => ({
+        ...item,
+        current_stock: item.current_stock ?? 0,
+        low_stock_threshold: item.low_stock_threshold ?? 0,
+      }));
 
-      // Merge global flavors with inventory records
-      const inventoryByFlavorId = new Map(
-        inventoryFlavors.map((item) => [item.flavor_id, item]),
-      );
-      flavorItems = globalFlavors.map((flavor) => {
-        const existing = inventoryByFlavorId.get(flavor.id);
-        if (existing) {
-          return { ...existing, name: flavor.name };
-        }
-        return {
-          id: flavor.id,
-          name: flavor.name,
-          type: "ball_based" as const,
-          current_stock: 0,
-          low_stock_threshold: 0,
-          flavor_id: flavor.id,
-          created_at: flavor.created_at ?? new Date().toISOString(),
-          updated_at: flavor.created_at ?? new Date().toISOString(),
-        };
-      });
+      stats = dashboard?.stats ?? null;
     } catch (e) {
       error = e instanceof Error ? e.message : "Error cargando inventario";
     } finally {
@@ -369,6 +471,22 @@
     showContainerTypes = true;
   }
 
+  function openGlobalFlavors() {
+    showGlobalFlavors = true;
+  }
+
+  function closeGlobalFlavors() {
+    showGlobalFlavors = false;
+  }
+
+  function openGlobalAddons() {
+    showGlobalAddons = true;
+  }
+
+  function closeGlobalAddons() {
+    showGlobalAddons = false;
+  }
+
   function getStockStatus(item: InventoryItem): {
     label: string;
     class: string;
@@ -422,457 +540,455 @@
     }
   }
 
-  $effect(() => {
-    loadInventory();
-  });
-
   onMount(() => {
     syncChartThemeColors();
     window.addEventListener("themechange", syncChartThemeColors);
+
+    const adminId = getCurrentAdminId();
+    if (adminId) {
+      const filterState = getInventoryFilterState(adminId);
+      tableFilter = filterState.stockFilter;
+      tableTypeFilter = filterState.typeFilter;
+      rowLimit = getCurrentRowsPerTable("inventario");
+    }
+
+    void loadInventory();
     return () =>
       window.removeEventListener("themechange", syncChartThemeColors);
   });
 </script>
 
-<section class="space-y-5 md:space-y-6">
+<section class="space-y-4 md:space-y-6">
   {#if moduleError || error}
-    <div class="alert alert-error">
-      <span>{moduleError || error}</span>
-    </div>
+    <div class="alert alert-warning"><span>{moduleError || error}</span></div>
   {/if}
 
   <!-- Card 1: Resumen de Inventario -->
-  <div class="card bg-base-100 shadow border border-base-300/60">
-    <div class="card-body py-4">
-      <div
-        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div class="flex items-center gap-3">
-          <div
-            class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0"
-          >
-            <Icon
-              icon="lucide:package"
-              width="20"
-              height="20"
-              class="text-warning"
-            />
-          </div>
-          <div>
-            <h2 class="card-title text-base leading-tight">
-              Resumen de Inventario
-            </h2>
-            <p class="text-xs text-base-content/55">Stock actual y alertas</p>
-          </div>
-        </div>
+  <div class="card bg-base-100 shadow">
+    <div class="card-body gap-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="card-title shrink-0 mr-1">Resumen de Inventario</h2>
+
+        <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+
         <button
-          class="btn btn-sm btn-primary gap-2 self-start sm:self-auto"
+          class="btn btn-sm btn-outline gap-2"
+          onclick={openGlobalFlavors}
+          disabled={loading || busy}
+        >
+          <Icon icon="lucide:ice-cream-bowl" class="h-4 w-4" />
+          Sabores
+        </button>
+        <button
+          class="btn btn-sm btn-outline gap-2"
+          onclick={openGlobalAddons}
+          disabled={loading || busy}
+        >
+          <Icon icon="lucide:puzzle" class="h-4 w-4" />
+          Complementos
+        </button>
+        <button
+          class="btn btn-sm btn-ghost btn-square shrink-0 sm:ml-auto"
+          type="button"
           onclick={loadInventory}
           disabled={loading}
+          aria-label="Actualizar inventario"
+          title="Actualizar inventario"
         >
           {#if loading}
             <span class="loading loading-spinner loading-xs"></span>
           {:else}
-            <Icon icon="lucide:refresh-cw" width="16" height="16" />
+            <Icon icon="lucide:refresh-cw" class="h-4 w-4" />
           {/if}
-          Actualizar
         </button>
       </div>
+
+      {#if stats}
+        <div class="px-4 pb-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            <div class="stat bg-base-200/30 rounded-box py-3">
+              <div class="stat-figure text-info">
+                <Icon icon="lucide:ice-cream-cone" class="h-6 w-6" />
+              </div>
+              <div class="stat-title text-xs">Sabores</div>
+              <div class="stat-value text-info text-2xl">
+                {stats.ball_based_items}
+              </div>
+            </div>
+            <div class="stat bg-base-200/30 rounded-box py-3">
+              <div class="stat-figure text-secondary">
+                <Icon icon="lucide:box" class="h-6 w-6" />
+              </div>
+              <div class="stat-title text-xs">Unitarios</div>
+              <div class="stat-value text-secondary text-2xl">
+                {stats.unit_based_items}
+              </div>
+            </div>
+            <div class="stat bg-base-200/30 rounded-box py-3">
+              <div class="stat-figure text-error">
+                <Icon icon="lucide:alert-triangle" class="h-6 w-6" />
+              </div>
+              <div class="stat-title text-xs">Agotados</div>
+              <div class="stat-value text-error text-2xl">
+                {stats.out_of_stock_items}
+              </div>
+              {#if stats.out_of_stock_items > 0}
+                <div class="stat-desc text-error text-xs">
+                  Requiere atención
+                </div>
+              {/if}
+            </div>
+            <div class="stat bg-base-200/30 rounded-box py-3">
+              <div class="stat-figure text-warning">
+                <Icon icon="lucide:alert-circle" class="h-6 w-6" />
+              </div>
+              <div class="stat-title text-xs">Stock Bajo</div>
+              <div class="stat-value text-warning text-2xl">
+                {stats.low_stock_items}
+              </div>
+              {#if stats.low_stock_items > 0}
+                <div class="stat-desc text-warning text-xs">
+                  Requiere atención
+                </div>
+              {/if}
+            </div>
+            <div class="stat bg-base-200/30 rounded-box py-3">
+              <div class="stat-figure text-success">
+                <Icon icon="lucide:check-circle" class="h-6 w-6" />
+              </div>
+              <div class="stat-title text-xs">OK</div>
+              <div class="stat-value text-success text-2xl">
+                {stats.healthy_items}
+              </div>
+            </div>
+          </div>
+        </div>
+      {/if}
+
+      {#if !loading && allItems.length > 0}
+        <div class="px-4 pb-4">
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div class="card bg-base-100 shadow">
+              <div class="card-body">
+                <h4 class="text-sm font-semibold flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-info inline-block"
+                  ></span>
+                  Distribución de stock
+                </h4>
+                <div class="h-64 w-full md:h-72">
+                  <Chart {init} options={stockStatusPieOptions} />
+                </div>
+              </div>
+            </div>
+
+            <div class="card bg-base-100 shadow">
+              <div class="card-body">
+                <h4 class="text-sm font-semibold flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-warning inline-block"
+                  ></span>
+                  Niveles de stock (más bajos)
+                </h4>
+                <div class="h-64 w-full md:h-72">
+                  <Chart {init} options={stockLevelsBarOptions} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {/if}
     </div>
 
-    {#if stats}
-      <div class="px-4 pb-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-          <div
-            class="stat bg-base-200/40 border border-base-300/50 rounded-box"
-          >
-            <div class="stat-figure text-info">
-              <Icon icon="lucide:ice-cream-cone" width="24" height="24" />
-            </div>
-            <div class="stat-title">Sabores</div>
-            <div class="stat-value text-info text-2xl">
-              {stats.ball_based_items}
-            </div>
-          </div>
-          <div
-            class="stat bg-base-200/40 border border-base-300/50 rounded-box"
-          >
-            <div class="stat-figure text-secondary">
-              <Icon icon="lucide:box" width="24" height="24" />
-            </div>
-            <div class="stat-title">Unitarios</div>
-            <div class="stat-value text-secondary text-2xl">
-              {stats.unit_based_items}
-            </div>
-          </div>
-          <div
-            class="stat bg-base-200/40 border border-base-300/50 rounded-box"
-          >
-            <div class="stat-figure text-error">
-              <Icon icon="lucide:alert-triangle" width="24" height="24" />
-            </div>
-            <div class="stat-title">Agotados</div>
-            <div class="stat-value text-error text-2xl">
-              {stats.out_of_stock_items}
-            </div>
-            {#if stats.out_of_stock_items > 0}
-              <div class="stat-desc text-error">Requiere atención</div>
-            {/if}
-          </div>
-          <div
-            class="stat bg-base-200/40 border border-base-300/50 rounded-box"
-          >
-            <div class="stat-figure text-warning">
-              <Icon icon="lucide:alert-circle" width="24" height="24" />
-            </div>
-            <div class="stat-title">Stock Bajo</div>
-            <div class="stat-value text-warning text-2xl">
-              {stats.low_stock_items}
-            </div>
-            {#if stats.low_stock_items > 0}
-              <div class="stat-desc text-warning">Requiere atención</div>
-            {/if}
-          </div>
-          <div
-            class="stat bg-base-200/40 border border-base-300/50 rounded-box"
-          >
-            <div class="stat-figure text-success">
-              <Icon icon="lucide:check-circle" width="24" height="24" />
-            </div>
-            <div class="stat-title">OK</div>
-            <div class="stat-value text-success text-2xl">
-              {stats.healthy_items}
-            </div>
-          </div>
-        </div>
-      </div>
-    {/if}
+    <!-- Card 2: Gestión de Stock -->
+    <div class="card bg-base-100 shadow">
+      <div class="card-body gap-4">
+        <!-- Toolbar -->
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="card-title shrink-0 mr-1">Sabores y Unitarios</h2>
 
-    {#if !loading && allItems.length > 0}
-      <div class="px-4 pb-4">
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div class="card bg-base-100 border border-base-300/50">
-            <div class="card-body">
-              <h4 class="text-sm font-semibold flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-info inline-block"
-                ></span>
-                Distribución de stock
-              </h4>
-              <div class="h-64 w-full md:h-72">
-                <Chart {init} options={stockStatusPieOptions} />
-              </div>
-            </div>
+          <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+
+          <input
+            class="input input-sm input-bordered w-full sm:w-36 md:w-44 lg:w-52"
+            type="text"
+            placeholder="Buscar item"
+            value={searchQuery}
+            oninput={(event) =>
+              (searchQuery = (event.currentTarget as HTMLInputElement).value)}
+          />
+
+          <!-- Stock filter -->
+          <div class="join">
+            <button
+              class="btn btn-sm join-item"
+              class:btn-primary={tableFilter === "all"}
+              class:btn-ghost={tableFilter !== "all"}
+              onclick={() => (tableFilter = "all")}
+            >
+              Todos
+            </button>
+            <button
+              class="btn btn-sm join-item"
+              class:btn-primary={tableFilter === "ok"}
+              class:btn-ghost={tableFilter !== "ok"}
+              onclick={() => (tableFilter = "ok")}
+            >
+              OK
+              {#if okCount > 0}
+                <span class="badge badge-sm badge-success ml-1">{okCount}</span>
+              {/if}
+            </button>
+            <button
+              class="btn btn-sm join-item"
+              class:btn-primary={tableFilter === "low-stock"}
+              class:btn-ghost={tableFilter !== "low-stock"}
+              onclick={() => (tableFilter = "low-stock")}
+            >
+              Stock bajo
+              {#if lowStockCount > 0}
+                <span class="badge badge-sm badge-warning ml-1"
+                  >{lowStockCount}</span
+                >
+              {/if}
+            </button>
+            <button
+              class="btn btn-sm join-item"
+              class:btn-primary={tableFilter === "out-of-stock"}
+              class:btn-ghost={tableFilter !== "out-of-stock"}
+              onclick={() => (tableFilter = "out-of-stock")}
+            >
+              Agotado
+              {#if outOfStockCount > 0}
+                <span class="badge badge-sm badge-error ml-1"
+                  >{outOfStockCount}</span
+                >
+              {/if}
+            </button>
           </div>
 
-          <div class="card bg-base-100 border border-base-300/50">
-            <div class="card-body">
-              <h4 class="text-sm font-semibold flex items-center gap-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-warning inline-block"
-                ></span>
-                Niveles de stock (más bajos)
-              </h4>
-              <div class="h-64 w-full md:h-72">
-                <Chart {init} options={stockLevelsBarOptions} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    {/if}
-  </div>
-
-  <!-- Card 2: Gestión de Stock -->
-  <div class="card bg-base-100 shadow border border-base-200">
-    <div class="card-body gap-4">
-      <!-- Toolbar (Personas pattern) -->
-      <div class="flex flex-wrap items-center gap-3">
-        <h2 class="card-title shrink-0 mr-1">Sabores y Unitarios</h2>
-
-        <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
-
-        <!-- Segmented filter -->
-        <div class="join">
           <button
-            class="btn btn-sm join-item"
-            class:btn-neutral={tableFilter === "all"}
-            class:btn-ghost={tableFilter !== "all"}
-            onclick={() => (tableFilter = "all")}
+            class="btn btn-sm btn-outline shrink-0 gap-2 sm:ml-auto"
+            onclick={openContainerTypes}
+            disabled={loading || busy}
           >
-            Todo
+            <Icon icon="lucide:container" class="h-4 w-4" />
+            Contenedores
           </button>
           <button
-            class="btn btn-sm join-item"
-            class:btn-neutral={tableFilter === "low-stock"}
-            class:btn-ghost={tableFilter !== "low-stock"}
-            onclick={() => (tableFilter = "low-stock")}
+            class="btn btn-sm btn-primary shrink-0 gap-2"
+            onclick={openEntry}
+            disabled={loading || busy}
           >
-            Stock Bajo
-            {#if lowStock.length > 0}
-              <span class="badge badge-sm badge-error ml-1"
-                >{lowStock.length}</span
-              >
-            {/if}
+            <Icon icon="lucide:plus" class="h-4 w-4" />
+            Nueva entrada
           </button>
         </div>
 
+        <!-- Type subtabs -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="join">
+            <button
+              class="btn btn-sm join-item"
+              class:btn-primary={tableTypeFilter === "all"}
+              class:btn-ghost={tableTypeFilter !== "all"}
+              onclick={() => (tableTypeFilter = "all")}
+            >
+              Todos ({allItems.length})
+            </button>
+            <button
+              class="btn btn-sm join-item"
+              class:btn-primary={tableTypeFilter === "flavor"}
+              class:btn-ghost={tableTypeFilter !== "flavor"}
+              onclick={() => (tableTypeFilter = "flavor")}
+            >
+              Sabores ({flavorItems.length})
+            </button>
+            <button
+              class="btn btn-sm join-item"
+              class:btn-primary={tableTypeFilter === "unit"}
+              class:btn-ghost={tableTypeFilter !== "unit"}
+              onclick={() => (tableTypeFilter = "unit")}
+            >
+              Unitarios ({unitItems.length})
+            </button>
+          </div>
+        </div>
+
+        <!-- Unified table -->
         <div
-          class="flex items-center gap-1.5 text-sm text-base-content/80 font-medium shrink-0"
+          class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
         >
-          <span
-            class="badge badge-info badge-sm font-semibold rounded-md text-white!"
-            >{allItems.length}</span
-          >
-          <span>items</span>
-        </div>
-
-        <button
-          class="btn btn-sm btn-primary shrink-0 ml-auto"
-          onclick={openEntry}
-          disabled={loading || busy}
-        >
-          <Icon icon="lucide:plus" width="16" height="16" />
-          Nueva entrada
-        </button>
-      </div>
-
-      <!-- Tables -->
-      {#if tableFilter === "all"}
-        <div class="animate-fadeIn space-y-4">
-          <!-- Sabores -->
-          <div>
-            <h3 class="text-sm font-semibold flex items-center gap-2 mb-2">
-              <span class="badge badge-info badge-sm">Sabores</span>
-              <span class="badge badge-ghost badge-sm"
-                >{flavorItems.length}</span
-              >
-            </h3>
-            <div
-              class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
-            >
-              <table class="table table-sm">
-                <thead class="bg-base-200/60 text-base-content">
-                  <tr>
-                    <th class="font-bold">Sabor</th>
-                    <th class="text-right font-bold">Stock Actual</th>
-                    <th class="text-right font-bold">Mínimo</th>
-                    <th class="font-bold">Estado</th>
-                    <th class="text-right font-bold">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each flavorItems as item (item.id)}
-                    {@const status = getStockStatus(item)}
-                    <tr class="hover:bg-base-200/50 transition-colors">
-                      <td>
-                        <div class="font-medium">{item.name}</div>
-                      </td>
-                      <td class="text-right font-mono">
-                        {(item.current_stock ?? 0).toLocaleString()}
-                        <span class="text-xs text-base-content/60">bolas</span>
-                      </td>
-                      <td class="text-right text-xs text-base-content/60">
-                        {item.low_stock_threshold ?? 0}
-                      </td>
-                      <td>
-                        <span class="badge badge-sm {status.class}"
-                          >{status.label}</span
-                        >
-                      </td>
-                      <td class="text-right">
-                        <div class="flex justify-end gap-1">
-                          <button
-                            class="btn btn-xs btn-soft btn-accent"
-                            title="Ajuste"
-                            onclick={() => openAdjustment(item)}
-                          >
-                            <Icon
-                              icon="lucide:sliders-horizontal"
-                              width="14"
-                              height="14"
-                            />
-                          </button>
-                          <button
-                            class="btn btn-xs btn-soft btn-ghost"
-                            title="Movimientos"
-                            onclick={() => loadMovements(item)}
-                          >
-                            <Icon icon="lucide:clock" width="14" height="14" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  {:else}
-                    <tr>
-                      <td
-                        colspan="5"
-                        class="text-center py-8 text-base-content/50"
+          <table class="table table-sm w-full table-fixed">
+            <thead class="bg-base-200/60 text-base-content">
+              <tr>
+                <th class="font-bold w-[34%] sm:w-[38%] lg:w-[40%]">Nombre</th>
+                <th class="font-bold w-[14%] sm:w-[12%] lg:w-[10%]">Tipo</th>
+                <th class="text-right font-bold w-[20%] sm:w-[18%] lg:w-[16%]">
+                  Stock actual
+                </th>
+                <th class="text-right font-bold w-[12%] sm:w-[10%]">Mínimo</th>
+                <th class="font-bold w-[14%] sm:w-[12%]">Estado</th>
+                <th class="text-right font-bold w-[16%] sm:w-[14%] lg:w-[12%]">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {#if filteredItems().length === 0}
+                <tr>
+                  <td colspan="6" class="text-center py-6 text-base-content/50">
+                    {#if loading}
+                      <span class="loading loading-spinner loading-sm"></span>
+                      Cargando inventario...
+                    {:else}
+                      No se encontraron items con los filtros seleccionados
+                    {/if}
+                  </td>
+                </tr>
+              {:else}
+                {#each visibleItems as item (item.id)}
+                  {@const status = getStockStatus(item)}
+                  {@const isFlavor = item.type === "ball_based"}
+                  <tr
+                    class="hover:bg-base-300/40 transition-colors {status.label ===
+                    'Agotado'
+                      ? 'bg-error/5'
+                      : ''}"
+                  >
+                    <td class="truncate">
+                      <div class="font-medium truncate">{item.name}</div>
+                    </td>
+                    <td class="whitespace-nowrap">
+                      <span
+                        class="badge badge-sm {isFlavor
+                          ? 'badge-info'
+                          : 'badge-secondary'}"
                       >
-                        {#if loading}
-                          <span class="loading loading-spinner loading-sm"
-                          ></span>
-                          Cargando inventario...
-                        {:else}
-                          No hay sabores en el inventario
-                        {/if}
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Unitarios -->
-          <div>
-            <h3 class="text-sm font-semibold flex items-center gap-2 mb-2">
-              <span class="badge badge-secondary badge-sm">Unitarios</span>
-              <span class="badge badge-ghost badge-sm">{unitItems.length}</span>
-            </h3>
-            <div
-              class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
-            >
-              <table class="table table-sm">
-                <thead class="bg-base-200/60 text-base-content">
-                  <tr>
-                    <th class="font-bold">Producto</th>
-                    <th class="text-right font-bold">Stock Actual</th>
-                    <th class="text-right font-bold">Mínimo</th>
-                    <th class="font-bold">Estado</th>
-                    <th class="text-right font-bold">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each unitItems as item (item.id)}
-                    {@const status = getStockStatus(item)}
-                    <tr class="hover:bg-base-200/50 transition-colors">
-                      <td>
-                        <div class="font-medium">{item.name}</div>
-                      </td>
-                      <td class="text-right font-mono">
-                        {(item.current_stock ?? 0).toLocaleString()}
-                        <span class="text-xs text-base-content/60"
-                          >unidades</span
-                        >
-                      </td>
-                      <td class="text-right text-xs text-base-content/60">
-                        {item.low_stock_threshold ?? 0}
-                      </td>
-                      <td>
-                        <span class="badge badge-sm {status.class}"
-                          >{status.label}</span
-                        >
-                      </td>
-                      <td class="text-right">
-                        <div class="flex justify-end gap-1">
-                          <button
-                            class="btn btn-xs btn-soft btn-accent"
-                            title="Ajuste"
-                            onclick={() => openAdjustment(item)}
-                          >
-                            <Icon
-                              icon="lucide:sliders-horizontal"
-                              width="14"
-                              height="14"
-                            />
-                          </button>
-                          <button
-                            class="btn btn-xs btn-soft btn-ghost"
-                            title="Movimientos"
-                            onclick={() => loadMovements(item)}
-                          >
-                            <Icon icon="lucide:clock" width="14" height="14" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  {:else}
-                    <tr>
-                      <td
-                        colspan="5"
-                        class="text-center py-8 text-base-content/50"
+                        {isFlavor ? "Sabor" : "Unitario"}
+                      </span>
+                    </td>
+                    <td
+                      class="text-right font-mono whitespace-nowrap px-1 sm:px-2"
+                    >
+                      {(item.current_stock ?? 0).toLocaleString()}
+                      <span class="text-xs text-base-content/60"
+                        >{isFlavor ? "bolas" : "uds"}</span
                       >
-                        {#if loading}
-                          <span class="loading loading-spinner loading-sm"
-                          ></span>
-                          Cargando inventario...
-                        {:else}
-                          No hay productos unitarios en el inventario
-                        {/if}
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      {/if}
-
-      {#if tableFilter === "low-stock"}
-        <div class="animate-fadeIn">
-          {#if lowStock.length > 0}
-            <div
-              class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
-            >
-              <table class="table table-sm">
-                <thead class="bg-base-200/60 text-base-content">
-                  <tr>
-                    <th class="font-bold">Item</th>
-                    <th class="text-right font-bold">Stock Actual</th>
-                    <th class="text-right font-bold">Mínimo</th>
-                    <th class="text-right font-bold">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each lowStock as item (item.id)}
-                    <tr class="hover:bg-base-200/50 transition-colors">
-                      <td>
-                        <div class="font-medium">{item.name}</div>
-                        <span
-                          class="badge badge-sm {item.type === 'ball_based'
-                            ? 'badge-info'
-                            : 'badge-secondary'}"
-                        >
-                          {item.type === "ball_based" ? "Sabor" : "Unitario"}
-                        </span>
-                      </td>
-                      <td class="text-right font-mono text-error font-bold">
-                        {(item.current_stock ?? 0).toLocaleString()}
-                      </td>
-                      <td class="text-right font-mono">
-                        {item.low_stock_threshold ?? 0}
-                      </td>
-                      <td class="text-right">
+                    </td>
+                    <td
+                      class="text-right text-xs text-base-content/60 whitespace-nowrap px-1 sm:px-2"
+                    >
+                      {item.low_stock_threshold ?? 0}
+                    </td>
+                    <td class="whitespace-nowrap">
+                      <span class="badge badge-sm {status.class}"
+                        >{status.label}</span
+                      >
+                    </td>
+                    <td class="text-right whitespace-nowrap">
+                      <div
+                        class="flex flex-wrap md:flex-nowrap items-center justify-end gap-1"
+                        role="group"
+                        aria-label="Acciones de item"
+                      >
                         <button
-                          class="btn btn-xs btn-soft btn-primary"
+                          class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-accent"
+                          type="button"
                           onclick={() => openAdjustment(item)}
+                          disabled={loading || busy}
+                          aria-label="Ajustar stock"
+                          title="Ajustar"
                         >
-                          Ajustar
+                          <Icon
+                            icon="lucide:sliders-horizontal"
+                            class="h-4 w-4"
+                          />
                         </button>
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
-          {:else}
-            <div class="text-center py-6 text-base-content/50">
-              <Icon
-                icon="lucide:check-circle-2"
-                width="48"
-                height="48"
-                class="mx-auto mb-2 text-success"
-              />
-              <p>Todos los items tienen stock suficiente</p>
-            </div>
-          {/if}
+                        <button
+                          class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-info"
+                          type="button"
+                          onclick={() => loadMovements(item)}
+                          disabled={loading || busy}
+                          aria-label="Ver movimientos"
+                          title="Movimientos"
+                        >
+                          <Icon icon="lucide:clock" class="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                {/each}
+              {/if}
+            </tbody>
+          </table>
         </div>
-      {/if}
+
+        <!-- Footer -->
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
+        >
+          <span class="text-sm text-base-content/60">
+            Mostrando {visibleItems.length} de {filteredItems().length}
+          </span>
+
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-base-content/60">Filas</span>
+            <div class="dropdown w-full sm:w-auto dropdown-top dropdown-end">
+              <div
+                tabindex="0"
+                role="button"
+                class="btn btn-sm btn-outline w-full sm:w-24 justify-between"
+              >
+                {rowLimitLabel}
+                <Icon icon="lucide:chevron-down" class="h-4 w-4 opacity-50" />
+              </div>
+              <ul
+                tabindex="-1"
+                class="dropdown-content menu bg-base-100 rounded-box z-100 w-full sm:w-32 p-2 mb-1 shadow-xl border border-base-300"
+              >
+                {#each rowLimitOptions as option}
+                  <li>
+                    <button type="button" onclick={() => setRowLimit(option)}
+                      >{option}</button
+                    >
+                  </li>
+                {/each}
+                <li>
+                  <button type="button" onclick={() => setRowLimit(0)}
+                    >Todos</button
+                  >
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- Dialogs -->
+<GlobalFlavorsManager
+  open={showGlobalFlavors}
+  {flavors}
+  busy={flavorBusy}
+  error={flavorError}
+  onClose={closeGlobalFlavors}
+  onCreate={onCreateFlavor}
+  onUpdate={onUpdateFlavor}
+  onDelete={onDeleteFlavor}
+/>
+
+<GlobalAddonsManager
+  open={showGlobalAddons}
+  {addons}
+  busy={addonBusy}
+  error={addonError}
+  onClose={closeGlobalAddons}
+  onCreate={onCreateAddon}
+  onUpdate={onUpdateAddon}
+  onDelete={onDeleteAddon}
+/>
+
 <InventoryEntryDialog
   open={showEntryDialog}
   {containerTypes}
@@ -906,19 +1022,3 @@
   {movements}
   onClose={() => (showMovements = false)}
 />
-
-<style>
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  .animate-fadeIn {
-    animation: fadeIn 0.18s ease-out;
-  }
-</style>

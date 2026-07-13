@@ -1,6 +1,13 @@
 <script lang="ts">
   import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
   import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
+  import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import {
+    closeConfirmDialog,
+    confirmDialogNow,
+    createConfirmDialogState,
+    openConfirmDialog,
+  } from "@shared/utils/confirm-dialog";
   import type { ContainerType } from "@features/admin-management/lib/bff";
 
   interface Props {
@@ -36,6 +43,8 @@
 
   let dialogRef = $state<HTMLDialogElement | null>(null);
   let editingId = $state<string | null>(null);
+  let confirmDialog = $state(createConfirmDialogState());
+  let pendingDeleteId = $state<string | null>(null);
   let form = $state({
     name: "",
     balls_per_container: 80,
@@ -90,9 +99,20 @@
     resetForm();
   }
 
+  function confirmDelete() {
+    if (!pendingDeleteId) return;
+    onDelete(pendingDeleteId);
+    pendingDeleteId = null;
+  }
+
   function handleDelete(id: string) {
-    if (!confirm("¿Eliminar este tipo de recipiente?")) return;
-    onDelete(id);
+    pendingDeleteId = id;
+    openConfirmDialog(
+      confirmDialog,
+      "Eliminar tipo de recipiente",
+      "¿Eliminar este tipo de recipiente?",
+      confirmDelete,
+    );
   }
 </script>
 
@@ -202,3 +222,13 @@
     {/if}
   </div>
 </AdminModalShell>
+
+<ConfirmDialog
+  open={confirmDialog.open}
+  title={confirmDialog.title}
+  message={confirmDialog.message}
+  busy={loading}
+  variant="error"
+  onConfirm={() => confirmDialogNow(confirmDialog)}
+  onCancel={() => closeConfirmDialog(confirmDialog)}
+/>

@@ -9,88 +9,89 @@ import "../styles/about.css";
     {/* ══════════════════════════════════════════ */}
     {/* ── HERO SECTION ── */}
     {/* ══════════════════════════════════════════ */}
-    <section class="relative overflow-hidden px-4 pt-8 pb-16 md:pt-12 md:pb-20">
+    <section class="relative overflow-hidden px-4 pt-8 pb-12 md:pt-12 md:pb-16">
       {/* Background blobs */}
       <div class="pointer-events-none absolute inset-0 overflow-hidden">
         <div
-          class="hero-blob-teal absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl"
+          class="hero-blob-teal absolute -top-24 -left-24 w-80 h-80 md:w-96 md:h-96 rounded-full blur-3xl"
           style="background: var(--ishos-teal);"
         >
         </div>
         <div
-          class="hero-blob-pink absolute -bottom-16 -right-16 w-80 h-80 rounded-full blur-3xl"
+          class="hero-blob-pink absolute -bottom-16 -right-16 w-64 h-64 md:w-80 md:h-80 rounded-full blur-3xl"
           style="background: var(--ishos-pink);"
         >
         </div>
-        <div class="stripe-bg absolute inset-0 opacity-40"></div>
+        <div class="stripe-bg absolute inset-0 opacity-30"></div>
       </div>
 
       <div class="relative max-w-3xl mx-auto text-center fade-up fade-up-1">
         {/* Pre-title pill */}
-        <div
-          class="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest mb-5 border"
-          style="background: var(--about-pill-teal-bg); border-color: color-mix(in srgb, var(--ishos-teal) 30%, transparent); color: var(--ishos-teal);"
-        >
+        <div class="section-pill mb-4">
           <span
-            class="w-1.5 h-1.5 rounded-full inline-block"
+            class="w-1.5 h-1.5 rounded-full inline-block mr-2 align-middle"
             style="background: var(--ishos-teal);"></span>
           Desde 2021
         </div>
 
         <h1
-          class="text-5xl md:text-6xl font-extrabold tracking-tight mb-3 leading-tight"
+          class="text-4xl md:text-5xl font-extrabold tracking-tight mb-2 leading-tight"
         >
           <span style="color: var(--ishos-teal);">Isho's</span>
           <span class="text-base-content"> Factory</span>
         </h1>
         <p
-          class="text-base-content/60 text-sm font-bold uppercase tracking-[0.25em] mb-10"
+          class="text-base-content/60 text-xs md:text-sm font-bold uppercase tracking-[0.2em] mb-8"
         >
           Gelatos &amp; Sorbetes Artesanales
         </p>
 
-        {/* Hero card with animated gradient border */}
-        <div class="hero-card-border shadow-2xl fade-up fade-up-2">
+        {/* Hero card */}
+        <div class="hero-card-border shadow-xl fade-up fade-up-2">
           <div
-            class="bg-base-100 rounded-3xl p-7 md:p-10 relative overflow-hidden"
+            class="bg-base-100 rounded-2xl md:rounded-3xl p-6 md:p-10 relative overflow-hidden text-left md:text-center"
           >
             {/* Inner accent bar */}
             <div
-              class="absolute top-0 left-0 right-0 h-1 rounded-t-3xl"
+              class="absolute top-0 left-0 right-0 h-1 rounded-t-2xl md:rounded-t-3xl"
               style="background: linear-gradient(90deg, var(--ishos-teal), var(--ishos-pink), var(--ishos-yellow));"
             >
             </div>
 
             <p
-              class="text-lg md:text-xl text-base-content/80 leading-relaxed font-medium mb-8"
+              class="text-base md:text-lg text-base-content/80 leading-relaxed font-medium mb-6 md:mb-8"
             >
               Isho's Factory ha sido sinónimo de
               <strong style="color: var(--ishos-teal);">tradición</strong> y
               <strong style="color: var(--ishos-maroon);">calidad</strong>
               en El Salvador. Nuestros helados artesanales son preparados con los
               mejores ingredientes y mucho amor. Cada bola de helado cuenta una historia
-              de sabor auténtico y dedicación. Visítanos y descubre por qué generaciones
-              de salvadoreños nos eligen.
+              de sabor auténtico y dedicación.
             </p>
 
-            <div class="flex flex-wrap gap-3 justify-center">
+            <div
+              class="flex flex-wrap gap-2 md:gap-3 justify-start md:justify-center"
+            >
               <span
-                class="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold border-2"
-                style="border-color: var(--ishos-teal); color: var(--ishos-teal);"
+                class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs md:text-sm font-semibold border"
+                style="border-color: color-mix(in srgb, var(--ishos-teal) 40%, transparent); color: var(--ishos-teal);"
               >
-                ✨ Artesanal
+                <Icon icon="lucide:sparkles" class="w-3.5 h-3.5" />
+                Artesanal
               </span>
               <span
-                class="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold border-2"
-                style="border-color: var(--ishos-maroon); color: var(--ishos-maroon);"
+                class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs md:text-sm font-semibold border"
+                style="border-color: color-mix(in srgb, var(--ishos-maroon) 40%, transparent); color: var(--ishos-maroon);"
               >
-                🍃 Ingredientes Naturales
+                <Icon icon="lucide:leaf" class="w-3.5 h-3.5" />
+                Ingredientes Naturales
               </span>
               <span
-                class="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold border-2 text-base-content/70"
-                style="border-color: color-mix(in srgb, var(--ishos-yellow) 80%, #aaa);"
+                class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs md:text-sm font-semibold border text-base-content/70"
+                style="border-color: color-mix(in srgb, var(--ishos-yellow) 60%, #aaa);"
               >
-                🇸🇻 Hecho en El Salvador
+                <Icon icon="lucide:map-pin" class="w-3.5 h-3.5" />
+                Hecho en El Salvador
               </span>
             </div>
           </div>
@@ -104,7 +105,7 @@ import "../styles/about.css";
         viewBox="0 0 1440 60"
         xmlns="http://www.w3.org/2000/svg"
         preserveAspectRatio="none"
-        style="height:40px; width:100%;"
+        style="height:24px; width:100%;"
       >
         <path
           d="M0,30 C240,60 480,0 720,30 C960,60 1200,0 1440,30 L1440,60 L0,60 Z"
@@ -115,42 +116,43 @@ import "../styles/about.css";
     {/* ══════════════════════════════════════════ */}
     {/* ── VALUES SECTION ── */}
     {/* ══════════════════════════════════════════ */}
-    <section class="px-4 py-14 md:py-18">
+    <section class="px-4 py-10 md:py-16">
       <div class="max-w-4xl mx-auto">
-        <div class="text-center mb-10 fade-up fade-up-2">
-          <div
-            class="inline-block rounded-2xl px-4 py-1 text-xs font-bold uppercase tracking-widest mb-3"
-            style="background: var(--about-pill-maroon-bg); color: var(--ishos-maroon);"
-          >
+        <div class="text-center mb-8 md:mb-10 fade-up fade-up-2">
+          <div class="section-pill section-pill--maroon mb-3">
             Nuestra Esencia
           </div>
-          <h2 class="text-3xl md:text-4xl font-extrabold text-base-content">
+          <h2 class="text-2xl md:text-4xl font-extrabold text-base-content">
             Lo que nos <span style="color: var(--ishos-teal);">define</span>
           </h2>
-          <p class="text-base-content/60 mt-2 font-medium">
+          <p class="text-base-content/60 mt-2 text-sm md:text-base font-medium">
             Los pilares de nuestra marca
           </p>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 fade-up fade-up-3">
+        <div
+          class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 fade-up fade-up-3"
+        >
           {/* Calidad */}
           <div
             class="value-card bg-base-100 border border-base-200 rounded-2xl text-center transition-all duration-300 overflow-hidden group"
           >
-            <div class="h-1.5 w-full" style="background: var(--ishos-teal);">
+            <div class="h-1 w-full" style="background: var(--ishos-teal);">
             </div>
-            <div class="p-8">
+            <div class="p-6 md:p-8">
               <div
-                class="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
                 style="background: var(--about-icon-teal-bg);"
               >
                 <Icon
                   icon="lucide:shield-check"
-                  class="w-7 h-7"
+                  class="w-6 h-6 md:w-7 md:h-7"
                   style="color: var(--ishos-teal);"
                 />
               </div>
-              <h3 class="text-xl font-extrabold mb-2 text-base-content">
+              <h3
+                class="text-lg md:text-xl font-extrabold mb-2 text-base-content"
+              >
                 Calidad
               </h3>
               <p class="text-base-content/70 text-sm leading-relaxed">
@@ -159,34 +161,29 @@ import "../styles/about.css";
             </div>
           </div>
 
-          {/* Tradición — featured / center */}
+          {/* Tradición */}
           <div
-            class="value-card rounded-2xl text-center transition-all duration-300 overflow-hidden group relative shadow-lg"
-            style="background: linear-gradient(145deg, var(--ishos-maroon), color-mix(in srgb, var(--ishos-maroon) 80%, black));"
+            class="value-card bg-base-100 border border-base-200 rounded-2xl text-center transition-all duration-300 overflow-hidden group"
           >
-            <div class="h-1.5 w-full" style="background: var(--ishos-pink);">
+            <div class="h-1 w-full" style="background: var(--ishos-pink);">
             </div>
-            <div class="p-8">
+            <div class="p-6 md:p-8">
               <div
-                class="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
                 style="background: var(--about-icon-pink-bg);"
               >
                 <Icon
                   icon="lucide:clock"
-                  class="w-7 h-7"
-                  style="color: var(--ishos-pink);"
+                  class="w-6 h-6 md:w-7 md:h-7"
+                  style="color: var(--ishos-maroon);"
                 />
               </div>
               <h3
-                class="text-xl font-extrabold mb-2"
-                style="color: var(--ishos-yellow);"
+                class="text-lg md:text-xl font-extrabold mb-2 text-base-content"
               >
                 Tradición
               </h3>
-              <p
-                class="text-sm leading-relaxed"
-                style="color: color-mix(in srgb, white 70%, var(--ishos-pink));"
-              >
+              <p class="text-base-content/70 text-sm leading-relaxed">
                 Más de 4 años llevando sabores auténticos a cada familia.
               </p>
             </div>
@@ -196,20 +193,22 @@ import "../styles/about.css";
           <div
             class="value-card bg-base-100 border border-base-200 rounded-2xl text-center transition-all duration-300 overflow-hidden group"
           >
-            <div class="h-1.5 w-full" style="background: var(--ishos-pink);">
+            <div class="h-1 w-full" style="background: var(--ishos-maroon);">
             </div>
-            <div class="p-8">
+            <div class="p-6 md:p-8">
               <div
-                class="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
                 style="background: var(--about-icon-pink-bg);"
               >
                 <Icon
                   icon="lucide:heart"
-                  class="w-7 h-7"
+                  class="w-6 h-6 md:w-7 md:h-7"
                   style="color: var(--ishos-maroon);"
                 />
               </div>
-              <h3 class="text-xl font-extrabold mb-2 text-base-content">
+              <h3
+                class="text-lg md:text-xl font-extrabold mb-2 text-base-content"
+              >
                 Pasión
               </h3>
               <p class="text-base-content/70 text-sm leading-relaxed">
@@ -224,7 +223,7 @@ import "../styles/about.css";
     {/* ══════════════════════════════════════════ */}
     {/* ── CONTACT SECTION ── */}
     {/* ══════════════════════════════════════════ */}
-    <section class="px-4 py-14 md:py-18 relative overflow-hidden">
+    <section id="contacto" class="px-4 py-10 md:py-16 relative overflow-hidden">
       {/* Subtle teal wash background */}
       <div
         class="absolute inset-0 pointer-events-none"
@@ -233,37 +232,36 @@ import "../styles/about.css";
       </div>
 
       <div class="max-w-5xl mx-auto relative">
-        <div class="text-center mb-10 fade-up fade-up-3">
-          <div
-            class="inline-block rounded-2xl px-4 py-1 text-xs font-bold uppercase tracking-widest mb-3"
-            style="background: var(--about-pill-teal-bg); color: var(--ishos-teal);"
-          >
-            Contáctanos
-          </div>
-          <h2 class="text-3xl md:text-4xl font-extrabold text-base-content">
-            📍 Estamos <span style="color: var(--ishos-teal);">aquí</span> para ti
+        <div class="text-center mb-8 md:mb-10 fade-up fade-up-3">
+          <div class="section-pill mb-3">Contáctanos</div>
+          <h2 class="text-2xl md:text-4xl font-extrabold text-base-content">
+            Estamos <span style="color: var(--ishos-teal);">aquí</span> para ti
           </h2>
-          <p class="text-base-content/60 mt-2 font-medium">
+          <p class="text-base-content/60 mt-2 text-sm md:text-base font-medium">
             Encuéntranos o comunícate con nosotros.
           </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 fade-up fade-up-4">
+        <div
+          class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 fade-up fade-up-4"
+        >
           {/* Location */}
           <div
-            class="bg-base-100 border border-base-200 rounded-2xl p-7 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            class="bg-base-100 border border-base-200 rounded-2xl p-6 md:p-7 text-center hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
           >
             <div
-              class="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
               style="background: var(--about-icon-teal-bg);"
             >
               <Icon
                 icon="lucide:map-pin"
-                class="w-7 h-7"
+                class="w-6 h-6 md:w-7 md:h-7"
                 style="color: var(--ishos-teal);"
               />
             </div>
-            <h3 class="text-lg font-extrabold mb-2 text-base-content">
+            <h3
+              class="text-base md:text-lg font-extrabold mb-2 text-base-content"
+            >
               Visítanos
             </h3>
             <p class="text-base-content/60 text-sm leading-relaxed">
@@ -273,21 +271,28 @@ import "../styles/about.css";
 
           {/* Phone / WhatsApp */}
           <div
-            class="rounded-2xl p-7 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300 shadow-md"
-            style="background: linear-gradient(145deg, var(--ishos-teal), color-mix(in srgb, var(--ishos-teal) 75%, var(--ishos-mint)));"
+            class="bg-base-100 border border-base-200 rounded-2xl p-6 md:p-7 text-center hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
           >
             <div
-              class="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-white/20"
+              class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              style="background: var(--about-icon-teal-bg);"
             >
-              <Icon icon="lucide:phone" class="w-7 h-7 text-white" />
+              <Icon
+                icon="lucide:phone"
+                class="w-6 h-6 md:w-7 md:h-7"
+                style="color: var(--ishos-teal);"
+              />
             </div>
-            <h3 class="text-lg font-extrabold mb-4 text-white phone-card-text">
+            <h3
+              class="text-base md:text-lg font-extrabold mb-4 text-base-content"
+            >
               Llámanos
             </h3>
-            <div class="flex flex-col gap-3">
+            <div class="flex flex-col gap-2.5">
               <a
                 href="tel:+50376454347"
-                class="flex items-center justify-center gap-2 rounded-full py-2.5 px-5 text-sm font-bold bg-white/20 hover:bg-white/30 text-white transition-colors phone-card-text"
+                class="flex items-center justify-center gap-2 rounded-full py-2 px-4 text-sm font-bold transition-colors"
+                style="background: color-mix(in srgb, var(--ishos-teal) 10%, transparent); color: var(--ishos-teal);"
               >
                 <Icon icon="lucide:phone-call" class="w-4 h-4" /> Llamar
               </a>
@@ -295,7 +300,7 @@ import "../styles/about.css";
                 href="https://wa.me/50376454347"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="flex items-center justify-center gap-2 rounded-full py-2.5 px-5 text-sm font-bold transition-opacity hover:opacity-90 phone-card-text"
+                class="flex items-center justify-center gap-2 rounded-full py-2 px-4 text-sm font-bold transition-opacity hover:opacity-90"
                 style="background: var(--ishos-maroon); color: white;"
               >
                 <Icon icon="mdi:whatsapp" class="w-4 h-4" /> WhatsApp
@@ -305,31 +310,33 @@ import "../styles/about.css";
 
           {/* Schedule */}
           <div
-            class="bg-base-100 border border-base-200 rounded-2xl p-7 text-center hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            class="bg-base-100 border border-base-200 rounded-2xl p-6 md:p-7 text-center hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
           >
             <div
-              class="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
               style="background: var(--about-icon-pink-bg);"
             >
               <Icon
                 icon="lucide:clock"
-                class="w-7 h-7"
+                class="w-6 h-6 md:w-7 md:h-7"
                 style="color: var(--ishos-maroon);"
               />
             </div>
-            <h3 class="text-lg font-extrabold mb-4 text-base-content">
+            <h3
+              class="text-base md:text-lg font-extrabold mb-4 text-base-content"
+            >
               Horario
             </h3>
             <div class="space-y-2">
               <div
-                class="flex justify-between items-center text-sm rounded-xl px-4 py-2.5"
+                class="flex justify-between items-center text-sm rounded-xl px-4 py-2"
                 style="background: var(--about-schedule-bg);"
               >
                 <span class="font-bold text-base-content/80">Lun – Vie</span>
                 <span class="text-base-content/65">10:30 AM – 6:30 PM</span>
               </div>
               <div
-                class="flex justify-between items-center text-sm rounded-xl px-4 py-2.5"
+                class="flex justify-between items-center text-sm rounded-xl px-4 py-2"
                 style="background: var(--about-schedule-bg);"
               >
                 <span class="font-bold text-base-content/80">Domingo</span>
@@ -340,19 +347,19 @@ import "../styles/about.css";
         </div>
 
         {/* ── Social Media ── */}
-        <div class="mt-10 fade-up fade-up-5">
+        <div class="mt-8 md:mt-10 fade-up fade-up-5">
           <p
-            class="text-center text-xs font-bold uppercase tracking-[0.2em] text-base-content/60 mb-5"
+            class="text-center text-xs font-bold uppercase tracking-[0.2em] text-base-content/60 mb-4"
           >
             Síguenos en Redes Sociales
           </p>
-          <div class="flex flex-wrap justify-center gap-4">
+          <div class="flex flex-wrap justify-center gap-3">
             {/* Instagram */}
             <a
               href="https://www.instagram.com/ishos_factory/?hl=en"
               target="_blank"
               rel="noopener noreferrer"
-              class="social-pill flex items-center gap-2.5 bg-base-100 border border-base-200 rounded-full px-6 py-3 text-sm font-semibold transition-all duration-300"
+              class="social-pill flex items-center gap-2 bg-base-100 border border-base-200 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300"
               aria-label="Instagram"
             >
               <svg
@@ -401,7 +408,7 @@ import "../styles/about.css";
               href="https://www.facebook.com/ishosfactory/"
               target="_blank"
               rel="noopener noreferrer"
-              class="social-pill flex items-center gap-2.5 bg-base-100 border border-base-200 rounded-full px-6 py-3 text-sm font-semibold transition-all duration-300"
+              class="social-pill flex items-center gap-2 bg-base-100 border border-base-200 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300"
               aria-label="Facebook"
             >
               <svg
@@ -422,7 +429,7 @@ import "../styles/about.css";
               href="https://www.tiktok.com/@ishosfactory"
               target="_blank"
               rel="noopener noreferrer"
-              class="social-pill flex items-center gap-2.5 bg-base-100 border border-base-200 rounded-full px-6 py-3 text-sm font-semibold transition-all duration-300"
+              class="social-pill flex items-center gap-2 bg-base-100 border border-base-200 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300"
               aria-label="TikTok"
             >
               <svg
@@ -444,33 +451,32 @@ import "../styles/about.css";
     {/* ══════════════════════════════════════════ */}
     {/* ── LOCATIONS / MAPS ── */}
     {/* ══════════════════════════════════════════ */}
-    <section class="px-4 py-14 md:py-18 pb-10">
+    <section class="px-4 py-10 md:py-16 pb-8 md:pb-12">
       <div class="max-w-5xl mx-auto">
-        <div class="text-center mb-10 fade-up fade-up-4">
-          <div
-            class="inline-block rounded-2xl px-4 py-1 text-xs font-bold uppercase tracking-widest mb-3"
-            style="background: var(--about-pill-maroon-bg); color: var(--ishos-maroon);"
-          >
-            Sucursales
-          </div>
-          <h2 class="text-3xl md:text-4xl font-extrabold text-base-content">
+        <div class="text-center mb-8 md:mb-10 fade-up fade-up-4">
+          <div class="section-pill section-pill--maroon mb-3">Sucursales</div>
+          <h2 class="text-2xl md:text-4xl font-extrabold text-base-content">
             Nuestras <span style="color: var(--ishos-teal);">Sucursales</span>
           </h2>
-          <p class="text-base-content/60 mt-2 font-medium">
+          <p class="text-base-content/60 mt-2 text-sm md:text-base font-medium">
             Encuéntranos en Ahuachapán, El Salvador.
           </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 fade-up fade-up-5">
+        <div
+          class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 fade-up fade-up-5"
+        >
           {/* Sucursal 1 */}
           <div
-            class="bg-base-100 border border-base-200 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 group"
+            class="bg-base-100 border border-base-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 group"
           >
             {/* Card header accent */}
-            <div class="px-5 pt-5 pb-3 flex items-center justify-between">
+            <div
+              class="px-4 pt-4 pb-3 flex items-start md:items-center justify-between gap-3"
+            >
               <div>
                 <h3
-                  class="text-base font-extrabold flex items-center gap-2 text-base-content"
+                  class="text-sm md:text-base font-extrabold flex items-center gap-2 text-base-content"
                 >
                   <span style="color: var(--ishos-teal);">
                     <Icon icon="lucide:map-pin" class="w-4 h-4 inline" />
@@ -485,13 +491,13 @@ import "../styles/about.css";
                 href="https://maps.google.com/?q=Isho%27s+Sucursal+1,+Ahuachap%C3%A1n,+El+Salvador"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-full border transition-colors hover:text-white hover:bg-[var(--ishos-teal)]"
+                class="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-full border transition-colors shrink-0"
                 style="border-color: var(--ishos-teal); color: var(--ishos-teal);"
               >
-                <Icon icon="lucide:external-link" class="w-3 h-3" /> Abrir en Maps
+                <Icon icon="lucide:external-link" class="w-3 h-3" /> Maps
               </a>
             </div>
-            <div class="mx-5 rounded-xl overflow-hidden" style="height: 220px;">
+            <div class="mx-4 rounded-xl overflow-hidden" style="height: 200px;">
               <iframe
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d6847.623198808501!2d-89.8518696249066!3d13.92355228648646!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8f6297001f790639%3A0xa292396c664dfae0!2sIsho%E2%80%99s%20Sucursal%201!5e1!3m2!1ses!2ssv!4v1777132497595!5m2!1ses!2ssv"
                 width="100%"
@@ -502,7 +508,7 @@ import "../styles/about.css";
                 referrerpolicy="no-referrer-when-downgrade"
                 title="Mapa de Isho's Sucursal 1"></iframe>
             </div>
-            <div class="p-5 pt-3">
+            <div class="p-4 pt-3">
               <a
                 href="https://maps.google.com/?q=Isho%27s+Sucursal+1,+Ahuachap%C3%A1n,+El+Salvador"
                 target="_blank"
@@ -510,19 +516,21 @@ import "../styles/about.css";
                 class="flex items-center justify-center gap-2 w-full rounded-xl py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
                 style="background: var(--ishos-teal);"
               >
-                <Icon icon="lucide:navigation" class="w-4 h-4" /> Obtener Direcciones
+                <Icon icon="lucide:navigation" class="w-4 h-4" /> Direcciones
               </a>
             </div>
           </div>
 
           {/* Sucursal 2 */}
           <div
-            class="bg-base-100 border border-base-200 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 group"
+            class="bg-base-100 border border-base-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 group"
           >
-            <div class="px-5 pt-5 pb-3 flex items-center justify-between">
+            <div
+              class="px-4 pt-4 pb-3 flex items-start md:items-center justify-between gap-3"
+            >
               <div>
                 <h3
-                  class="text-base font-extrabold flex items-center gap-2 text-base-content"
+                  class="text-sm md:text-base font-extrabold flex items-center gap-2 text-base-content"
                 >
                   <span style="color: var(--ishos-teal);">
                     <Icon icon="lucide:map-pin" class="w-4 h-4 inline" />
@@ -537,13 +545,13 @@ import "../styles/about.css";
                 href="https://maps.app.goo.gl/bSYLeqagKbSW3wUh8"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-full border transition-colors hover:text-white hover:bg-[var(--ishos-teal)]"
+                class="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-full border transition-colors shrink-0"
                 style="border-color: var(--ishos-teal); color: var(--ishos-teal);"
               >
-                <Icon icon="lucide:external-link" class="w-3 h-3" /> Abrir en Maps
+                <Icon icon="lucide:external-link" class="w-3 h-3" /> Maps
               </a>
             </div>
-            <div class="mx-5 rounded-xl overflow-hidden" style="height: 220px;">
+            <div class="mx-4 rounded-xl overflow-hidden" style="height: 200px;">
               <iframe
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d6847.705736039818!2d-89.8483311!3d13.920766299999997!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8f6297004861f67d%3A0xfed9bfb450de212f!2sIsho%E2%80%99s%20sucursal%202!5e1!3m2!1ses!2ssv!4v1777132555390!5m2!1ses!2ssv"
                 width="100%"
@@ -554,7 +562,7 @@ import "../styles/about.css";
                 referrerpolicy="no-referrer-when-downgrade"
                 title="Mapa de Isho's Sucursal 2"></iframe>
             </div>
-            <div class="p-5 pt-3">
+            <div class="p-4 pt-3">
               <a
                 href="https://maps.app.goo.gl/bSYLeqagKbSW3wUh8"
                 target="_blank"
@@ -562,7 +570,7 @@ import "../styles/about.css";
                 class="flex items-center justify-center gap-2 w-full rounded-xl py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
                 style="background: var(--ishos-teal);"
               >
-                <Icon icon="lucide:navigation" class="w-4 h-4" /> Obtener Direcciones
+                <Icon icon="lucide:navigation" class="w-4 h-4" /> Direcciones
               </a>
             </div>
           </div>

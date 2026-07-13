@@ -16,6 +16,10 @@
     type PublicProduct,
     type StoreCartItem,
   } from "@features/catalog";
+  import {
+    clearIdempotencyKey,
+    getIdempotencyKey,
+  } from "@features/orders/lib/idempotency";
   import { saveTracking } from "@features/analytics/lib/tracking";
   import { formatCurrency, toSafeImageUrl } from "@shared/utils/formatters";
   import {
@@ -308,26 +312,30 @@
     submitting = true;
 
     try {
-      const created = await createPublicOrder({
-        customer_name: form.customer_name.trim(),
-        customer_phone: form.customer_phone.trim(),
-        customer_email: form.customer_email.trim() || undefined,
-        payment_method: form.payment_method,
-        order_type: form.order_type,
-        table_number:
-          form.order_type === "en_local" && form.table_number.trim()
-            ? Number(form.table_number)
-            : undefined,
-        notes: form.notes.trim() || undefined,
-        items: items.map((item) => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          customizations: buildCustomizations(item),
-        })),
-      });
+      const created = await createPublicOrder(
+        {
+          customer_name: form.customer_name.trim(),
+          customer_phone: form.customer_phone.trim(),
+          customer_email: form.customer_email.trim() || undefined,
+          payment_method: form.payment_method,
+          order_type: form.order_type,
+          table_number:
+            form.order_type === "en_local" && form.table_number.trim()
+              ? Number(form.table_number)
+              : undefined,
+          notes: form.notes.trim() || undefined,
+          items: items.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            customizations: buildCustomizations(item),
+          })),
+        },
+        getIdempotencyKey(),
+      );
 
       saveTracking(created.order_number, created.tracking_token);
       clearCartItems();
+      clearIdempotencyKey();
       items = [];
       window.location.href = "/order/tracking";
     } catch (requestError: unknown) {

@@ -54,15 +54,17 @@
 
 /* ── Timestamp below current step label ─────────────────────────── */
 .order-step-timestamp {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 500;
-  color: color-mix(
-    in oklab,
-    var(--fallback-bc, oklch(0% 0 0)) 48%,
-    transparent
-  );
+  color: var(--color-base-content, var(--fallback-bc, oklch(0% 0 0)));
   white-space: nowrap;
   line-height: 1;
+}
+
+@media (min-width: 640px) {
+  .order-step-timestamp {
+    font-size: 0.8rem;
+  }
 }
 
 /* ── Screen-reader-only live region ─────────────────────────────── */

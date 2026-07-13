@@ -12,7 +12,8 @@ export type RowsPerTableTabKey =
   | "categorias"
   | "productos"
   | "usuarios"
-  | "empleados";
+  | "empleados"
+  | "inventario";
 
 export type RowsPerTableConfig = {
   default: number;
@@ -21,6 +22,15 @@ export type RowsPerTableConfig = {
   productos: number;
   usuarios: number;
   empleados: number;
+  inventario: number;
+};
+
+export type InventoryStockFilter = "all" | "ok" | "low-stock" | "out-of-stock";
+export type InventoryTypeFilter = "all" | "flavor" | "unit";
+
+export type InventoryFilterState = {
+  stockFilter: InventoryStockFilter;
+  typeFilter: InventoryTypeFilter;
 };
 
 export const DEFAULT_PANEL_CONFIG: PanelConfigValues = {
@@ -47,6 +57,12 @@ export const DEFAULT_ROWS_PER_TABLE_CONFIG: RowsPerTableConfig = {
   productos: DEFAULT_ROWS_PER_TABLE,
   usuarios: DEFAULT_ROWS_PER_TABLE,
   empleados: DEFAULT_ROWS_PER_TABLE,
+  inventario: DEFAULT_ROWS_PER_TABLE,
+};
+
+export const DEFAULT_INVENTORY_FILTER_STATE: InventoryFilterState = {
+  stockFilter: "all",
+  typeFilter: "all",
 };
 
 export type AdminLocalSettings = {
@@ -57,6 +73,7 @@ export type AdminLocalSettings = {
     offers: StoreOfferItem[];
   };
   rows_per_table: RowsPerTableConfig;
+  inventory_filter_state: InventoryFilterState;
 };
 
 function getStorageKey(adminId: string): string {
@@ -72,6 +89,7 @@ function cloneDefaults(): AdminLocalSettings {
       offers: [...DEFAULT_STORE_SETTINGS.offers],
     },
     rows_per_table: { ...DEFAULT_ROWS_PER_TABLE_CONFIG },
+    inventory_filter_state: { ...DEFAULT_INVENTORY_FILTER_STATE },
   };
 }
 
@@ -160,6 +178,7 @@ function normalizeRowsPerTableConfig(value: unknown): RowsPerTableConfig {
       productos: normalized,
       usuarios: normalized,
       empleados: normalized,
+      inventario: normalized,
     };
   }
 
@@ -175,7 +194,35 @@ function normalizeRowsPerTableConfig(value: unknown): RowsPerTableConfig {
     productos: normalizeRowsPerTableValue(value.productos ?? defaultValue),
     usuarios: normalizeRowsPerTableValue(value.usuarios ?? defaultValue),
     empleados: normalizeRowsPerTableValue(value.empleados ?? defaultValue),
+    inventario: normalizeRowsPerTableValue(value.inventario ?? defaultValue),
   };
+}
+
+function normalizeInventoryFilterState(value: unknown): InventoryFilterState {
+  if (!isObject(value)) {
+    return { ...DEFAULT_INVENTORY_FILTER_STATE };
+  }
+
+  const validStockFilters: InventoryStockFilter[] = [
+    "all",
+    "ok",
+    "low-stock",
+    "out-of-stock",
+  ];
+  const stockFilter = validStockFilters.includes(
+    value.stockFilter as InventoryStockFilter,
+  )
+    ? (value.stockFilter as InventoryStockFilter)
+    : DEFAULT_INVENTORY_FILTER_STATE.stockFilter;
+
+  const validTypeFilters: InventoryTypeFilter[] = ["all", "flavor", "unit"];
+  const typeFilter = validTypeFilters.includes(
+    value.typeFilter as InventoryTypeFilter,
+  )
+    ? (value.typeFilter as InventoryTypeFilter)
+    : DEFAULT_INVENTORY_FILTER_STATE.typeFilter;
+
+  return { stockFilter, typeFilter };
 }
 
 export function getAdminLocalSettings(adminId: string): AdminLocalSettings {
@@ -203,6 +250,9 @@ export function getAdminLocalSettings(adminId: string): AdminLocalSettings {
       panel_config: normalizePanelConfig(parsed.panel_config),
       store_settings: normalizeStoreSettings(parsed.store_settings),
       rows_per_table: normalizeRowsPerTableConfig(parsed.rows_per_table),
+      inventory_filter_state: normalizeInventoryFilterState(
+        parsed.inventory_filter_state,
+      ),
     };
   } catch {
     return cloneDefaults();
@@ -218,6 +268,9 @@ export function saveAdminLocalSettings(
     panel_config: normalizePanelConfig(settings.panel_config),
     store_settings: normalizeStoreSettings(settings.store_settings),
     rows_per_table: normalizeRowsPerTableConfig(settings.rows_per_table),
+    inventory_filter_state: normalizeInventoryFilterState(
+      settings.inventory_filter_state,
+    ),
   };
 
   if (typeof window === "undefined" || !adminId) {
@@ -277,6 +330,25 @@ export function saveAdminRowsPerTable(
     rows_per_table: normalizeRowsPerTableConfig(rowsPerTable),
   });
   return next.rows_per_table;
+}
+
+export function getInventoryFilterState(adminId: string): InventoryFilterState {
+  return getAdminLocalSettings(adminId).inventory_filter_state;
+}
+
+export function saveInventoryFilterState(
+  adminId: string,
+  filterState: Partial<InventoryFilterState>,
+): InventoryFilterState {
+  const current = getAdminLocalSettings(adminId);
+  const next = saveAdminLocalSettings(adminId, {
+    ...current,
+    inventory_filter_state: normalizeInventoryFilterState({
+      ...current.inventory_filter_state,
+      ...filterState,
+    }),
+  });
+  return next.inventory_filter_state;
 }
 
 export function setCurrentAdminContext(adminId: string, rowsPerTable: number) {

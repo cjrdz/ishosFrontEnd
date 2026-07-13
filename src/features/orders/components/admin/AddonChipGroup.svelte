@@ -19,7 +19,7 @@
     selectedIds: string[];
     noneId?: string;
     noneLabel?: string;
-    label: string;
+    label?: string;
     variant?: "unified" | "multi";
     required?: boolean;
     error?: string;
@@ -122,25 +122,27 @@
 </script>
 
 <div class="space-y-2">
-  <div class="flex items-center justify-between gap-2">
-    <div class="flex items-center gap-1.5">
-      <span class="text-xs font-medium text-base-content/80">{label}</span>
-      {#if required}
-        <span class="text-error">*</span>
+  {#if label}
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-1.5">
+        <span class="text-xs font-medium text-base-content/80">{label}</span>
+        {#if required}
+          <span class="text-error">*</span>
+        {/if}
+      </div>
+      {#if canClear}
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs btn-square text-error"
+          aria-label={`Borrar ${label.toLowerCase()}`}
+          title={`Borrar ${label.toLowerCase()}`}
+          onclick={clearSelection}
+        >
+          <Icon icon="lucide:trash-2" width="12" height="12" />
+        </button>
       {/if}
     </div>
-    {#if canClear}
-      <button
-        type="button"
-        class="btn btn-ghost btn-xs btn-square text-error"
-        aria-label={`Borrar ${label.toLowerCase()}`}
-        title={`Borrar ${label.toLowerCase()}`}
-        onclick={clearSelection}
-      >
-        <Icon icon="lucide:trash-2" width="12" height="12" />
-      </button>
-    {/if}
-  </div>
+  {/if}
 
   <div
     bind:this={groupRef}

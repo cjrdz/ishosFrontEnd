@@ -7,6 +7,7 @@
   interface Props {
     manualItems: ManualOrderItemDraft[];
     draftItemEditIndex: number | null;
+    manualOrderTotal: number;
     onEdit: (index: number) => void;
     onRemove: (index: number) => void;
     onUpdateQuantity: (index: number, quantity: number) => void;
@@ -23,6 +24,7 @@
   let {
     manualItems,
     draftItemEditIndex,
+    manualOrderTotal,
     onEdit,
     onRemove,
     onUpdateQuantity,
@@ -35,14 +37,16 @@
 </script>
 
 {#if manualItems.length > 0}
-  <div class="space-y-2">
-    <div class="flex items-center justify-between gap-2">
-      <span class="text-xs font-medium text-base-content/70">
+  <div class="rounded-xl border border-base-300 bg-base-100 p-3 space-y-3">
+    <div
+      class="flex items-center justify-between gap-2 border-b border-base-200/60 pb-2"
+    >
+      <span class="text-sm font-semibold text-base-content/90">
         {manualItems.length}
-        {manualItems.length === 1 ? "producto agregado" : "productos agregados"}
+        {manualItems.length === 1 ? "producto" : "productos"}
       </span>
-      <span class="text-xs text-base-content/50">
-        Puedes repetir el mismo producto con diferentes sabores o extras.
+      <span class="text-sm font-bold text-primary">
+        {formatCurrency(manualOrderTotal)}
       </span>
     </div>
 
@@ -60,7 +64,7 @@
         <div
           class={`rounded-lg border bg-base-100 p-3 ${
             draftItemEditIndex === index
-              ? "border-primary/40 ring-1 ring-primary/20"
+              ? "border-primary bg-primary/5 ring-1 ring-primary/30"
               : "border-base-200"
           }`}
         >

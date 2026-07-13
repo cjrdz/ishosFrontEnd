@@ -4,8 +4,7 @@ export type TabKey =
   | "productos"
   | "inventario"
   | "personas"
-  | "ofertas"
-  | "herramientas";
+  | "analitica";
 
 export const TAB_LABELS: Record<TabKey, string> = {
   ordenes: "Ordenes",
@@ -13,8 +12,7 @@ export const TAB_LABELS: Record<TabKey, string> = {
   productos: "Productos",
   inventario: "Inventario",
   personas: "Personas",
-  ofertas: "Ofertas",
-  herramientas: "Herramientas",
+  analitica: "Analitica",
 };
 
 export const ADMIN_ONLY_TABS = new Set<TabKey>([
@@ -22,8 +20,7 @@ export const ADMIN_ONLY_TABS = new Set<TabKey>([
   "productos",
   "inventario",
   "personas",
-  "ofertas",
-  "herramientas",
+  "analitica",
 ]);
 
 export const DEFAULT_TAB_ORDER: TabKey[] = [
@@ -32,13 +29,14 @@ export const DEFAULT_TAB_ORDER: TabKey[] = [
   "productos",
   "inventario",
   "personas",
-  "ofertas",
-  "herramientas",
+  "analitica",
 ];
 
 const LEGACY_TAB_MAP: Record<string, TabKey | null> = {
   empleados: "personas",
   usuarios: "personas",
+  herramientas: "analitica",
+  ofertas: null,
 };
 
 export function toTabKey(value: string): TabKey | null {

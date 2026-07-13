@@ -24,3 +24,9 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 .wrangler/
+
+# githints local change-tracking store (store.db, salt, and rendered markdown)
+.githints/
+AGENTS.md
+.agents
+skills-lock.json

@@ -1,5 +1,6 @@
 import { arraysEqualUnordered } from "@shared/utils/collections";
 import { normalizeSelectionIds } from "@features/catalog/lib/customization";
+import { clearIdempotencyKey } from "@features/orders/lib/idempotency";
 
 export type StoreCartItem = {
   product_id: string;
@@ -243,4 +244,5 @@ export function removeCartItem(
 
 export function clearCartItems() {
   setCartItems([]);
+  clearIdempotencyKey();
 }

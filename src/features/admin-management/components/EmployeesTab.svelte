@@ -1,10 +1,15 @@
 <script lang="ts">
   import type { Employee } from "@features/admin-management/lib/api";
-  import { getCurrentRowsPerTable } from "@features/admin-management";
-  import Icon from "@shared/components/AppIcon.svelte";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
   import AdminModalShell from "./shared/AdminModalShell.svelte";
   import AdminFormActions from "./shared/AdminFormActions.svelte";
+  import {
+    closeConfirmDialog,
+    confirmDialogNow,
+    createConfirmDialogState,
+    openConfirmDialog,
+  } from "@shared/utils/confirm-dialog";
+  import EmployeeList from "./EmployeeList.svelte";
 
   interface Props {
     employees: Employee[];
@@ -48,50 +53,8 @@
 
   let employeeEditorDialog = $state<HTMLDialogElement | null>(null);
   let lockoutResetDialog = $state<HTMLDialogElement | null>(null);
-  let confirmOpen = $state(false);
-  let confirmTitle = $state("Confirmar accion");
-  let confirmMessage = $state("");
-  let confirmAction = $state<null | (() => void)>(null);
+  let confirmDialog = $state(createConfirmDialogState());
   let editingEmployeeId = $state<string | null>(null);
-
-  let employeeStateFilter = $state<"all" | "active" | "inactive">("all");
-  const filteredEmployees = $derived(
-    employeeStateFilter === "all"
-      ? employees
-      : employees.filter((employee) =>
-          employeeStateFilter === "active"
-            ? employee.state === "active"
-            : employee.state === "inactive",
-        ),
-  );
-  const employeeStateFilterLabel = $derived(
-    employeeStateFilter === "all"
-      ? "Todos"
-      : employeeStateFilter === "active"
-        ? "Activos"
-        : "Inactivos",
-  );
-
-  const rowLimitOptions = [5, 10, 25, 50, 100] as const;
-  let employeeRowLimit = $state<number>(5);
-
-  $effect(() => {
-    employeeRowLimit = getCurrentRowsPerTable("empleados");
-  });
-
-  const visibleEmployees = $derived(
-    employeeRowLimit <= 0
-      ? filteredEmployees
-      : filteredEmployees.slice(0, employeeRowLimit),
-  );
-
-  const employeeRowLimitLabel = $derived(
-    employeeRowLimit <= 0 ? "Todos" : String(employeeRowLimit),
-  );
-
-  function setEmployeeRowLimit(limit: number) {
-    employeeRowLimit = limit;
-  }
 
   let form = $state({
     email: "",
@@ -180,22 +143,15 @@
   }
 
   function openConfirm(title: string, message: string, action: () => void) {
-    confirmTitle = title;
-    confirmMessage = message;
-    confirmAction = action;
-    confirmOpen = true;
+    openConfirmDialog(confirmDialog, title, message, action);
   }
 
   function confirmNow() {
-    const action = confirmAction;
-    confirmAction = null;
-    confirmOpen = false;
-    if (action) action();
+    confirmDialogNow(confirmDialog);
   }
 
   function closeConfirm() {
-    confirmAction = null;
-    confirmOpen = false;
+    closeConfirmDialog(confirmDialog);
   }
 
   function toggleEmployeeState(employee: Employee, checked: boolean) {
@@ -262,183 +218,15 @@
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
 
-  <div class="card bg-base-100 shadow">
-    <div class="card-body gap-4">
-      <div class="flex flex-wrap items-center gap-3">
-        <h2 class="card-title shrink-0 mr-1">Empleados</h2>
-
-        <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
-
-        <div class="dropdown w-full sm:w-auto dropdown-bottom">
-          <div
-            tabindex="0"
-            role="button"
-            class="btn btn-sm btn-outline w-full sm:w-40 justify-between"
-          >
-            {employeeStateFilterLabel}
-            <span class="opacity-50">▼</span>
-          </div>
-          <ul
-            tabindex="-1"
-            class="dropdown-content menu bg-base-100 rounded-box z-100 w-full sm:w-52 p-2 mt-1 shadow-xl border border-base-300"
-          >
-            <li>
-              <button
-                type="button"
-                onclick={() => (employeeStateFilter = "all")}>Todos</button
-              >
-            </li>
-            <li>
-              <button
-                type="button"
-                onclick={() => (employeeStateFilter = "active")}>Activos</button
-              >
-            </li>
-            <li>
-              <button
-                type="button"
-                onclick={() => (employeeStateFilter = "inactive")}
-                >Inactivos</button
-              >
-            </li>
-          </ul>
-        </div>
-
-        <div class="dropdown w-full sm:w-auto dropdown-bottom">
-          <div
-            tabindex="0"
-            role="button"
-            class="btn btn-sm btn-outline w-full sm:w-24 justify-between"
-          >
-            {employeeRowLimitLabel}
-            <span class="opacity-50">▼</span>
-          </div>
-          <ul
-            tabindex="-1"
-            class="dropdown-content menu bg-base-100 rounded-box z-100 w-full sm:w-40 p-2 mt-1 shadow-xl border border-base-300"
-          >
-            {#each rowLimitOptions as option}
-              <li>
-                <button
-                  type="button"
-                  onclick={() => setEmployeeRowLimit(option)}>{option}</button
-                >
-              </li>
-            {/each}
-            <li>
-              <button type="button" onclick={() => setEmployeeRowLimit(0)}
-                >Todos</button
-              >
-            </li>
-          </ul>
-        </div>
-
-        <div
-          class="flex items-center gap-1.5 text-sm text-base-content/80 font-medium shrink-0"
-        >
-          <span
-            class="badge badge-info badge-sm font-semibold rounded-md text-white!"
-            >{filteredEmployees.length}</span
-          >
-          <span>empleados</span>
-        </div>
-
-        <button
-          class="btn btn-sm btn-soft btn-warning shrink-0"
-          type="button"
-          onclick={openLockoutResetModal}
-          disabled={busy}
-        >
-          Desbloquear usuario
-        </button>
-
-        <button
-          class="btn btn-sm btn-primary shrink-0 ml-auto"
-          type="button"
-          onclick={openCreateEmployeeModal}
-          disabled={busy}
-        >
-          + Crear empleado
-        </button>
-      </div>
-
-      <div
-        class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
-      >
-        <table class="table">
-          <thead class="bg-base-200/60 text-base-content"
-            ><tr
-              ><th class="font-bold">Email</th><th class="font-bold">Nombre</th
-              ><th class="font-bold">Rol</th><th class="font-bold">Estado</th
-              ><th class="font-bold"></th></tr
-            ></thead
-          >
-          <tbody>
-            {#if filteredEmployees.length === 0}
-              <tr
-                ><td colspan="5" class="text-center py-6 text-base-content/50"
-                  >No hay empleados</td
-                ></tr
-              >
-            {:else}
-              {#each visibleEmployees as employee}
-                <tr class="hover:bg-base-300/40 transition-colors">
-                  <td>{employee.email}</td>
-                  <td>{employee.name || "-"}</td>
-                  <td>{employee.role}</td>
-                  <td>
-                    <span
-                      class={`badge ${employee.state === "inactive" ? "badge-ghost" : "badge-success"}`}
-                    >
-                      {employee.state || "-"}
-                    </span>
-                  </td>
-                  <td>
-                    <div class="flex flex-wrap items-center justify-end gap-2">
-                      <button
-                        class="btn btn-sm btn-soft btn-accent"
-                        type="button"
-                        onclick={() => editEmployee(employee)}
-                      >
-                        Editar
-                      </button>
-                      <label
-                        class="label cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-2 py-1"
-                      >
-                        <input
-                          class="toggle toggle-xs"
-                          type="checkbox"
-                          checked={employee.state !== "inactive"}
-                          onchange={(event) =>
-                            toggleEmployeeState(
-                              employee,
-                              (event.currentTarget as HTMLInputElement).checked,
-                            )}
-                          disabled={busy}
-                        />
-                        <span class="label-text text-xs"
-                          >{employee.state === "inactive"
-                            ? "Inactivo"
-                            : "Activo"}</span
-                        >
-                      </label>
-                      <button
-                        class="btn btn-sm btn-soft btn-error"
-                        type="button"
-                        onclick={() => requestDelete(employee)}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              {/each}
-            {/if}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+  <EmployeeList
+    {employees}
+    {busy}
+    onCreateEmployee={openCreateEmployeeModal}
+    onToggleState={toggleEmployeeState}
+    onEdit={editEmployee}
+    onRequestDelete={requestDelete}
+    onOpenLockoutReset={openLockoutResetModal}
+  />
 </section>
 
 <AdminModalShell
@@ -593,10 +381,11 @@
 </AdminModalShell>
 
 <ConfirmDialog
-  open={confirmOpen}
-  title={confirmTitle}
-  message={confirmMessage}
+  open={confirmDialog.open}
+  title={confirmDialog.title}
+  message={confirmDialog.message}
   {busy}
+  variant="error"
   onConfirm={confirmNow}
   onCancel={closeConfirm}
 />

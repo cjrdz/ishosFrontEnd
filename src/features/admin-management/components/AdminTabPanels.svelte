@@ -4,8 +4,7 @@
   import { CategoriesTab, ProductsTab } from "@features/products";
   import EmployeesTab from "@features/admin-management/components/EmployeesTab.svelte";
   import UsersTab from "@features/admin-management/components/UsersTab.svelte";
-  import { OffersTab } from "@features/offers";
-  import { ToolsTab } from "@features/analytics";
+  import { Analytics, ExportTool } from "@features/analytics";
   import { InventoryTab } from "@features/inventory";
 
   let {
@@ -24,20 +23,25 @@
     isAdmin={orders.isAdmin}
     orders={orders.orders}
     products={orders.products}
+    categories={categories.categories}
     employees={orders.employees}
     selectedOrder={orders.selectedOrder}
     busy={orders.busy}
     moduleError={orders.moduleError}
     orderStatusFilter={orders.orderStatusFilter}
+    showArchived={orders.showArchived}
     onFilterChange={orders.onFilterChange}
+    onToggleArchivedView={orders.onToggleArchivedView}
     onReload={orders.onReload}
     onOpenOrder={orders.onOpenOrder}
+    onClearSelectedOrder={orders.onClearSelectedOrder}
     onApprove={orders.onApprove}
     onReject={orders.onReject}
     onStatusChange={orders.onStatusChange}
     onUpdateOrder={orders.onUpdateOrder}
     onDelete={orders.onDelete}
     onCreate={orders.onCreate}
+    onArchive={orders.onArchive}
     saveUserFromOrder={orders.saveUserFromOrder}
   />
 {/if}
@@ -223,34 +227,25 @@
     <InventoryTab
       busy={shared.busy.inventario}
       moduleError={shared.moduleErrors.inventario}
+      flavors={products.flavors}
+      addons={products.addons}
+      flavorBusy={products.flavorBusy}
+      addonBusy={products.addonBusy}
+      flavorError={products.flavorError}
+      addonError={products.addonError}
+      onCreateFlavor={products.onCreateFlavor}
+      onUpdateFlavor={products.onUpdateFlavor}
+      onDeleteFlavor={products.onDeleteFlavor}
+      onCreateAddon={products.onCreateAddon}
+      onUpdateAddon={products.onUpdateAddon}
+      onDeleteAddon={products.onDeleteAddon}
     />
   {/if}
 {/if}
 
-{#if shared.isAdmin && shared.activeTab === "ofertas"}
-  {#if shared.lazyTabState.ofertas.loading && !shared.lazyTabState.ofertas.hydrated}
-    <section class="space-y-4" aria-busy="true" aria-live="polite">
-      <div class="card bg-base-100 shadow" aria-hidden="true">
-        <div class="card-body gap-4">
-          <div class="skeleton h-8 w-52"></div>
-          <div class="rounded-box border border-base-content/5 overflow-hidden">
-            <div class="bg-base-200/60 p-3">
-              <div class="skeleton h-5 w-full"></div>
-            </div>
-            <div class="p-3 space-y-3">
-              {#each [1, 2, 3, 4] as item (item)}
-                <div class="skeleton h-10 w-full"></div>
-              {/each}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  {:else}
-    <OffersTab adminId="" products={products.products} />
-  {/if}
-{/if}
-
-{#if shared.isAdmin && shared.activeTab === "herramientas"}
-  <ToolsTab />
+{#if shared.isAdmin && shared.activeTab === "analitica"}
+  <section class="space-y-5 md:space-y-6">
+    <Analytics />
+    <ExportTool />
+  </section>
 {/if}

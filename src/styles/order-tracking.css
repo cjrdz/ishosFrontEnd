@@ -53,6 +53,11 @@
   --step-color: var(--ishos-teal);
 }
 
+.order-steps.order-steps--cozy .step-primary::before,
+.order-steps.order-steps--cozy .step-primary::after {
+  --step-color: var(--ishos-teal);
+}
+
 /* ── Section divider wave ─────────────────────────────────────────── */
 .wave-divider {
   overflow: hidden;

@@ -11,9 +11,13 @@
     setCurrentAdminContext,
     getAdminStoreSettings,
     updateAdminStoreSettings,
+    getOrderArchiveConfig,
+    updateOrderArchiveConfig,
+    runArchive,
     type RowsPerTableConfig,
     type PanelConfigValues,
     type StoreOfferItem,
+    type OrderArchiveConfig,
     DEFAULT_PANEL_CONFIG,
     DEFAULT_ROWS_PER_TABLE_CONFIG,
     DEFAULT_TAB_ORDER,
@@ -105,6 +109,13 @@
         "kill switch",
       ],
     },
+    {
+      id: "archivo-ordenes",
+      title: "Archivo de ordenes",
+      description: "Archivar automaticamente ordenes antiguas",
+      icon: "lucide:archive",
+      keywords: ["archivo", "archivar", "ordenes", "auto archive", "historial"],
+    },
   ] as const;
 
   let loading = $state(true);
@@ -120,6 +131,12 @@
   });
   let storeOrdersEnabled = $state(true);
   let storeOffers = $state<StoreOfferItem[]>([]);
+  const DEFAULT_ARCHIVE_CONFIG: OrderArchiveConfig = {
+    enabled: true,
+    age_days: 7,
+    interval_minutes: 60,
+  };
+  let archiveConfig = $state<OrderArchiveConfig>({ ...DEFAULT_ARCHIVE_CONFIG });
 
   // Search palette
   let searchQuery = $state("");
@@ -273,6 +290,12 @@
       storeOffers = settings.store_settings.offers ?? [];
     }
 
+    try {
+      archiveConfig = await getOrderArchiveConfig();
+    } catch {
+      archiveConfig = { ...DEFAULT_ARCHIVE_CONFIG };
+    }
+
     busy = false;
   }
 
@@ -387,6 +410,50 @@
     }
   }
 
+  async function handleSaveArchiveConfig(nextConfig: OrderArchiveConfig) {
+    busy = true;
+    moduleError = "";
+    try {
+      archiveConfig = await updateOrderArchiveConfig(nextConfig);
+      setNotice("Configuracion de archivo actualizada");
+      trackAction("admin_settings_archive_config_saved", {
+        ...archiveConfig,
+      });
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.handleSaveArchiveConfig", {
+        ...nextConfig,
+      });
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo guardar la configuracion de archivo";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleRunArchive() {
+    busy = true;
+    moduleError = "";
+    try {
+      const result = await runArchive();
+      setNotice(
+        `Archivo ejecutado: ${result.archived ?? 0} ordenes archivadas`,
+      );
+      trackAction("admin_settings_archive_run", {
+        archived: result.archived ?? 0,
+      });
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.handleRunArchive");
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo ejecutar el archivo";
+    } finally {
+      busy = false;
+    }
+  }
+
   async function handleLogout() {
     let logoutFailed = false;
     try {
@@ -428,45 +495,56 @@
   </div>
 {:else if session}
   <div class="space-y-6">
-    <!-- Header — same layout as AdminHeader -->
-    <div
-      class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div>
-        <h1 class="text-3xl font-bold">Configuraciones</h1>
-        <div
-          class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-base-content/70"
+    <!-- Header -->
+    <div class="space-y-4">
+      <!-- Top row: back link + actions -->
+      <div class="flex items-center justify-between gap-3">
+        <a
+          href="/admin"
+          class="btn btn-ghost btn-sm gap-2"
+          title="Volver al panel administrativo"
         >
-          <p class="flex items-center gap-2">
-            <span>Administrador, <strong>{session.name}</strong></span>
-            <Icon icon="lucide:settings-2" class="h-4 w-4" />
-          </p>
-          <a
-            href="/admin"
-            class="flex items-center gap-1.5 transition hover:text-base-content"
+          <Icon icon="lucide:arrow-left" class="h-4 w-4" />
+          <span>Panel administrativo</span>
+        </a>
+        <div class="flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            class="btn btn-outline btn-sm"
+            type="button"
+            onclick={handleLogout}
           >
-            <Icon icon="lucide:arrow-left" class="h-3.5 w-3.5" />
-            <span>Panel administrativo</span>
-          </a>
+            <Icon icon="lucide:log-out" class="h-4 w-4" />
+            <span class="hidden sm:inline">Cerrar sesion</span>
+          </button>
         </div>
       </div>
-      <div class="flex items-center gap-2 self-end sm:self-auto">
-        <ThemeToggle />
+
+      <!-- Title + search -->
+      <div
+        class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"
+      >
+        <div>
+          <h1
+            class="text-2xl font-bold tracking-tight text-base-content/90 sm:text-3xl"
+          >
+            Configuraciones
+          </h1>
+          <p class="mt-1 text-sm text-base-content/70">
+            Administrador, <strong>{session.name}</strong>
+          </p>
+        </div>
+
         <button
           type="button"
-          class="btn btn-ghost gap-2"
+          class="btn btn-ghost h-10 w-full justify-start gap-2 rounded-lg border border-base-300 px-3 hover:bg-base-200 lg:w-80"
           onclick={openSearch}
           title="Buscar ajuste (Ctrl+K)"
         >
-          <Icon icon="lucide:search" class="h-4 w-4" />
-          <span class="hidden text-sm text-base-content/50 sm:inline"
-            >Buscar ajuste...</span
-          >
-          <kbd class="kbd kbd-sm hidden sm:inline">Ctrl K</kbd>
+          <Icon icon="lucide:search" class="h-4 w-4 text-base-content/50" />
+          <span class="text-sm text-base-content/50">Buscar ajuste...</span>
+          <kbd class="kbd kbd-sm ml-auto hidden sm:inline">Ctrl K</kbd>
         </button>
-        <button class="btn btn-outline" type="button" onclick={handleLogout}
-          >Cerrar sesion</button
-        >
       </div>
     </div>
 
@@ -483,6 +561,7 @@
         {panelConfig}
         rowsPerTable={rowsPerTable as unknown as any}
         {storeOrdersEnabled}
+        {archiveConfig}
         {busy}
         {moduleError}
         onSave={handleSaveTabOrder}
@@ -490,6 +569,8 @@
         onToggleStoreOrders={handleToggleStoreOrders}
         onSaveRowsPerTable={(rows) =>
           void handleSaveRowsPerTable(rows as unknown as RowsPerTableConfig)}
+        onSaveArchiveConfig={handleSaveArchiveConfig}
+        onRunArchive={handleRunArchive}
       />
 
       <section id="proximas-personalizaciones" class="card bg-base-100 shadow">

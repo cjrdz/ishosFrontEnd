@@ -5,17 +5,18 @@
 :root {
   --pc-gradient-overlay: linear-gradient(
     to top,
-    oklch(0% 0 0 / 0.82) 0%,
-    oklch(0% 0 0 / 0.28) 45%,
+    oklch(0% 0 0 / 0.78) 0%,
+    oklch(0% 0 0 / 0.35) 40%,
+    oklch(0% 0 0 / 0.05) 70%,
     transparent 100%
   );
   --pc-text-over-image: white;
-  --pc-price-strikethrough-over: oklch(1 0 0 / 0.55);
-  --pc-note-over: oklch(1 0 0 / 0.72);
+  --pc-price-strikethrough-over: oklch(1 0 0 / 0.65);
+  --pc-note-over: oklch(1 0 0 / 0.8);
   --pc-countdown-bg: oklch(0 0 0 / 0.42);
-  --pc-countdown-border: oklch(1 0 0 / 0.1);
-  --pc-pill-border: oklch(1 0 0 / 0.1);
-  --pc-pill-bg: oklch(var(--b1) / 0.18);
+  --pc-countdown-border: oklch(1 0 0 / 0.12);
+  --pc-pill-border: oklch(1 0 0 / 0.12);
+  --pc-pill-bg: oklch(var(--b1) / 0.32);
   --pc-price-strikethrough-plain: oklch(var(--bc) / 0.5);
   --pc-note-plain: oklch(var(--bc) / 0.65);
   --pc-card-shadow: 0 1px 3px oklch(0% 0 0 / 0.07), 0 1px 2px oklch(0% 0 0 / 0.06);
@@ -25,12 +26,13 @@
 [data-theme="night"] {
   --pc-gradient-overlay: linear-gradient(
     to top,
-    oklch(0% 0 0 / 0.85) 0%,
-    oklch(0% 0 0 / 0.32) 45%,
+    oklch(0% 0 0 / 0.82) 0%,
+    oklch(0% 0 0 / 0.38) 40%,
+    oklch(0% 0 0 / 0.06) 70%,
     transparent 100%
   );
-  --pc-pill-bg: oklch(var(--b1) / 0.35);
-  --pc-pill-border: oklch(1 0 0 / 0.06);
+  --pc-pill-bg: oklch(var(--b1) / 0.45);
+  --pc-pill-border: oklch(1 0 0 / 0.08);
   --pc-card-shadow: 0 1px 3px oklch(0% 0 0 / 0.12), 0 1px 2px oklch(0% 0 0 / 0.1);
   --pc-card-shadow-hover: 0 4px 16px oklch(0% 0 0 / 0.18), 0 2px 6px oklch(0% 0 0 / 0.14);
 }

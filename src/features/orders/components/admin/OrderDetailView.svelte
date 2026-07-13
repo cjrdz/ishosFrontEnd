@@ -148,400 +148,379 @@
   }
 </script>
 
-<div class="card bg-base-100 shadow-sm border border-base-200">
-  <div class="card-body p-4 sm:p-6 text-sm">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <div class="flex flex-wrap items-center gap-2">
-        <h3 class="card-title text-base sm:text-lg">
-          Detalle de orden: {selectedOrder.order_number}
-        </h3>
-        <button
-          class="btn btn-xs btn-ghost"
-          type="button"
-          title="Copiar numero de orden"
-          onclick={() => onCopyToken(selectedOrder.order_number, "both")}
-          aria-label="Copiar numero de orden"
-        >
-          <Icon
-            icon={tokenCopied === "both" ? "lucide:check" : "lucide:copy"}
-            width="14"
-            height="14"
-          />
-          {tokenCopied === "both" ? "¡Copiado!" : "Copiar ORD"}
-        </button>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        {#if trackingLink}
-          <button
-            class="btn btn-xs btn-outline btn-warning gap-1"
-            type="button"
-            title="Copiar enlace seguro de seguimiento"
-            onclick={() => onCopyToken(trackingLink, "link")}
-            aria-label="Copiar enlace de seguimiento"
-          >
-            <Icon
-              icon={tokenCopied === "link" ? "lucide:check" : "lucide:link"}
-              width="14"
-              height="14"
-            />
-            {tokenCopied === "link" ? "¡Copiado!" : "Copiar enlace"}
-          </button>
-        {/if}
-        {#if isAdmin}
-          <button
-            class="btn btn-sm btn-soft btn-secondary"
-            type="button"
-            onclick={() => onOpenSaveUserDialog(selectedOrder)}
-          >
-            Guardar como usuario
-          </button>
-        {/if}
+<div class="flex flex-col gap-4 text-sm">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="flex items-center gap-2 min-w-0">
+      <h3 class="text-base sm:text-lg font-semibold truncate">
+        Detalle: {selectedOrder.order_number}
+      </h3>
+      <button
+        class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-info shrink-0"
+        type="button"
+        title="Copiar numero de orden"
+        onclick={() => onCopyToken(selectedOrder.order_number, "both")}
+        aria-label="Copiar numero de orden"
+      >
+        <Icon
+          icon={tokenCopied === "both" ? "lucide:check" : "lucide:copy"}
+          class="h-4 w-4"
+        />
+      </button>
+    </div>
+    {#if trackingLink}
+      <button
+        class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-warning"
+        type="button"
+        title="Copiar enlace de seguimiento"
+        onclick={() => onCopyToken(trackingLink, "link")}
+        aria-label="Copiar enlace de seguimiento"
+      >
+        <Icon
+          icon={tokenCopied === "link" ? "lucide:check" : "lucide:link"}
+          class="h-4 w-4"
+        />
+      </button>
+    {/if}
+  </div>
+  <div class="grid gap-4 md:grid-cols-3">
+    <div class="space-y-1">
+      <span class="text-xs text-base-content/60">Cliente</span>
+      <p class="font-medium">{selectedOrder.customer_name}</p>
+    </div>
+    <div class="space-y-1">
+      <span class="text-xs text-base-content/60">Telefono</span>
+      <p class="font-medium">{selectedOrder.customer_phone}</p>
+    </div>
+    <div class="space-y-1">
+      <span class="text-xs text-base-content/60">Metodo de pago</span>
+      <p class="font-medium capitalize">{selectedOrder.payment_method}</p>
+    </div>
+    <div class="space-y-1">
+      <span class="text-xs text-base-content/60">Tipo</span>
+      <p class="font-medium">
+        {selectedOrder.order_type
+          ? orderTypeLabel(selectedOrder.order_type)
+          : "No definido"}
+      </p>
+    </div>
+    <div class="space-y-1">
+      <span class="text-xs text-base-content/60">Mesa</span>
+      <p class="font-medium">
+        {selectedOrder.order_type === "en_local"
+          ? (selectedOrder.table_number ?? "Sin mesa")
+          : "No aplica"}
+      </p>
+    </div>
+    <div class="space-y-1">
+      <span class="text-xs text-base-content/60">Creada por</span>
+      <p class="font-medium">{createdByLabel(selectedOrder, employeeById)}</p>
+    </div>
+    <div class="space-y-1 md:col-span-3">
+      <span class="text-xs text-base-content/60">Notas</span>
+      <div
+        class="rounded-lg border border-base-300/60 bg-base-100 p-3 text-sm max-h-28 overflow-y-auto"
+      >
+        {selectedOrder.notes?.trim() ? selectedOrder.notes : "Sin notas"}
       </div>
     </div>
-    <div class="grid gap-3 md:grid-cols-[1fr_1fr_0.9fr] text-sm">
-      <div class="space-y-2">
-        <p><strong>Cliente:</strong> {selectedOrder.customer_name}</p>
-        <p><strong>Metodo pago:</strong> {selectedOrder.payment_method}</p>
-        <p>
-          <strong>Mesa:</strong>
-          {selectedOrder.order_type === "en_local"
-            ? (selectedOrder.table_number ?? "Sin mesa")
-            : "No aplica"}
-        </p>
-      </div>
-      <div class="space-y-2">
-        <p><strong>Telefono:</strong> {selectedOrder.customer_phone}</p>
-        <p>
-          <strong>Tipo:</strong>
-          {selectedOrder.order_type
-            ? orderTypeLabel(selectedOrder.order_type)
-            : "No definido"}
-        </p>
-        <p>
-          <strong>Creada por:</strong>
-          {createdByLabel(selectedOrder, employeeById)}
-        </p>
-      </div>
-      <div class="space-y-2">
-        <p><strong>Notas:</strong></p>
-        <div
-          class="rounded-lg border border-base-300/60 bg-base-200/40 p-3 text-sm max-h-28 overflow-y-auto"
-        >
-          {selectedOrder.notes?.trim() ? selectedOrder.notes : "Sin notas"}
-        </div>
-      </div>
-      {#if selectedOrder.tracking_token}
-        <div
-          class="md:col-span-3 rounded-lg border border-warning/40 bg-warning/5 p-3 space-y-2"
-        >
+    {#if selectedOrder.tracking_token}
+      <div
+        class="md:col-span-3 rounded-lg border border-warning/30 bg-warning/5 p-3 space-y-2"
+      >
+        <div class="flex items-center justify-between gap-2">
           <p
             class="text-xs font-semibold text-warning/80 uppercase tracking-wide"
           >
-            Token de seguimiento del cliente
+            Token de seguimiento
           </p>
-          <div class="flex flex-wrap items-center gap-2">
-            <code
-              class="flex-1 min-w-0 truncate rounded bg-base-300/60 px-2 py-1 text-xs font-mono select-all"
-            >
-              {tokenVisible
-                ? selectedOrder.tracking_token
-                : "\u2022".repeat(24)}
-            </code>
-            <button
-              class="btn btn-xs btn-ghost"
-              type="button"
-              title={tokenVisible ? "Ocultar token" : "Revelar token"}
-              onclick={onToggleTokenVisibility}
-              aria-label={tokenVisible ? "Ocultar token" : "Revelar token"}
-            >
-              <Icon
-                icon={tokenVisible ? "lucide:eye-off" : "lucide:eye"}
-                width="14"
-                height="14"
-              />
-            </button>
-            <button
-              class="btn btn-xs btn-ghost"
-              type="button"
-              title="Copiar token"
-              onclick={() =>
-                onCopyToken(selectedOrder.tracking_token!, "token")}
-              aria-label="Copiar token"
-            >
-              <Icon
-                icon={tokenCopied === "token" ? "lucide:check" : "lucide:copy"}
-                width="14"
-                height="14"
-              />
-              {tokenCopied === "token" ? "¡Copiado!" : "Token"}
-            </button>
-          </div>
           {#if selectedOrder.tracking_token_expires_at}
             <p class="text-xs text-base-content/50">
-              Expira: {new Date(
+              Expira {new Date(
                 selectedOrder.tracking_token_expires_at,
               ).toLocaleDateString("es-SV", { dateStyle: "medium" })}
             </p>
           {/if}
         </div>
-      {/if}
-      <div class="md:col-span-3">
-        {#if selectedOrder.status === "cancelada"}
-          <div class="flex flex-col gap-1">
-            <div class="flex flex-wrap items-center gap-2">
-              <p class="text-left"><strong>Estado:</strong></p>
-              <span class="badge badge-error badge-outline">Orden denegada</span
-              >
-              {#if selectedOrder.rejection_reason}
-                <span class="text-xs text-base-content/60"
-                  >Motivo: {selectedOrder.rejection_reason}</span
-                >
-              {/if}
-              {#if isAdmin}
-                <button
-                  class="btn btn-xs btn-soft btn-success"
-                  onclick={() => onOpenReactivate(selectedOrder.id)}
-                >
-                  Aceptar
-                </button>
-              {/if}
-            </div>
-            <div
-              role="progressbar"
-              aria-valuenow={canceledFlow.indexOf(
-                selectedOrder.status as "pendiente_revision" | "cancelada",
-              ) + 1}
-              aria-valuemin={1}
-              aria-valuemax={canceledFlow.length}
-              aria-label="Estado de cancelacion"
-            >
-              <ul
-                class="steps steps-vertical sm:steps-horizontal w-full max-w-2xl mt-2 order-steps order-steps--compact"
-              >
-                {#each canceledFlow as stepStatus}
-                  {@const reached =
-                    canceledFlow.indexOf(stepStatus) <=
-                    canceledFlow.indexOf("cancelada")}
-                  {@const completed =
-                    canceledFlow.indexOf(stepStatus) <
-                    canceledFlow.indexOf("cancelada")}
-                  {@const current = stepStatus === "cancelada"}
-                  <li
-                    data-content=""
-                    class={`step min-h-18! ${reached ? "step-primary" : ""}`}
-                    aria-current={current ? "step" : undefined}
-                  >
-                    <div
-                      class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-1"
-                    >
-                      <span
-                        class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"}`}
-                      >
-                        <Icon
-                          icon={current
-                            ? canceledStepIconsActive[stepStatus]
-                            : canceledStepIconsStatic[stepStatus]}
-                          width="18"
-                          height="18"
-                        />
-                      </span>
-                      <span
-                        class={`text-sm font-semibold ${current ? "text-error" : completed ? "text-base-content" : "text-base-content/45"}`}
-                        >{canceledStepLabels[stepStatus]}</span
-                      >
-                      {#if stepTimestamp(stepStatus)}
-                        <span class="order-step-timestamp"
-                          >{stepTimestamp(stepStatus)}</span
-                        >
-                      {/if}
-                    </div>
-                  </li>
-                {/each}
-              </ul>
-              <span
-                class="order-steps-sr-only"
-                aria-live="polite"
-                aria-atomic="true">{canceledStepAnnouncement}</span
-              >
-            </div>
-          </div>
-        {:else}
-          <div
-            class="grid gap-3 md:grid-cols-[200px_minmax(240px,1fr)_200px] items-center"
+        <div class="flex items-center gap-2">
+          <code
+            class="flex-1 min-w-0 truncate rounded bg-base-100 px-2 py-1.5 text-xs font-mono select-all border border-warning/20"
           >
-            <div class="text-left">
-              <p><strong>Estado:</strong></p>
-            </div>
-            <div
-              role="progressbar"
-              aria-valuenow={statusIndex + 1}
-              aria-valuemin={1}
-              aria-valuemax={linearStatuses.length}
-              aria-label="Progreso del pedido"
+            {tokenVisible ? selectedOrder.tracking_token : "\u2022".repeat(24)}
+          </code>
+          <button
+            class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-warning"
+            type="button"
+            title={tokenVisible ? "Ocultar token" : "Revelar token"}
+            onclick={onToggleTokenVisibility}
+            aria-label={tokenVisible ? "Ocultar token" : "Revelar token"}
+          >
+            <Icon
+              icon={tokenVisible ? "lucide:eye-off" : "lucide:eye"}
+              class="h-4 w-4"
+            />
+          </button>
+          <button
+            class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-warning"
+            type="button"
+            title="Copiar token"
+            onclick={() => onCopyToken(selectedOrder.tracking_token!, "token")}
+            aria-label="Copiar token"
+          >
+            <Icon
+              icon={tokenCopied === "token" ? "lucide:check" : "lucide:copy"}
+              class="h-4 w-4"
+            />
+          </button>
+        </div>
+      </div>
+    {/if}
+    <div class="md:col-span-3 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <span class="text-xs text-base-content/60">Estado</span>
+        {#if selectedOrder.status === "cancelada"}
+          {#if isAdmin}
+            <button
+              class="btn btn-xs btn-soft btn-success"
+              type="button"
+              onclick={() => onOpenReactivate(selectedOrder.id)}
             >
-              <ul
-                class="steps steps-vertical sm:steps-horizontal w-full max-w-3xl mx-auto order-steps order-steps--compact"
+              Reactivar
+            </button>
+          {/if}
+        {:else}
+          <div class="flex items-center gap-2">
+            {#if kitchenBadge(selectedOrder)}
+              <span class={kitchenBadge(selectedOrder)?.className}
+                >{kitchenBadge(selectedOrder)?.text}</span
               >
-                {#each linearStatuses as stepStatus}
-                  {@const reached = isStepReached(
-                    selectedOrder.status,
-                    stepStatus,
-                  )}
-                  {@const completed =
-                    reached && selectedOrder.status !== stepStatus}
-                  {@const current = selectedOrder.status === stepStatus}
-                  {@const isHint =
-                    stepStatus === suggestedNext && !current && !completed}
-                  <li
-                    data-content=""
-                    class={`step min-h-18! ${reached ? "step-primary" : ""}`}
-                    aria-current={current ? "step" : undefined}
-                  >
-                    <div
-                      class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-1"
-                    >
-                      <button
-                        class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"} ${!current && !completed && onCanChangeToStep(selectedOrder, stepStatus) ? "order-step-node--clickable" : ""} ${isHint ? "order-step-node--hint" : ""}`}
-                        type="button"
-                        onclick={() =>
-                          onHandleStepClick(selectedOrder, stepStatus)}
-                        disabled={!onCanChangeToStep(selectedOrder, stepStatus)}
-                        aria-label={`Actualizar estado a ${statusLabels[stepStatus]}`}
-                      >
-                        <Icon
-                          icon={current
-                            ? statusStepIconsActive[stepStatus]
-                            : statusStepIconsStatic[stepStatus]}
-                          width="18"
-                          height="18"
-                        />
-                      </button>
-                      <button
-                        class={`order-step-label-btn ${current ? "text-primary" : completed ? "text-base-content" : "text-base-content/45"}`}
-                        type="button"
-                        onclick={() =>
-                          onHandleStepClick(selectedOrder, stepStatus)}
-                        disabled={!onCanChangeToStep(selectedOrder, stepStatus)}
-                        aria-label={`Actualizar estado a ${statusLabels[stepStatus]}`}
-                      >
-                        {statusLabels[stepStatus]}
-                      </button>
-                      {#if stepTimestamp(stepStatus)}
-                        <span class="order-step-timestamp"
-                          >{stepTimestamp(stepStatus)}</span
-                        >
-                      {/if}
-                    </div>
-                  </li>
-                {/each}
-              </ul>
-              <span
-                class="order-steps-sr-only"
-                aria-live="polite"
-                aria-atomic="true">{stepAnnouncement}</span
+            {/if}
+            {#if selectedOrder.status === "recibida" && isAdmin}
+              <button
+                class="btn btn-xs btn-soft btn-error"
+                type="button"
+                onclick={() => onOpenReject(selectedOrder.id)}
               >
-            </div>
-            <div class="flex justify-end">
-              <div class="flex items-center gap-2">
-                {#if kitchenBadge(selectedOrder)}
-                  <span class={kitchenBadge(selectedOrder)?.className}
-                    >{kitchenBadge(selectedOrder)?.text}</span
-                  >
-                {/if}
-                {#if selectedOrder.status === "recibida" && isAdmin}
-                  <button
-                    class="btn btn-xs btn-soft btn-error"
-                    onclick={() => onOpenReject(selectedOrder.id)}
-                  >
-                    Rechazar
-                  </button>
-                {/if}
-              </div>
-            </div>
+                Rechazar
+              </button>
+            {/if}
           </div>
         {/if}
       </div>
-    </div>
-    <div class="overflow-x-auto mt-2">
-      <table class="table table-sm">
-        <thead class="bg-base-200/60 text-base-content">
-          <tr>
-            <th class="w-[40%] font-bold">Producto</th>
-            <th class="w-[25%] font-bold">Sabores</th>
-            <th class="w-[15%] text-center font-bold">Cantidad</th>
-            <th class="w-[20%] text-right font-bold"
-              >{amountColumnLabel(selectedOrder.status)}</th
+
+      {#if selectedOrder.status === "cancelada"}
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="badge badge-error badge-outline">Orden denegada</span>
+          {#if selectedOrder.rejection_reason}
+            <span class="text-xs text-base-content/60"
+              >Motivo: {selectedOrder.rejection_reason}</span
             >
-          </tr>
-        </thead>
-        <tbody>
-          {#if !selectedOrder.items || selectedOrder.items.length === 0}
-            <tr><td colspan="4">Sin items</td></tr>
-          {:else}
-            {#each selectedOrder.items as item}
-              {@const flavorText = itemFlavorText(item.customizations)}
-              <tr>
-                <td>
-                  <div>{item.product_name}</div>
-                  {#if item.customizations}
-                    {#if Array.isArray(item.customizations.addon_names) && item.customizations.addon_names.length > 0 && !Array.isArray(item.customizations.included_addon_names) && !Array.isArray(item.customizations.extra_addon_names)}
-                      <div class="text-xs text-base-content/60">
-                        Complementos: {item.customizations.addon_names.join(
-                          ", ",
-                        )}
-                      </div>
-                    {/if}
-                    {#if Array.isArray(item.customizations.included_addon_names) && item.customizations.included_addon_names.length > 0}
-                      <div class="text-xs text-base-content/60">
-                        Incluidos: {item.customizations.included_addon_names.join(
-                          ", ",
-                        )}
-                      </div>
-                    {/if}
-                    {#if Array.isArray(item.customizations.extra_addon_names) && item.customizations.extra_addon_names.length > 0}
-                      <div class="text-xs text-base-content/60">
-                        Extras: {item.customizations.extra_addon_names.join(
-                          ", ",
-                        )}
-                      </div>
-                    {/if}
-                    {#if item.customizations.notes}
-                      <div class="text-xs text-base-content/60">
-                        Nota: {item.customizations.notes}
-                      </div>
-                    {/if}
-                  {/if}
-                </td>
-                <td>
-                  {#if flavorText}
-                    <span class="text-xs text-base-content/70"
-                      >{flavorText}</span
-                    >
-                  {:else}
-                    <span class="text-xs text-base-content/40">—</span>
-                  {/if}
-                </td>
-                <td class="text-center">{item.quantity}</td>
-                <td class="text-right">{formatCurrency(item.subtotal)}</td>
-              </tr>
-            {/each}
           {/if}
-        </tbody>
-      </table>
-    </div>
-    <div class="mt-3 flex justify-end">
-      <div
-        class="rounded-xl border border-base-300/60 bg-base-200/40 px-4 py-2 text-right"
-      >
-        <p
-          class="text-xs font-semibold uppercase tracking-wide text-base-content/60"
+        </div>
+        <div
+          role="progressbar"
+          aria-valuenow={canceledFlow.indexOf(
+            selectedOrder.status as "pendiente_revision" | "cancelada",
+          ) + 1}
+          aria-valuemin={1}
+          aria-valuemax={canceledFlow.length}
+          aria-label="Estado de cancelacion"
         >
-          Total de la orden
-        </p>
-        <p class="text-lg font-bold text-primary">
-          {formatCurrency(selectedOrder.total_amount)}
-        </p>
-      </div>
+          <ul
+            class="steps steps-vertical md:steps-horizontal w-full max-w-4xl mt-1 order-steps order-steps--compact"
+          >
+            {#each canceledFlow as stepStatus}
+              {@const reached =
+                canceledFlow.indexOf(stepStatus) <=
+                canceledFlow.indexOf("cancelada")}
+              {@const completed =
+                canceledFlow.indexOf(stepStatus) <
+                canceledFlow.indexOf("cancelada")}
+              {@const current = stepStatus === "cancelada"}
+              <li
+                data-content=""
+                class={`step min-h-18! ${reached ? "step-primary" : ""}`}
+                aria-current={current ? "step" : undefined}
+              >
+                <div
+                  class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-1"
+                >
+                  <span
+                    class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"}`}
+                  >
+                    <Icon
+                      icon={current
+                        ? canceledStepIconsActive[stepStatus]
+                        : canceledStepIconsStatic[stepStatus]}
+                      width="18"
+                      height="18"
+                    />
+                  </span>
+                  <span
+                    class={`text-sm font-semibold ${current ? "text-error" : completed ? "text-base-content" : "text-base-content/45"}`}
+                    >{canceledStepLabels[stepStatus]}</span
+                  >
+                  {#if stepTimestamp(stepStatus)}
+                    <span class="order-step-timestamp"
+                      >{stepTimestamp(stepStatus)}</span
+                    >
+                  {/if}
+                </div>
+              </li>
+            {/each}
+          </ul>
+          <span
+            class="order-steps-sr-only"
+            aria-live="polite"
+            aria-atomic="true">{canceledStepAnnouncement}</span
+          >
+        </div>
+      {:else}
+        <div
+          role="progressbar"
+          class="w-full min-w-0"
+          aria-valuenow={statusIndex + 1}
+          aria-valuemin={1}
+          aria-valuemax={linearStatuses.length}
+          aria-label="Progreso del pedido"
+        >
+          <ul
+            class="steps steps-vertical md:steps-horizontal w-full max-w-4xl mx-auto order-steps order-steps--compact"
+          >
+            {#each linearStatuses as stepStatus}
+              {@const reached = isStepReached(selectedOrder.status, stepStatus)}
+              {@const completed =
+                reached && selectedOrder.status !== stepStatus}
+              {@const current = selectedOrder.status === stepStatus}
+              {@const isHint =
+                stepStatus === suggestedNext && !current && !completed}
+              <li
+                data-content=""
+                class={`step min-h-18! ${reached ? "step-primary" : ""}`}
+                aria-current={current ? "step" : undefined}
+              >
+                <div
+                  class="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2 mt-1"
+                >
+                  <button
+                    class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"} ${!current && !completed && onCanChangeToStep(selectedOrder, stepStatus) ? "order-step-node--clickable" : ""} ${isHint ? "order-step-node--hint" : ""}`}
+                    type="button"
+                    onclick={() => onHandleStepClick(selectedOrder, stepStatus)}
+                    disabled={!onCanChangeToStep(selectedOrder, stepStatus)}
+                    aria-label={`Actualizar estado a ${statusLabels[stepStatus]}`}
+                  >
+                    <Icon
+                      icon={current
+                        ? statusStepIconsActive[stepStatus]
+                        : statusStepIconsStatic[stepStatus]}
+                      width="18"
+                      height="18"
+                    />
+                  </button>
+                  <button
+                    class={`order-step-label-btn ${current ? "text-primary" : completed ? "text-base-content" : "text-base-content/45"}`}
+                    type="button"
+                    onclick={() => onHandleStepClick(selectedOrder, stepStatus)}
+                    disabled={!onCanChangeToStep(selectedOrder, stepStatus)}
+                    aria-label={`Actualizar estado a ${statusLabels[stepStatus]}`}
+                  >
+                    {statusLabels[stepStatus]}
+                  </button>
+                  {#if stepTimestamp(stepStatus)}
+                    <span class="order-step-timestamp"
+                      >{stepTimestamp(stepStatus)}</span
+                    >
+                  {/if}
+                </div>
+              </li>
+            {/each}
+          </ul>
+          <span
+            class="order-steps-sr-only"
+            aria-live="polite"
+            aria-atomic="true">{stepAnnouncement}</span
+          >
+        </div>
+      {/if}
+    </div>
+  </div>
+
+  <div
+    class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
+  >
+    <table class="table table-sm w-full">
+      <thead class="bg-base-200/60 text-base-content">
+        <tr>
+          <th class="font-bold">Producto</th>
+          <th class="font-bold">Sabores</th>
+          <th class="text-center font-bold">Cantidad</th>
+          <th class="text-right font-bold"
+            >{amountColumnLabel(selectedOrder.status)}</th
+          >
+        </tr>
+      </thead>
+      <tbody>
+        {#if !selectedOrder.items || selectedOrder.items.length === 0}
+          <tr
+            ><td colspan="4" class="text-center py-6 text-base-content/50"
+              >Sin items</td
+            ></tr
+          >
+        {:else}
+          {#each selectedOrder.items as item (item.id ?? `${item.product_name}-${item.quantity}`)}
+            {@const flavorText = itemFlavorText(item.customizations)}
+            <tr class="hover:bg-base-300/40 transition-colors">
+              <td>
+                <div class="font-medium">{item.product_name}</div>
+                {#if item.customizations}
+                  {#if Array.isArray(item.customizations.addon_names) && item.customizations.addon_names.length > 0 && !Array.isArray(item.customizations.included_addon_names) && !Array.isArray(item.customizations.extra_addon_names)}
+                    <div class="text-xs text-base-content/60">
+                      Complementos: {item.customizations.addon_names.join(", ")}
+                    </div>
+                  {/if}
+                  {#if Array.isArray(item.customizations.included_addon_names) && item.customizations.included_addon_names.length > 0}
+                    <div class="text-xs text-base-content/60">
+                      Incluidos: {item.customizations.included_addon_names.join(
+                        ", ",
+                      )}
+                    </div>
+                  {/if}
+                  {#if Array.isArray(item.customizations.extra_addon_names) && item.customizations.extra_addon_names.length > 0}
+                    <div class="text-xs text-base-content/60">
+                      Extras: {item.customizations.extra_addon_names.join(", ")}
+                    </div>
+                  {/if}
+                  {#if item.customizations.notes}
+                    <div class="text-xs text-base-content/60">
+                      Nota: {item.customizations.notes}
+                    </div>
+                  {/if}
+                {/if}
+              </td>
+              <td>
+                {#if flavorText}
+                  <span class="text-xs text-base-content/70">{flavorText}</span>
+                {:else}
+                  <span class="text-xs text-base-content/40">—</span>
+                {/if}
+              </td>
+              <td class="text-center align-middle">{item.quantity}</td>
+              <td class="text-right align-middle"
+                >{formatCurrency(item.subtotal)}</td
+              >
+            </tr>
+          {/each}
+        {/if}
+      </tbody>
+    </table>
+  </div>
+  <div class="flex justify-end">
+    <div
+      class="rounded-lg border border-base-300/60 bg-base-100 px-4 py-2 text-right shadow-sm"
+    >
+      <p class="text-xs text-base-content/60">Total de la orden</p>
+      <p class="text-lg font-bold text-primary">
+        {formatCurrency(selectedOrder.total_amount)}
+      </p>
     </div>
   </div>
 </div>

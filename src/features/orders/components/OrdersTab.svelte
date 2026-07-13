@@ -1,6 +1,11 @@
 <script lang="ts">
   import Icon from "@shared/components/AppIcon.svelte";
-  import type { Employee, Order, Product } from "@features/admin-management";
+  import type {
+    Category,
+    Employee,
+    Order,
+    Product,
+  } from "@features/admin-management";
   import {
     groupAddonsByGroup,
     normalizeAddonGroupName,
@@ -10,6 +15,7 @@
     statusLabels,
     statusBadgeClass,
     canChangeToStep,
+    isOrderEditable,
     type LinearOrderStatus,
   } from "../lib/order-status";
   import * as DraftHelpers from "../lib/draft-item-helpers";
@@ -19,14 +25,25 @@
   import * as OrderSubmission from "../lib/order-submission";
   import * as SaveUserHelpers from "../lib/save-user-helpers";
   import { emitOrderStatusSync } from "../lib/status-sync";
+  import {
+    clearIdempotencyKey,
+    generateIdempotencyKey,
+  } from "../lib/idempotency";
   import OrderDetailView from "./admin/OrderDetailView.svelte";
   import OrderList from "./admin/OrderList.svelte";
   import OrderEditor from "./admin/OrderEditor.svelte";
+  import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
   import SaveUserFromOrderDialog from "./admin/SaveUserFromOrderDialog.svelte";
   import RejectOrderDialog from "./admin/RejectOrderDialog.svelte";
   import ReactivateOrderDialog from "./admin/ReactivateOrderDialog.svelte";
   import PrintPromptDialog from "./admin/PrintPromptDialog.svelte";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import {
+    closeConfirmDialog,
+    confirmDialogNow,
+    createConfirmDialogState,
+    openConfirmDialog,
+  } from "@shared/utils/confirm-dialog";
   import type {
     CreateOrderPayload,
     OrdersTabProps,
@@ -51,24 +68,30 @@
     isAdmin,
     orders,
     products,
+    categories,
     employees,
     selectedOrder,
     busy,
     moduleError,
     orderStatusFilter,
+    showArchived,
     onFilterChange,
+    onToggleArchivedView,
     onReload,
     onOpenOrder,
+    onClearSelectedOrder,
     onApprove,
     onReject,
     onStatusChange,
     onUpdateOrder,
     onDelete,
     onCreate,
+    onArchive,
     saveUserFromOrder,
   }: OrdersTabProps = $props();
 
-  let confirmOpen = $state(false);
+  let confirmDialog = $state(createConfirmDialogState());
+  let detailDialogRef = $state<HTMLDialogElement | null>(null);
   let orderEditorOpen = $state(false);
   let saveUserOpen = $state(false);
   let tokenVisible = $state(false);
@@ -80,6 +103,11 @@
       const reset = TokenHelpers.resetTokenState();
       tokenVisible = reset.tokenVisible;
       tokenCopied = reset.tokenCopied;
+      if (detailDialogRef && !detailDialogRef.open) {
+        detailDialogRef.showModal();
+      }
+    } else if (detailDialogRef && detailDialogRef.open) {
+      detailDialogRef.close();
     }
   });
 
@@ -94,10 +122,6 @@
       });
     }
   }
-
-  let confirmTitle = $state("Confirmar accion");
-  let confirmMessage = $state("");
-  let confirmAction = $state<null | (() => void)>(null);
 
   let rejectState = $state<DialogState.RejectDialogState>(
     DialogState.closeReject(),
@@ -123,6 +147,7 @@
   let selectedExtraAddonIds = $state<string[]>([]);
   let lastSelectedProductId = $state("");
   let editingDraftIndex = $state<number | null>(null);
+  let createOrderIdempotencyKey = $state<string | null>(null);
 
   type ProductAddon = NonNullable<Product["addons"]>[number];
   type ProductFlavor = NonNullable<Product["flavors"]>[number];
@@ -728,29 +753,45 @@
   );
 
   function requestApprove(order: Order) {
-    const newState = DialogState.openConfirm(
+    openConfirmDialog(
+      confirmDialog,
       "Aprobar orden",
       `Confirmar aprobacion de ${order.order_number}?`,
       () => {
         void approveAndSync(order.id);
       },
     );
-    confirmTitle = newState.title;
-    confirmMessage = newState.message;
-    confirmAction = newState.action;
-    confirmOpen = newState.open;
   }
 
   function requestDelete(order: Order) {
-    const newState = DialogState.openConfirm(
+    openConfirmDialog(
+      confirmDialog,
       "Eliminar orden",
       `Seguro que deseas eliminar ${order.order_number}?`,
       () => onDelete(order.id),
     );
-    confirmTitle = newState.title;
-    confirmMessage = newState.message;
-    confirmAction = newState.action;
-    confirmOpen = newState.open;
+  }
+
+  function requestArchive(order: Order) {
+    openConfirmDialog(
+      confirmDialog,
+      "Archivar orden",
+      `Archivar ${order.order_number}? Las ordenes archivadas no aparecen en la lista principal.`,
+      () => {
+        void onArchive(order.id, true);
+      },
+    );
+  }
+
+  function requestUnarchive(order: Order) {
+    openConfirmDialog(
+      confirmDialog,
+      "Desarchivar orden",
+      `Desarchivar ${order.order_number}? Volvera a aparecer en la lista principal.`,
+      () => {
+        void onArchive(order.id, false);
+      },
+    );
   }
 
   async function printFromList(orderId: string) {
@@ -809,6 +850,7 @@
 
   function openCreateOrderModal() {
     addItemError = "";
+    createOrderIdempotencyKey = generateIdempotencyKey();
     if (!restoreManualDraft()) {
       resetOrderForm();
     }
@@ -949,9 +991,14 @@
       items,
     );
 
-    const created = await onCreate(createPayload);
+    const created = await onCreate(
+      createPayload,
+      createOrderIdempotencyKey ?? undefined,
+    );
     if (created) {
       clearManualDraftStorage();
+      clearIdempotencyKey();
+      createOrderIdempotencyKey = null;
       closeOrderEditor();
     } else {
       editError = "No se pudo crear la orden";
@@ -959,34 +1006,19 @@
   }
 
   function openConfirm(title: string, message: string, action: () => void) {
-    const newState = DialogState.openConfirm(title, message, action);
-    confirmTitle = newState.title;
-    confirmMessage = newState.message;
-    confirmAction = newState.action;
-    confirmOpen = newState.open;
+    openConfirmDialog(confirmDialog, title, message, action);
   }
 
   function confirmNow() {
-    const result = DialogState.confirmNow({
-      open: confirmOpen,
-      title: confirmTitle,
-      message: confirmMessage,
-      action: confirmAction,
-    });
-    const action = result.action;
-    confirmTitle = result.newState.title;
-    confirmMessage = result.newState.message;
-    confirmAction = result.newState.action;
-    confirmOpen = result.newState.open;
-    if (action) action();
+    confirmDialogNow(confirmDialog);
   }
 
   function closeConfirm() {
-    const newState = DialogState.closeConfirm();
-    confirmTitle = newState.title;
-    confirmMessage = newState.message;
-    confirmAction = newState.action;
-    confirmOpen = newState.open;
+    closeConfirmDialog(confirmDialog);
+  }
+
+  function closeDetailDrawer() {
+    onClearSelectedOrder();
   }
 
   function openReject(orderId: string) {
@@ -1141,7 +1173,7 @@
   }
 </script>
 
-<section class="space-y-4">
+<section class="space-y-4 md:space-y-6">
   {#if moduleError}
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
@@ -1155,10 +1187,12 @@
     {orderStatusFilterLabel}
     {statusLabels}
     {statusBadgeClass}
+    {showArchived}
     onSearchChange={(value) => {
       orderSearch = value;
     }}
     {onFilterChange}
+    {onToggleArchivedView}
     {onReload}
     onCreateOrder={openCreateOrderModal}
     onOpenOrder={(orderId) => {
@@ -1172,10 +1206,60 @@
     }}
     onRequestApprove={requestApprove}
     onOpenReject={openReject}
+    onRequestArchive={requestArchive}
+    onRequestUnarchive={requestUnarchive}
     onRequestDelete={requestDelete}
   />
+</section>
 
-  {#if selectedOrder}
+{#if selectedOrder}
+  <AdminModalShell
+    bind:dialogRef={detailDialogRef}
+    title={`Detalle: ${selectedOrder.order_number}`}
+    icon="lucide:file-text"
+    widthClass="w-full md:w-5/6 lg:w-3/4 xl:max-w-5xl"
+    onClose={closeDetailDrawer}
+  >
+    {#snippet headerActions()}
+      {#if isOrderEditable(selectedOrder.status)}
+        <button
+          class="btn btn-ghost btn-sm btn-square text-base-content/70 hover:text-info"
+          type="button"
+          onclick={() => {
+            void startEdit(selectedOrder.id);
+          }}
+          disabled={busy}
+          aria-label="Editar orden"
+          title="Editar"
+        >
+          <Icon icon="lucide:pencil" class="h-4 w-4" />
+        </button>
+      {/if}
+      <button
+        class="btn btn-ghost btn-sm btn-square text-base-content/70 hover:text-info"
+        type="button"
+        onclick={() => {
+          void printFromList(selectedOrder.id);
+        }}
+        disabled={busy}
+        aria-label="Imprimir orden"
+        title="Imprimir"
+      >
+        <Icon icon="lucide:printer" class="h-4 w-4" />
+      </button>
+      {#if isAdmin}
+        <button
+          class="btn btn-ghost btn-sm btn-square text-base-content/70 hover:text-secondary"
+          type="button"
+          onclick={() => openSaveUserDialogFromOrder(selectedOrder)}
+          aria-label="Guardar como usuario"
+          title="Guardar como usuario"
+        >
+          <Icon icon="lucide:user-plus" class="h-4 w-4" />
+        </button>
+      {/if}
+    {/snippet}
+
     <OrderDetailView
       {selectedOrder}
       {isAdmin}
@@ -1192,8 +1276,8 @@
       onHandleStepClick={handleStepClick}
       onCanChangeToStep={canChangeToStep}
     />
-  {/if}
-</section>
+  </AdminModalShell>
+{/if}
 
 <OrderEditor
   open={orderEditorOpen}
@@ -1202,6 +1286,7 @@
   {selectedOrder}
   {busy}
   {products}
+  {categories}
   {orderForm}
   {manualItems}
   {selectedProductFlavors}
@@ -1263,10 +1348,11 @@
 />
 
 <ConfirmDialog
-  open={confirmOpen}
-  title={confirmTitle}
-  message={confirmMessage}
+  open={confirmDialog.open}
+  title={confirmDialog.title}
+  message={confirmDialog.message}
   {busy}
+  variant="primary"
   onConfirm={confirmNow}
   onCancel={closeConfirm}
 />

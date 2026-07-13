@@ -1,6 +1,13 @@
 <script lang="ts">
   import type { AdminImage } from "@features/admin-management";
   import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
+  import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import {
+    closeConfirmDialog,
+    confirmDialogNow,
+    createConfirmDialogState,
+    openConfirmDialog,
+  } from "@shared/utils/confirm-dialog";
 
   interface Props {
     open: boolean;
@@ -32,6 +39,8 @@
   let uploadInput = $state<HTMLInputElement | null>(null);
   let selectedUploadFile = $state<File | null>(null);
   let actionBusy = $state(false);
+  let confirmDialog = $state(createConfirmDialogState());
+  let pendingImageName = $state<string | null>(null);
 
   $effect(() => {
     if (!dialogRef) return;
@@ -66,8 +75,10 @@
     onClose();
   }
 
-  async function removeImage(imageName: string) {
-    if (!confirm(`¿Eliminar imagen "${imageName}"?`)) return;
+  async function confirmImageDelete() {
+    if (!pendingImageName) return;
+    const imageName = pendingImageName;
+    pendingImageName = null;
     actionBusy = true;
     try {
       await onDelete(imageName);
@@ -76,6 +87,16 @@
     } finally {
       actionBusy = false;
     }
+  }
+
+  function requestDeleteImage(imageName: string) {
+    pendingImageName = imageName;
+    openConfirmDialog(
+      confirmDialog,
+      "Eliminar imagen",
+      `¿Eliminar imagen "${imageName}"?`,
+      confirmImageDelete,
+    );
   }
 </script>
 
@@ -150,7 +171,7 @@
             <button
               class="btn btn-xs btn-error"
               type="button"
-              onclick={() => removeImage(image.name)}
+              onclick={() => requestDeleteImage(image.name)}
               disabled={busy || galleryBusy || actionBusy}
             >
               Eliminar
@@ -161,3 +182,13 @@
     {/if}
   </div>
 </AdminModalShell>
+
+<ConfirmDialog
+  open={confirmDialog.open}
+  title={confirmDialog.title}
+  message={confirmDialog.message}
+  busy={busy || galleryBusy || actionBusy}
+  variant="error"
+  onConfirm={() => confirmDialogNow(confirmDialog)}
+  onCancel={() => closeConfirmDialog(confirmDialog)}
+/>

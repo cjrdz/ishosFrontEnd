@@ -62,7 +62,7 @@
     role: "admin" | "employee";
     active?: boolean;
   };
-  type LazyTabKey = Exclude<TabKey, "ordenes">;
+  type LazyTabKey = Exclude<TabKey, "ordenes" | "analitica">;
 
   function trackAction(action: string, metadata?: Record<string, unknown>) {
     if (import.meta.env.DEV) {
@@ -112,6 +112,7 @@
   const addons = $derived($adminData.addons);
   const selectedOrder = $derived($adminDashboardUi.selectedOrder);
   const orderStatusFilter = $derived($adminDashboardUi.orderStatusFilter);
+  let showArchivedOrders = $state(false);
   const productGalleryBusy = $derived($adminDashboardUi.productGalleryBusy);
   let hasLoadedOrdersOnce = false;
   let knownOrderIds = new Set<string>();
@@ -139,8 +140,6 @@
     productos: { loading: false, hydrated: false },
     inventario: { loading: false, hydrated: false },
     personas: { loading: false, hydrated: false },
-    ofertas: { loading: false, hydrated: false },
-    herramientas: { loading: false, hydrated: false },
   };
   let tabLazyState = $state(structuredClone(DEFAULT_TAB_LAZY_STATE));
   let tabOrder = $state<TabKey[]>([...DEFAULT_TAB_ORDER]);
@@ -206,6 +205,10 @@
 
   function setSelectedOrder(value: Order | null) {
     patchAdminUi({ selectedOrder: value });
+  }
+
+  function handleClearSelectedOrder() {
+    setSelectedOrder(null);
   }
 
   function setSelectedUserOrders(value: UserOrderHistoryItem[]) {
@@ -442,7 +445,7 @@
   }
 
   function isLazyTabKey(tab: TabKey): tab is LazyTabKey {
-    return tab !== "ordenes";
+    return tab !== "ordenes" && tab !== "analitica";
   }
 
   async function ensureTabDataLoaded(tab: TabKey) {
@@ -471,14 +474,16 @@
           runLazyModuleLoad("product-images", loadProductImages),
         ]);
       } else if (tab === "inventario") {
-        await runLazyModuleLoad("inventario", loadInventory);
+        await Promise.allSettled([
+          runLazyModuleLoad("inventario", loadInventory),
+          runLazyModuleLoad("flavors", loadFlavors),
+          runLazyModuleLoad("addons", loadAddons),
+        ]);
       } else if (tab === "personas") {
         await Promise.allSettled([
           runLazyModuleLoad("empleados", loadEmployees),
           runLazyModuleLoad("usuarios", loadUsers),
         ]);
-      } else if (tab === "ofertas") {
-        await runLazyModuleLoad("productos-core", loadProducts);
       }
 
       tabLazyState = {
@@ -597,6 +602,9 @@
         runLazyModuleLoad("productos-core", async () => {
           await loadProducts();
         }),
+        runLazyModuleLoad("categorias", async () => {
+          await loadCategories();
+        }),
         runLazyModuleLoad("tabs-settings", async () => {
           await loadTabsSettings();
         }),
@@ -625,7 +633,6 @@
   }
 
   async function loadCategories() {
-    if (!isAdmin) return;
     setBusy("categorias", true);
     clearModuleError("categorias");
     try {
@@ -688,7 +695,7 @@
     }
 
     try {
-      const response = await listOrders(orderStatusFilter);
+      const response = await listOrders(orderStatusFilter, showArchivedOrders);
       const incomingOrders = response.orders;
 
       if (hasLoadedOrdersOnce && silent) {
@@ -846,6 +853,7 @@
     handleReject,
     handleStatusChange,
     handleUpdateOrder,
+    handleArchiveOrder,
   } = createDashboardOrderHandlers({
     runModuleAction,
     loadOrders,
@@ -1033,6 +1041,11 @@
     loadOrders();
   }
 
+  function handleToggleArchivedView() {
+    showArchivedOrders = !showArchivedOrders;
+    void loadOrders();
+  }
+
   function replaceUrlTab(tab: TabKey) {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
@@ -1067,15 +1080,19 @@
     busy: busy.ordenes,
     moduleError: moduleErrors.ordenes,
     orderStatusFilter,
+    showArchived: showArchivedOrders,
     onFilterChange: handleFilterChange,
+    onToggleArchivedView: handleToggleArchivedView,
     onReload: loadOrders,
     onOpenOrder: handleOpenOrder,
+    onClearSelectedOrder: handleClearSelectedOrder,
     onApprove: handleApprove,
     onReject: handleReject,
     onStatusChange: handleStatusChange,
     onUpdateOrder: handleUpdateOrder,
     onDelete: handleDeleteOrder,
     onCreate: handleCreateOrder,
+    onArchive: handleArchiveOrder,
     saveUserFromOrder: handleSaveUserFromOrder,
   });
   const categoriesPanelProps = $derived({
@@ -1133,6 +1150,18 @@
   const inventoryPanelProps = $derived({
     busy: busy.inventario,
     moduleError: moduleErrors.inventario,
+    flavors,
+    addons,
+    flavorBusy: busy.sabores,
+    addonBusy: busy.complementos,
+    flavorError: moduleErrors.sabores,
+    addonError: moduleErrors.complementos,
+    onCreateFlavor: handleCreateFlavor,
+    onUpdateFlavor: handleUpdateFlavor,
+    onDeleteFlavor: handleDeleteFlavor,
+    onCreateAddon: handleCreateAddon,
+    onUpdateAddon: handleUpdateAddon,
+    onDeleteAddon: handleDeleteAddon,
   });
 
   function openSettingsPage() {

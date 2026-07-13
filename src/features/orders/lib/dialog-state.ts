@@ -2,13 +2,6 @@ import type { Order } from "@features/admin-management";
 
 /** Dialog and modal state management helpers */
 
-export interface ConfirmDialogState {
-  open: boolean;
-  title: string;
-  message: string;
-  action: (() => void) | null;
-}
-
 export interface RejectDialogState {
   open: boolean;
   targetId: string | null;
@@ -38,47 +31,6 @@ export interface SaveUserDialogState {
     status: "active" | "inactive";
   };
   error: string;
-}
-
-/** Opens the confirm dialog */
-export function openConfirm(
-  title: string,
-  message: string,
-  action: () => void,
-): ConfirmDialogState {
-  return {
-    open: true,
-    title,
-    message,
-    action,
-  };
-}
-
-/** Closes the confirm dialog after executing the action */
-export function confirmNow(state: ConfirmDialogState): {
-  newState: ConfirmDialogState;
-  action: (() => void) | null;
-} {
-  const action = state.action;
-  return {
-    newState: {
-      open: false,
-      title: "",
-      message: "",
-      action: null,
-    },
-    action,
-  };
-}
-
-/** Closes the confirm dialog without executing the action */
-export function closeConfirm(): ConfirmDialogState {
-  return {
-    open: false,
-    title: "",
-    message: "",
-    action: null,
-  };
 }
 
 /** Opens the reject dialog */

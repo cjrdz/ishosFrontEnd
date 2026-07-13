@@ -150,10 +150,11 @@ export function requiresGroupSelection(
 export function computeUnitPrice(
   product: PublicProduct | undefined,
   draft: ProductCustomizationDraft,
+  basePrice?: number,
 ): number {
   if (!product) return 0;
 
-  let unitPrice = toSafeNumber(product.price);
+  let unitPrice = toSafeNumber(basePrice ?? product.price);
   const extraIds = draft.extra_addon_ids ?? [];
 
   if (extraIds.length === 0) return unitPrice;
@@ -170,7 +171,8 @@ export function computeUnitPrice(
 export function computeTotalPrice(
   product: PublicProduct | undefined,
   draft: ProductCustomizationDraft,
+  basePrice?: number,
 ): number {
   const safeQty = normalizeQuantity(draft.quantity);
-  return computeUnitPrice(product, draft) * safeQty;
+  return computeUnitPrice(product, draft, basePrice) * safeQty;
 }

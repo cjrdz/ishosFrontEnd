@@ -47,8 +47,6 @@
     typeof offer?.discount_price === "number" && offer.discount_price > 0,
   );
 
-  // Unified card: always full-height, image fills, info overlays from bottom.
-  // The outer wrapper handles link/button semantics; the article is purely visual.
   function handleOpen() {
     if (clickable) onOpen();
   }
@@ -68,7 +66,6 @@
   function handleImgError() {
     imgFailed = true;
   }
-  // Reset on imageUrl change (e.g. product swapped in a list)
   $effect(() => {
     imageUrl;
     imgFailed = false;
@@ -82,10 +79,7 @@
   - default → <div>
   All three share the same inner <article> markup — no duplication.
 -->
-<div
-  class="pc-root h-full group"
-  class:pc-root--featured={variant === "featured"}
->
+<div class="pc-root h-full group">
   {#if href}
     <a {href} class="pc-link" aria-label={product.name}>
       <article class="pc-card pc-card--{variant}">
@@ -93,7 +87,6 @@
       </article>
     </a>
   {:else if clickable}
-    <!-- Invisible full-card button sits above everything except the add/select controls -->
     <button
       type="button"
       class="pc-overlay-btn"
@@ -111,9 +104,9 @@
 </div>
 
 {#snippet cardInner()}
-  <!-- Image layer -->
-  {#if imageUrl && !imgFailed}
-    <figure class="pc-figure" aria-hidden="true">
+  <!-- Image fills the card; card height set by aspect ratio -->
+  <figure class="pc-figure" aria-hidden="true">
+    {#if imageUrl && !imgFailed}
       <img
         src={imageUrl}
         alt={product.name}
@@ -121,22 +114,22 @@
         loading="lazy"
         onerror={handleImgError}
       />
-      <!-- Gradient: stronger at bottom for legible text, lighter at top -->
+      <!-- Gradient ensures text stays readable without killing image visibility -->
       <div class="pc-gradient"></div>
-    </figure>
-  {:else}
-    <div
-      class="pc-no-image"
-      role="img"
-      aria-label={`Imagen no disponible para ${product.name}`}
-    >
-      <Icon
-        icon="lucide:image-off"
-        class="size-10 opacity-30"
-        aria-hidden="true"
-      />
-    </div>
-  {/if}
+    {:else}
+      <div
+        class="pc-no-image"
+        role="img"
+        aria-label={`Imagen no disponible para ${product.name}`}
+      >
+        <Icon
+          icon="lucide:image-off"
+          class="size-10 opacity-30"
+          aria-hidden="true"
+        />
+      </div>
+    {/if}
+  </figure>
 
   <!-- Stock status badge -->
   {#if product.stock_status === "out_of_stock"}
@@ -149,19 +142,11 @@
     </span>
   {/if}
 
-  <!-- Offer badge (single source of truth — do not add a second badge in the parent) -->
+  <!-- Offer badge -->
   {#if offer}
     <span class="badge badge-warning badge-sm absolute left-3 top-3 z-20">
       {offer.label || "Oferta"}
     </span>
-  {/if}
-
-  <!-- Urgency countdown chip — rendered inside the card so it is clipped by overflow:hidden -->
-  {#if countdown}
-    <div class="pc-countdown" aria-label="Tiempo restante">
-      <Icon icon="lucide:clock-3" class="size-3" />
-      <span>{countdown}</span>
-    </div>
   {/if}
 
   <!-- Seasonal badge -->
@@ -171,24 +156,16 @@
     </span>
   {/if}
 
-  <!-- Add-to-cart fab -->
-  {#if ordersEnabled && !showSelectButton}
-    <button
-      type="button"
-      class="pc-add-btn"
-      aria-label={`Agregar ${product.name} al pedido`}
-      onclick={handleAdd}
-    >
-      <Icon icon="lucide:plus" class="size-4" />
-    </button>
+  <!-- Countdown chip -->
+  {#if countdown}
+    <div class="pc-countdown" aria-label="Tiempo restante">
+      <Icon icon="lucide:clock-3" class="size-3" />
+      <span>{countdown}</span>
+    </div>
   {/if}
 
-  <!-- Info bar at bottom -->
-  <div
-    class="pc-info {imageUrl && !imgFailed
-      ? 'pc-info--over-image'
-      : 'pc-info--plain'}"
-  >
+  <!-- Floating info pill at the bottom; gradient + subtle blur keeps image visible -->
+  <div class="pc-info">
     <div class="pc-info-inner">
       <h3 class="pc-name">{product.name}</h3>
 
@@ -208,10 +185,16 @@
           {/if}
         </div>
 
-        {#if ordersEnabled && showSelectButton}
-          <button type="button" class="pc-select-btn" onclick={handleSelect}>
-            Seleccionar
-          </button>
+        {#if ordersEnabled}
+          {#if showSelectButton}
+            <button type="button" class="pc-action-btn" onclick={handleSelect}>
+              Seleccionar
+            </button>
+          {:else}
+            <button type="button" class="pc-action-btn" onclick={handleAdd}>
+              Agregar
+            </button>
+          {/if}
         {/if}
       </div>
     </div>
@@ -223,19 +206,7 @@
   .pc-root {
     position: relative;
     width: 100%;
-    max-width: 17.5rem;
-    margin-inline: auto;
-  }
-
-  @media (max-width: 767px) {
-    .pc-root {
-      max-width: 100%;
-    }
-  }
-
-  /* Featured variant fills its carousel slot fully */
-  .pc-root--featured {
-    max-width: 100%;
+    height: 100%;
   }
 
   /* Full-card invisible overlay for clickable cards */
@@ -249,7 +220,7 @@
     cursor: pointer;
   }
   .pc-overlay-btn:focus-visible {
-    outline: 2px solid oklch(var(--p) / 0.5);
+    outline: 2px solid var(--ishos-teal);
     outline-offset: 2px;
   }
 
@@ -263,15 +234,15 @@
   /* ── Card shell ──────────────────────────────────────────────── */
   .pc-card {
     position: relative;
-    display: flex;
-    flex-direction: column;
+    display: block;
     width: 100%;
     height: 100%;
-    min-height: 24rem;
+    /* Taller ratio so products feel substantial and images show fully */
+    aspect-ratio: 3 / 4;
     overflow: hidden;
     border-radius: 1.25rem;
     border: 1px solid oklch(var(--b2) / 0.7);
-    background-color: oklch(var(--b1));
+    background-color: oklch(var(--b2) / 0.55);
     box-shadow: var(--pc-card-shadow);
     transition:
       box-shadow 0.25s ease,
@@ -285,110 +256,7 @@
   }
 
   .pc-card--featured {
-    /* Featured cards have slightly softer shadow at rest */
     box-shadow: 0 1px 2px oklch(0% 0 0 / 0.06);
-  }
-
-  @media (max-width: 767px) {
-    .pc-card--menu {
-      min-height: 12.5rem;
-      display: grid;
-      grid-template-columns: minmax(0, 42%) minmax(0, 58%);
-    }
-
-    .pc-card--menu .pc-figure,
-    .pc-card--menu .pc-no-image {
-      position: relative;
-      inset: auto;
-      height: 100%;
-      grid-column: 1;
-      grid-row: 1;
-    }
-
-    .pc-card--menu .pc-gradient {
-      background: linear-gradient(
-        to right,
-        transparent 55%,
-        oklch(0% 0 0 / 0.2) 100%
-      );
-    }
-
-    .pc-card--menu .pc-info {
-      grid-column: 2;
-      grid-row: 1;
-      margin-top: 0;
-      padding: 0.65rem;
-      display: flex;
-      align-items: stretch;
-    }
-
-    .pc-card--menu .pc-info-inner {
-      width: 100%;
-      justify-content: center;
-      padding: 0.15rem 0.1rem 0.15rem 0.35rem;
-      gap: 0.5rem;
-    }
-
-    .pc-card--menu .pc-info--over-image .pc-info-inner {
-      background: transparent;
-      backdrop-filter: none;
-      -webkit-backdrop-filter: none;
-      border: 0;
-      border-radius: 0;
-    }
-
-    .pc-card--menu .pc-name {
-      color: oklch(var(--bc));
-      font-size: 1.05rem;
-      line-height: 1.2;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .pc-card--menu .pc-price-main {
-      color: oklch(var(--p));
-      font-size: 1.65rem;
-      line-height: 1;
-    }
-
-    .pc-card--menu .pc-price-before {
-      color: oklch(var(--bc) / 0.5);
-      font-size: 0.78rem;
-    }
-
-    .pc-card--menu .pc-note {
-      color: oklch(var(--bc) / 0.65);
-      font-size: 0.78rem;
-      white-space: normal;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
-      -webkit-box-orient: vertical;
-    }
-
-    .pc-card--menu .pc-select-btn {
-      font-size: 0.82rem;
-      padding: 0.4rem 0.95rem;
-    }
-
-    .pc-card--menu .pc-add-btn {
-      bottom: 0.65rem;
-      right: 0.65rem;
-    }
-
-    .pc-card--menu .pc-countdown {
-      top: 0.55rem;
-      right: 0.55rem;
-    }
-
-    .pc-card--menu .badge {
-      top: 0.55rem;
-      left: 0.55rem;
-    }
   }
 
   /* Hover: lift + subtle scale on the whole group */
@@ -398,11 +266,12 @@
     transform: translateY(-2px) scale(1.01);
   }
 
-  /* ── Image & gradient ────────────────────────────────────────── */
+  /* ── Image ───────────────────────────────────────────────────── */
   .pc-figure {
     position: absolute;
     inset: 0;
     overflow: hidden;
+    margin: 0;
   }
 
   .pc-img {
@@ -418,177 +287,24 @@
     transform: scale(1.04);
   }
 
-  /* Two-stop gradient: readable text without killing the image */
+  /* Gradient keeps text legible while letting the image show through */
   .pc-gradient {
     position: absolute;
     inset: 0;
     background: var(--pc-gradient-overlay);
+    pointer-events: none;
   }
 
   /* Fallback when no image */
   .pc-no-image {
-    flex: 1;
+    width: 100%;
+    height: 100%;
     display: grid;
     place-items: center;
-    background-color: oklch(var(--b2) / 0.6);
   }
 
-  /* ── Add FAB ─────────────────────────────────────────────────── */
-  .pc-add-btn {
-    position: absolute;
-    bottom: 0.75rem;
-    right: 0.75rem;
-    z-index: 20;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 9999px;
-    border: none;
-    background-color: oklch(var(--p));
-    color: oklch(var(--pc));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 2px 8px oklch(var(--p) / 0.45);
-    /* Always visible on touch, fade+scale in on hover for pointer devices */
-    opacity: 1;
-    transform: scale(1);
-    transition:
-      opacity 0.2s ease,
-      transform 0.2s ease,
-      box-shadow 0.2s ease;
-  }
-  @media (hover: hover) and (pointer: fine) {
-    .pc-add-btn {
-      opacity: 0;
-      transform: scale(0.8);
-    }
-    .pc-root:hover .pc-add-btn,
-    .pc-link:hover .pc-add-btn {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-  .pc-add-btn:hover {
-    box-shadow: 0 4px 14px oklch(var(--p) / 0.55);
-    transform: scale(1.08);
-  }
-  .pc-add-btn:focus-visible {
-    outline: 2px solid oklch(var(--p) / 0.5);
-    outline-offset: 2px;
-  }
-
-  /* ── Info bar ────────────────────────────────────────────────── */
-  .pc-info {
-    position: relative;
-    z-index: 20;
-    margin-top: auto;
-  }
-
-  .pc-info--over-image {
-    /* Floating frosted-glass pill at the card bottom */
-    padding: 0 0.5rem 0.5rem;
-  }
-
-  .pc-info--plain {
-    padding: 0.75rem;
-    border-top: 1px solid oklch(var(--b2) / 0.5);
-  }
-
-  .pc-info-inner {
-    padding: 0.625rem 0.75rem 0.625rem 0.875rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  /* Frosted pill only when sitting over image */
-  .pc-info--over-image .pc-info-inner {
-    background-color: var(--pc-pill-bg);
-    backdrop-filter: blur(10px) saturate(1.4);
-    -webkit-backdrop-filter: blur(10px) saturate(1.4);
-    border-radius: 0.875rem;
-    border: 1px solid var(--pc-pill-border);
-  }
-
-  .pc-name {
-    font-size: 0.875rem;
-    font-weight: 700;
-    line-height: 1.25;
-    color: var(--pc-text-over-image);
-    margin: 0;
-  }
-
-  .pc-info--plain .pc-name {
-    color: oklch(var(--bc));
-  }
-
-  /* ── Pricing ─────────────────────────────────────────────────── */
-  .pc-price-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  .pc-prices {
-    display: flex;
-    align-items: baseline;
-    gap: 0.375rem;
-  }
-
-  .pc-price-main {
-    font-size: 1.125rem;
-    font-weight: 800;
-    color: var(--pc-text-over-image);
-    line-height: 1;
-  }
-  @media (min-width: 768px) {
-    .pc-price-main {
-      font-size: 1.25rem;
-    }
-  }
-
-  .pc-info--plain .pc-price-main {
-    color: oklch(var(--p));
-  }
-
-  .pc-price-before {
-    font-size: 0.75rem;
-    text-decoration: line-through;
-    color: var(--pc-price-strikethrough-over);
-  }
-
-  .pc-info--plain .pc-price-before {
-    color: var(--pc-price-strikethrough-plain);
-  }
-
-  /* ── Select button ───────────────────────────────────────────── */
-  .pc-select-btn {
-    flex-shrink: 0;
-    padding: 0.3rem 0.875rem;
-    border-radius: 9999px;
-    border: none;
-    background-color: oklch(var(--p));
-    color: oklch(var(--pc));
-    font-size: 0.75rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition:
-      box-shadow 0.2s ease,
-      transform 0.15s ease;
-    position: relative;
-    z-index: 20;
-  }
-  .pc-select-btn:hover {
-    box-shadow: 0 3px 10px oklch(var(--p) / 0.4);
-    transform: translateY(-1px);
-  }
-  @media (min-width: 768px) {
-    .pc-select-btn {
-      padding: 0.35rem 1.1rem;
-      font-size: 0.8125rem;
-    }
+  .pc-no-image :global(svg) {
+    opacity: 0.25;
   }
 
   /* ── Countdown chip ─────────────────────────────────────────── */
@@ -612,35 +328,145 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.03em;
     pointer-events: none;
+    text-shadow: 0 1px 2px oklch(0% 0 0 / 0.35);
   }
 
-  /* ── Offer note ──────────────────────────────────────────────── */
-  .pc-note {
-    font-size: 0.7rem;
-    color: var(--pc-note-over);
-    line-height: 1.3;
+  /* ── Floating info pill ──────────────────────────────────────── */
+  .pc-info {
+    position: absolute;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    z-index: 20;
+  }
+
+  .pc-info-inner {
+    padding: 0.625rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    background-color: var(--pc-pill-bg);
+    backdrop-filter: blur(10px) saturate(1.4);
+    -webkit-backdrop-filter: blur(10px) saturate(1.4);
+    border-radius: 0.875rem;
+    border: 1px solid var(--pc-pill-border);
+  }
+
+  .pc-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--pc-text-over-image);
     margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-shadow: 0 1px 3px oklch(0% 0 0 / 0.45);
+  }
+  @media (min-width: 640px) {
+    .pc-name {
+      font-size: 1rem;
+    }
   }
 
-  .pc-info--plain .pc-note {
-    color: var(--pc-note-plain);
+  .pc-note {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--pc-note-over);
+    line-height: 1.35;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-shadow: 0 1px 3px oklch(0% 0 0 / 0.55);
+  }
+
+  /* ── Pricing ─────────────────────────────────────────────────── */
+  .pc-price-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.125rem;
+  }
+
+  .pc-prices {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+
+  .pc-price-main {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--pc-text-over-image);
+    line-height: 1;
+    text-shadow: 0 1px 3px oklch(0% 0 0 / 0.45);
+  }
+  @media (min-width: 640px) {
+    .pc-price-main {
+      font-size: 1.15rem;
+    }
+  }
+
+  .pc-price-before {
+    font-size: 0.75rem;
+    text-decoration: line-through;
+    color: var(--pc-price-strikethrough-over);
+    text-shadow: 0 1px 2px oklch(0% 0 0 / 0.35);
+  }
+
+  /* ── Action button ───────────────────────────────────────────── */
+  .pc-action-btn {
+    flex-shrink: 0;
+    padding: 0.35rem 0.875rem;
+    border-radius: 9999px;
+    border: 1px solid oklch(1 0 0 / 0.25);
+    background-color: var(--ishos-teal);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 8px oklch(0% 0 0 / 0.25);
+    transition:
+      box-shadow 0.2s ease,
+      transform 0.15s ease,
+      filter 0.2s ease;
+    position: relative;
+    z-index: 20;
+  }
+  .pc-action-btn:hover {
+    box-shadow: 0 4px 12px oklch(0% 0 0 / 0.35);
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+  }
+  .pc-action-btn:focus-visible {
+    outline: 2px solid var(--ishos-teal);
+    outline-offset: 2px;
+  }
+  @media (min-width: 640px) {
+    .pc-action-btn {
+      padding: 0.4rem 1rem;
+      font-size: 0.8125rem;
+    }
   }
 
   /* ── Dark-theme overrides ────────────────────────────────────── */
   :global([data-theme="night"]) .pc-card {
-    background-color: oklch(var(--b1) / 0.95);
     border-color: oklch(var(--bc) / 0.18);
   }
 
-  :global([data-theme="night"]) .pc-info--over-image .pc-info-inner {
+  :global([data-theme="night"]) .pc-info-inner {
     background-color: oklch(var(--b1) / 0.35);
     border-color: oklch(1 0 0 / 0.06);
   }
 
   :global([data-theme="night"]) .pc-price-before {
-    color: oklch(var(--bc) / 0.55);
+    color: oklch(1 0 0 / 0.55);
   }
 </style>

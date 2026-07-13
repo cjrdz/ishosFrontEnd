@@ -5,6 +5,7 @@
   import { formatCurrency } from "@shared/utils/formatters";
   import "../../../../styles/product-modal.css";
   import type { PublicProduct } from "@features/catalog/lib/api";
+  import FlavorSelector from "@shared/components/FlavorSelector.svelte";
   import ProductAddonChipGroup from "./ProductAddonChipGroup.svelte";
   import {
     activeFlavors,
@@ -24,6 +25,7 @@
     ordersEnabled: boolean;
     imageUrl?: string;
     initialDraft?: ProductCustomizationDraft | null;
+    basePrice?: number;
     onClose?: () => void;
     onConfirm?: (draft: ProductCustomizationDraft) => void | Promise<void>;
   }
@@ -33,6 +35,7 @@
     ordersEnabled,
     imageUrl,
     initialDraft = null,
+    basePrice,
     onClose = () => {},
     onConfirm = () => {},
   }: Props = $props();
@@ -94,7 +97,9 @@
     hasMixedFlavors && flavorSelections.some((id) => !id),
   );
 
-  const totalPrice = $derived(computeTotalPrice(product ?? undefined, draft));
+  const totalPrice = $derived(
+    computeTotalPrice(product ?? undefined, draft, basePrice),
+  );
   const addDisabled = $derived(
     !ordersEnabled ||
       !product ||
@@ -143,14 +148,12 @@
     };
   }
 
-  function selectFlavor(flavorId: string) {
-    draft = { ...draft, flavor_id: flavorId };
-  }
-
-  function selectMixedFlavor(index: number, flavorId: string) {
-    const nextIds = [...flavorSelections];
-    nextIds[index] = flavorId;
-    draft = { ...draft, flavor_ids: nextIds };
+  function handleFlavorChange(value: string | string[]) {
+    if (hasMixedFlavors) {
+      draft = { ...draft, flavor_ids: value as string[] };
+    } else {
+      draft = { ...draft, flavor_id: value as string };
+    }
   }
 
   function updateToppingSelection(
@@ -502,105 +505,34 @@
               {/if}
 
               {#if flavorOptions.length > 0}
-                {#if hasMixedFlavors}
-                  <details
-                    class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                    open={!!mixedFlavorsRequired}
+                <details
+                  class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
+                  open={flavorRequired ||
+                    mixedFlavorsRequired ||
+                    !draft.flavor_id}
+                >
+                  <summary
+                    class="collapse-title font-bold flex items-center gap-2"
                   >
-                    <summary
-                      class="collapse-title font-bold flex items-center gap-2"
-                    >
-                      Sabores (mezclados) <span
-                        class="badge badge-warning badge-sm">requerido</span
-                      >
-                    </summary>
-                    <div class="collapse-content pt-1 space-y-3">
-                      <p class="text-sm text-base-content/70">
-                        Selecciona un sabor para cada bola:
-                      </p>
-                      {#each Array(ballQuantity) as _, index (index)}
-                        <div class="space-y-2">
-                          <div class="flex items-center gap-2">
-                            <span class="badge badge-ghost badge-sm"
-                              >Bola {index + 1}</span
-                            >
-                            {#if flavorSelections[index]}
-                              <span
-                                class="text-sm font-medium"
-                                style="color: var(--ishos-teal);"
-                              >
-                                {flavorOptions.find(
-                                  (f) => f.id === flavorSelections[index],
-                                )?.name ?? ""}
-                              </span>
-                            {/if}
-                          </div>
-                          <div
-                            class="flex flex-col sm:flex-row flex-wrap gap-2"
-                          >
-                            {#each flavorOptions as flavor (flavor.id)}
-                              <label
-                                class="label cursor-pointer gap-1.5 rounded-lg border px-3 py-1.5 transition-colors
-                              {flavorSelections[index] === flavor.id
-                                  ? 'border-[var(--ishos-teal)] bg-[color-mix(in_srgb,var(--ishos-teal)_10%,transparent)]'
-                                  : 'border-base-300 hover:bg-base-200/50'}"
-                              >
-                                <input
-                                  type="radio"
-                                  class="radio radio-sm"
-                                  name="mixed_flavor_{index}"
-                                  value={flavor.id}
-                                  checked={flavorSelections[index] ===
-                                    flavor.id}
-                                  onchange={() =>
-                                    selectMixedFlavor(index, flavor.id)}
-                                />
-                                <span class="label-text text-sm"
-                                  >{flavor.name}</span
-                                >
-                                {#if flavor.is_seasonal}
-                                  <span class="text-xs opacity-70">★</span>
-                                {/if}
-                              </label>
-                            {/each}
-                          </div>
-                        </div>
-                      {/each}
-                    </div>
-                  </details>
-                {:else}
-                  <details
-                    class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                    open={flavorRequired || !draft.flavor_id}
-                  >
-                    <summary
-                      class="collapse-title font-bold flex items-center gap-2"
-                    >
-                      Sabor <span class="badge badge-warning badge-sm"
-                        >requerido</span
-                      >
-                    </summary>
-                    <div class="collapse-content pt-1">
-                      <div class="flex flex-wrap gap-2">
-                        {#each flavorOptions as flavor (flavor.id)}
-                          <button
-                            type="button"
-                            class={chipClass(
-                              draft.flavor_id === flavor.id,
-                              "required",
-                            )}
-                            onclick={() => selectFlavor(flavor.id)}
-                          >
-                            {flavor.name}
-                            {#if flavor.is_seasonal}
-                              <span class="ml-1 opacity-70">★</span>
-                            {/if}
-                          </button>
-                        {/each}
-                      </div>
-                    </div>
-                  </details>
-                {/if}
+                    {hasMixedFlavors ? "Sabores (mezclados)" : "Sabor"}
+                    <span class="badge badge-warning badge-sm">requerido</span>
+                  </summary>
+                  <div class="collapse-content pt-1">
+                    <FlavorSelector
+                      flavors={flavorOptions}
+                      mode={hasMixedFlavors ? "fill" : "single"}
+                      {ballQuantity}
+                      selectedId={draft.flavor_id ?? ""}
+                      selectedIds={flavorSelections}
+                      label={hasMixedFlavors ? "Sabores" : "Sabor"}
+                      required={true}
+                      error={flavorRequired || mixedFlavorsRequired
+                        ? "Selecciona un sabor"
+                        : ""}
+                      onChange={handleFlavorChange}
+                    />
+                  </div>
+                </details>
               {/if}
 
               {#if toppingOptions.length > 0}

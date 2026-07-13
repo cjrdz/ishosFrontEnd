@@ -2,6 +2,14 @@
   import type { Flavor } from "@features/admin-management";
   import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
   import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
+  import AdminTableRowActions from "@features/admin-management/components/shared/AdminTableRowActions.svelte";
+  import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import {
+    closeConfirmDialog,
+    confirmDialogNow,
+    createConfirmDialogState,
+    openConfirmDialog,
+  } from "@shared/utils/confirm-dialog";
   import { sortByDisplayOrderAndName } from "@features/products";
 
   interface Props {
@@ -12,7 +20,6 @@
     onClose: () => void;
     onCreate: (payload: {
       name: string;
-      display_order: number;
       is_seasonal: boolean;
     }) => void | Promise<void>;
     onUpdate: (
@@ -48,6 +55,7 @@
     is_seasonal: false,
     is_active: true,
   });
+  let confirmDialog = $state(createConfirmDialogState());
 
   const sortedFlavors = $derived(
     flavors
@@ -94,20 +102,17 @@
     event.preventDefault();
     formBusy = true;
     try {
-      const payload = {
-        name: flavorForm.name.trim(),
-        display_order: Number(flavorForm.display_order),
-        is_seasonal: Boolean(flavorForm.is_seasonal),
-        is_active: Boolean(flavorForm.is_active),
-      };
-
       if (flavorForm.id) {
-        await onUpdate(flavorForm.id, payload);
+        await onUpdate(flavorForm.id, {
+          name: flavorForm.name.trim(),
+          display_order: Number(flavorForm.display_order),
+          is_seasonal: Boolean(flavorForm.is_seasonal),
+          is_active: Boolean(flavorForm.is_active),
+        });
       } else {
         await onCreate({
-          name: payload.name,
-          display_order: payload.display_order,
-          is_seasonal: payload.is_seasonal,
+          name: flavorForm.name.trim(),
+          is_seasonal: Boolean(flavorForm.is_seasonal),
         });
       }
 
@@ -117,9 +122,37 @@
     }
   }
 
-  async function requestDeleteFlavor(flavor: Flavor) {
-    if (!confirm(`Seguro que deseas eliminar ${flavor.name}?`)) return;
-    await onDelete(flavor.id);
+  function requestDeleteFlavor(flavor: Flavor) {
+    openConfirmDialog(
+      confirmDialog,
+      "Eliminar sabor",
+      `Seguro que deseas eliminar ${flavor.name}?`,
+      () => onDelete(flavor.id),
+    );
+  }
+
+  async function moveFlavor(flavor: Flavor, direction: -1 | 1) {
+    const index = sortedFlavors.findIndex((f) => f.id === flavor.id);
+    if (index < 0) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= sortedFlavors.length) return;
+
+    const target = sortedFlavors[targetIndex];
+    const currentPayload = {
+      name: flavor.name,
+      display_order: target.display_order,
+      is_seasonal: flavor.is_seasonal,
+      is_active: flavor.is_active,
+    };
+    const targetPayload = {
+      name: target.name,
+      display_order: flavor.display_order,
+      is_seasonal: target.is_seasonal,
+      is_active: target.is_active,
+    };
+
+    await onUpdate(flavor.id, currentPayload);
+    await onUpdate(target.id, targetPayload);
   }
 </script>
 
@@ -159,7 +192,7 @@
             {#each sortedFlavors as flavor}
               <tr>
                 <td>{flavor.name}</td>
-                <td class="text-center">{flavor.display_order}</td>
+                <td class="text-center">{flavor.display_order + 1}</td>
                 <td class="text-center">
                   {#if flavor.is_seasonal}
                     <span class="badge badge-warning badge-sm">Temporada</span>
@@ -174,20 +207,22 @@
                   >
                 </td>
                 <td class="text-center">
-                  <div class="flex justify-center gap-2">
-                    <button
-                      class="btn btn-xs btn-soft btn-accent"
-                      type="button"
-                      onclick={() => editFlavor(flavor)}
-                      disabled={busy || formBusy}>Editar</button
-                    >
-                    <button
-                      class="btn btn-xs btn-soft btn-error"
-                      type="button"
-                      onclick={() => requestDeleteFlavor(flavor)}
-                      disabled={busy || formBusy}>Eliminar</button
-                    >
-                  </div>
+                  <AdminTableRowActions
+                    itemName={flavor.name}
+                    {busy}
+                    {formBusy}
+                    canMoveUp={sortedFlavors.findIndex(
+                      (f) => f.id === flavor.id,
+                    ) > 0}
+                    canMoveDown={sortedFlavors.findIndex(
+                      (f) => f.id === flavor.id,
+                    ) <
+                      sortedFlavors.length - 1}
+                    onEdit={() => editFlavor(flavor)}
+                    onDelete={() => requestDeleteFlavor(flavor)}
+                    onMoveUp={() => moveFlavor(flavor, -1)}
+                    onMoveDown={() => moveFlavor(flavor, 1)}
+                  />
                 </td>
               </tr>
             {/each}
@@ -217,15 +252,6 @@
             placeholder="Vainilla"
             bind:value={flavorForm.name}
             required
-          />
-        </div>
-        <div class="form-control">
-          <span class="label-text text-xs mb-1">Orden de visualizacion</span>
-          <input
-            type="number"
-            class="input input-bordered input-sm w-full"
-            placeholder="0"
-            bind:value={flavorForm.display_order}
           />
         </div>
         <label
@@ -262,3 +288,13 @@
     </section>
   </div>
 </AdminModalShell>
+
+<ConfirmDialog
+  open={confirmDialog.open}
+  title={confirmDialog.title}
+  message={confirmDialog.message}
+  busy={busy || formBusy}
+  variant="error"
+  onConfirm={() => confirmDialogNow(confirmDialog)}
+  onCancel={() => closeConfirmDialog(confirmDialog)}
+/>

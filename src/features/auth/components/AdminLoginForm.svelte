@@ -494,7 +494,7 @@
         onkeydown={(e) => handleCharacterKey(e, triggerYuyuEngine)}
       >
         <img
-          src="/images/whiteYuyu.png"
+          src="/images/Yuli.png"
           alt=""
           width="768"
           height="768"
@@ -520,7 +520,7 @@
         onkeydown={(e) => handleCharacterKey(e, triggerAlbertoBell)}
       >
         <img
-          src="/images/blackAlberto.png"
+          src="/images/Alberto.png"
           alt=""
           width="768"
           height="768"

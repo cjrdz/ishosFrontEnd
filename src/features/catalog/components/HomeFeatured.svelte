@@ -10,7 +10,14 @@
     type StoreOfferItem,
   } from "@features/catalog/lib/api";
   import ProductCard from "./shared/ProductCard.svelte";
+  import ProductModal from "./shared/ProductModal.svelte";
+  import ProductSlider from "./shared/ProductSlider.svelte";
   import StoreOffers from "./StoreOffers.svelte";
+  import {
+    computeUnitPrice,
+    isProductConfigurable,
+    type ProductCustomizationDraft,
+  } from "@features/catalog/lib/customization";
   import "../../../styles/home.css";
 
   let loading = $state(true);
@@ -19,8 +26,14 @@
   let allProducts = $state<PublicProduct[]>([]);
   let ordersEnabled = $state(true);
   let offers = $state<StoreOfferItem[]>([]);
+  let selectedProduct = $state<PublicProduct | null>(null);
+  let selectedDraft = $state<ProductCustomizationDraft | null>(null);
+  let selectedBasePrice = $state<number | undefined>(undefined);
   const featuredSkeletonCards = Array.from({ length: 4 }, (_, index) => index);
   const activeOfferMap = $derived(buildActiveOfferMap(offers));
+  const featuredSliderItems = $derived(
+    featured.map((product) => ({ id: product.id, product })),
+  );
 
   onMount(() => {
     void loadFeatured();
@@ -55,28 +68,61 @@
       loading = false;
     }
   }
+
+  function openProductModal(
+    product: PublicProduct,
+    initialDraft?: ProductCustomizationDraft,
+    basePrice?: number,
+  ) {
+    selectedProduct = product;
+    selectedDraft = initialDraft ?? { quantity: 1 };
+    selectedBasePrice = basePrice;
+  }
+
+  function addConfiguredProduct(
+    product: PublicProduct,
+    draft: ProductCustomizationDraft,
+  ) {
+    addCartItem({
+      product_id: product.id,
+      name: product.name,
+      image_url: toSafeImageUrl(product.image_url),
+      unit_price: computeUnitPrice(product, draft, selectedBasePrice),
+      quantity: draft.quantity,
+      flavor_id: draft.flavor_id || undefined,
+      flavor_ids: draft.flavor_ids || undefined,
+      included_addon_ids: draft.included_addon_ids,
+      extra_addon_ids: draft.extra_addon_ids,
+      topping_selection: draft.topping_selection,
+      jalea_selection: draft.jalea_selection,
+    });
+
+    selectedProduct = null;
+    selectedDraft = null;
+    selectedBasePrice = undefined;
+  }
 </script>
 
 <div class="home-featured space-y-0">
-  <section class="relative overflow-hidden px-4 pt-8 pb-16 md:pt-12 md:pb-20">
+  <section class="relative overflow-hidden px-4 pt-4 pb-8 md:pt-6 md:pb-10">
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
       <div
-        class="hero-blob-teal absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl"
+        class="hero-blob-teal absolute -top-16 -left-16 w-72 h-72 rounded-full blur-3xl"
         style="background: var(--ishos-teal);"
       ></div>
       <div
-        class="hero-blob-pink absolute -bottom-16 -right-16 w-80 h-80 rounded-full blur-3xl"
+        class="hero-blob-pink absolute -bottom-12 -right-12 w-56 h-56 rounded-full blur-3xl"
         style="background: var(--ishos-pink);"
       ></div>
       <div
-        class="hero-blob-blue absolute top-1/3 right-1/4 w-64 h-64 rounded-full blur-3xl"
+        class="hero-blob-blue absolute top-1/3 right-1/4 w-48 h-48 rounded-full blur-3xl"
         style="background: var(--ishos-yellow);"
       ></div>
       <div class="stripe-bg absolute inset-0 opacity-40"></div>
     </div>
 
     <div class="relative max-w-3xl mx-auto text-center fade-up fade-up-1">
-      <div class="section-pill mb-5">
+      <div class="section-pill mb-3">
         <span
           class="w-1.5 h-1.5 rounded-full inline-block mr-2 align-middle"
           style="background: var(--ishos-teal);"
@@ -85,7 +131,7 @@
       </div>
 
       <h1
-        class="text-4xl md:text-5xl font-extrabold tracking-tight mb-3 leading-tight"
+        class="text-3xl md:text-4xl font-bold tracking-tight mb-2 leading-tight"
       >
         <span
           class="text-transparent bg-clip-text"
@@ -94,14 +140,6 @@
           Isho's Factory
         </span>
       </h1>
-      <p
-        class="hero-kicker mt-3 text-sm font-medium uppercase tracking-[0.16em] text-base-content/65 md:text-base"
-      >
-        Tradicion desde 2021
-      </p>
-      <p class="hero-copy mt-2 text-sm text-base-content/75 md:text-base">
-        Sabores artesanales listos para pedir en minutos.
-      </p>
     </div>
   </section>
 
@@ -110,7 +148,7 @@
       viewBox="0 0 1440 60"
       xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="none"
-      style="height:40px; width:100%;"
+      style="height:24px; width:100%;"
     >
       <path
         d="M0,30 C240,60 480,0 720,30 C960,60 1200,0 1440,30 L1440,60 L0,60 Z"
@@ -126,6 +164,7 @@
         {offers}
         products={allProducts.length > 0 ? allProducts : featured}
         {ordersEnabled}
+        onConfigure={openProductModal}
       />
     </div>
   {/if}
@@ -135,11 +174,6 @@
     <div class="text-center mb-4 md:mb-6 fade-up fade-up-3">
       <div class="section-pill mb-3">Destacados</div>
       <h2 class="text-2xl md:text-3xl font-bold mb-1">Productos Destacados</h2>
-      <p
-        class="featured-subtitle text-base-content/70 font-medium text-sm md:text-base"
-      >
-        Nuestros sabores más queridos.
-      </p>
     </div>
 
     {#if loading}
@@ -148,13 +182,18 @@
       >
         {#each featuredSkeletonCards as cardIndex (cardIndex)}
           <article
-            class="card bg-base-100 w-full shadow-sm border border-base-200/50 overflow-hidden h-full rounded-2xl sm:rounded-3xl"
+            class="card bg-base-100 w-full shadow-sm border border-base-200/50 overflow-hidden h-full rounded-2xl sm:rounded-3xl aspect-[3/4] relative"
             aria-hidden="true"
           >
-            <div class="skeleton w-full aspect-square"></div>
-            <div class="card-body p-3 sm:p-4 md:p-5 space-y-2">
-              <div class="skeleton h-4 w-3/4"></div>
-              <div class="skeleton h-5 w-16"></div>
+            <div class="skeleton w-full h-full absolute inset-0"></div>
+            <div
+              class="absolute left-0 right-0 bottom-0 p-2 bg-base-100/40 backdrop-blur-sm border-t border-base-200/50"
+            >
+              <div class="skeleton h-4 w-3/4 mb-1"></div>
+              <div class="flex items-center justify-between">
+                <div class="skeleton h-4 w-14"></div>
+                <div class="skeleton h-6 w-16 rounded-full"></div>
+              </div>
             </div>
           </article>
         {/each}
@@ -164,10 +203,13 @@
         {error}
       </div>
     {:else}
-      <div
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"
+      <ProductSlider
+        items={featuredSliderItems}
+        ariaLabel="Productos Destacados"
+        maxCards={4}
       >
-        {#each featured as product (product.id)}
+        {#snippet card(item, index)}
+          {@const product = item.product}
           {@const offer = activeOfferMap.get(product.id)}
           <ProductCard
             {product}
@@ -176,7 +218,13 @@
             imageUrl={toSafeImageUrl(product.image_url)}
             {ordersEnabled}
             variant="featured"
+            showSelectButton={true}
             onAdd={() => {
+              if (isProductConfigurable(product)) {
+                openProductModal(product);
+                return;
+              }
+
               addCartItem({
                 product_id: product.id,
                 name: product.name,
@@ -185,15 +233,72 @@
                 quantity: 1,
               });
             }}
+            onSelect={() => openProductModal(product)}
           />
-        {/each}
-      </div>
+        {/snippet}
+      </ProductSlider>
     {/if}
+  </section>
+
+  <!-- About / Contact CTA Section -->
+  <section class="relative overflow-hidden">
+    <div class="stripe-bg absolute inset-0 opacity-30"></div>
+    <div
+      class="absolute inset-x-0 top-0 h-px"
+      style="background: linear-gradient(90deg, transparent, var(--ishos-teal), var(--ishos-pink), var(--ishos-yellow), transparent);"
+    ></div>
+
+    <div
+      class="relative max-w-3xl mx-auto px-4 py-10 md:py-14 text-center fade-up fade-up-4"
+    >
+      <div class="section-pill mb-3">Conócenos</div>
+      <h2 class="text-xl md:text-2xl font-bold text-base-content mb-2">
+        ¿Quieres saber más de <span style="color: var(--ishos-teal);"
+          >Isho's Factory</span
+        >?
+      </h2>
+      <p
+        class="text-sm md:text-base text-base-content/60 mb-5 max-w-md mx-auto leading-relaxed"
+      >
+        Descubre nuestra historia, valores y cómo contactarnos.
+      </p>
+
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <a
+          href="/about"
+          class="inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          style="background: var(--ishos-teal);"
+        >
+          <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+          Conocer más
+        </a>
+        <a
+          href="/about#contacto"
+          class="inline-flex items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold border transition-colors hover:bg-base-100/50"
+          style="border-color: color-mix(in srgb, var(--ishos-teal) 40%, transparent); color: var(--ishos-teal);"
+        >
+          Contáctanos
+        </a>
+      </div>
+    </div>
   </section>
 </div>
 
-<style>
-  :global([data-theme="night"]) .home-featured .featured-subtitle {
-    color: oklch(var(--bc) / 0.82);
-  }
-</style>
+<ProductModal
+  product={selectedProduct}
+  {ordersEnabled}
+  initialDraft={selectedDraft ?? undefined}
+  basePrice={selectedBasePrice}
+  imageUrl={selectedProduct
+    ? toSafeImageUrl(selectedProduct.image_url)
+    : undefined}
+  onClose={() => {
+    selectedProduct = null;
+    selectedDraft = null;
+    selectedBasePrice = undefined;
+  }}
+  onConfirm={(draft) => {
+    if (!selectedProduct) return;
+    addConfiguredProduct(selectedProduct, draft);
+  }}
+/>

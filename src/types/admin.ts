@@ -103,8 +103,6 @@ export interface TabPanelSharedProps {
     productos: { loading: boolean; hydrated: boolean };
     inventario: { loading: boolean; hydrated: boolean };
     personas: { loading: boolean; hydrated: boolean };
-    ofertas: { loading: boolean; hydrated: boolean };
-    herramientas: { loading: boolean; hydrated: boolean };
   };
 }
 
@@ -190,6 +188,39 @@ export interface UsersPanelProps {
 export interface InventoryPanelProps {
   busy: boolean;
   moduleError: string;
+  flavors: import("@features/admin-management").Flavor[];
+  addons: import("@features/admin-management").Addon[];
+  flavorBusy: boolean;
+  addonBusy: boolean;
+  flavorError: string;
+  addonError: string;
+  onCreateFlavor: (payload: { name: string; is_seasonal: boolean }) => void;
+  onUpdateFlavor: (
+    id: string,
+    payload: {
+      name: string;
+      display_order: number;
+      is_seasonal: boolean;
+      is_active: boolean;
+    },
+  ) => void;
+  onDeleteFlavor: (id: string) => void;
+  onCreateAddon: (payload: {
+    name: string;
+    price: number;
+    group_name: string;
+  }) => void;
+  onUpdateAddon: (
+    id: string,
+    payload: {
+      name: string;
+      price: number;
+      group_name: string;
+      display_order: number;
+      is_active: boolean;
+    },
+  ) => void;
+  onDeleteAddon: (id: string) => void;
 }
 
 export interface AdminTabsProps {

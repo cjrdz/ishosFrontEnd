@@ -121,3 +121,22 @@
 .phone-card-text {
   text-shadow: var(--about-phone-text-shadow);
 }
+
+/* ── Section pills ────────────────────────────────────────────────── */
+.section-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.2rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--about-pill-teal-bg);
+  color: var(--ishos-teal);
+}
+
+.section-pill--maroon {
+  background: var(--about-pill-maroon-bg);
+  color: var(--ishos-maroon);
+}

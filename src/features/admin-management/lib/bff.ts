@@ -106,10 +106,12 @@ async function bffRequest<T>(
     method?: "GET" | "POST" | "PATCH" | "DELETE";
     body?: unknown;
     query?: Record<string, string | number | boolean>;
+    headers?: Record<string, string>;
   } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    ...options.headers,
   };
 
   let fullPath = path;
@@ -157,9 +159,10 @@ async function bffRequest<T>(
 }
 
 // Orders
-export async function listOrders(status?: string) {
+export async function listOrders(status?: string, archived = false) {
   const query: Record<string, string> = { lite: "true" };
   if (status) query.status = status;
+  if (archived) query.archived = "true";
   const res = await bffRequest<any>("/api/admin/orders", { query });
   const data = Array.isArray(res) ? res : (res?.data ?? []);
   const pg = res?.pagination;
@@ -176,13 +179,35 @@ export async function listOrders(status?: string) {
   };
 }
 
+export async function archiveOrder(id: string, archived: boolean) {
+  return bffRequest<any>(`/api/admin/orders/${id}/archive`, {
+    method: "PATCH",
+    body: { archived },
+  });
+}
+
+export async function runArchive() {
+  return bffRequest<{ archived: number; message: string }>(
+    "/api/admin/orders/archive/run",
+    {
+      method: "POST",
+      body: {},
+    },
+  );
+}
+
 export async function getOrder(id: string) {
   return bffRequest<any>(`/api/admin/orders/${id}`);
 }
 
-export async function createOrder(payload: any) {
+export async function createOrder(payload: any, idempotencyKey?: string) {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
   return bffRequest<any>("/api/admin/orders", {
     method: "POST",
+    headers,
     body: payload,
   });
 }
@@ -670,6 +695,8 @@ export interface StoreOfferItem {
   label: string;
   note?: string;
   discount_price?: number;
+  flavor_id?: string;
+  flavor_ids?: string[];
   expires_at: string;
 }
 
@@ -684,6 +711,25 @@ export async function getAdminStoreSettings() {
 
 export async function updateAdminStoreSettings(payload: AdminStoreSettings) {
   return bffRequest<AdminStoreSettings>("/api/admin/settings/store", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+// ── Order Archive Settings ───────────────────────────────────────────
+
+export interface OrderArchiveConfig {
+  enabled: boolean;
+  age_days: number;
+  interval_minutes: number;
+}
+
+export async function getOrderArchiveConfig() {
+  return bffRequest<OrderArchiveConfig>("/api/admin/settings/archive");
+}
+
+export async function updateOrderArchiveConfig(payload: OrderArchiveConfig) {
+  return bffRequest<OrderArchiveConfig>("/api/admin/settings/archive", {
     method: "PATCH",
     body: payload,
   });
@@ -774,6 +820,10 @@ export async function recordInventoryAdjustment(
     method: "POST",
     body: payload,
   });
+}
+
+export async function getInventoryDashboard() {
+  return bffRequest<any>("/api/admin/inventory/dashboard");
 }
 
 export async function getLowStockItems() {

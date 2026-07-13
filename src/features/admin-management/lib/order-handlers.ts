@@ -1,5 +1,6 @@
 import {
   approveOrder,
+  archiveOrder,
   createOrder,
   deleteOrder,
   getOrder,
@@ -20,6 +21,36 @@ interface OrderHandlerDeps {
   setSelectedOrder: (value: Order | null) => void;
 }
 
+const DETAIL_CACHE_TTL_MS = 10_000;
+
+interface CachedOrder {
+  order: Order;
+  expiresAt: number;
+}
+
+const detailCache = new Map<string, CachedOrder>();
+
+function getCachedOrder(orderId: string): Order | null {
+  const entry = detailCache.get(orderId);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    detailCache.delete(orderId);
+    return null;
+  }
+  return entry.order;
+}
+
+function setCachedOrder(order: Order) {
+  detailCache.set(order.id, {
+    order,
+    expiresAt: Date.now() + DETAIL_CACHE_TTL_MS,
+  });
+}
+
+function invalidateCachedOrder(orderId: string) {
+  detailCache.delete(orderId);
+}
+
 function mergeSelectedOrder(
   deps: OrderHandlerDeps,
   orderId: string,
@@ -29,6 +60,7 @@ function mergeSelectedOrder(
   if (selected?.id === orderId) {
     deps.setSelectedOrder({ ...selected, ...updated });
   }
+  setCachedOrder(updated);
 }
 
 export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
@@ -41,13 +73,16 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
     setSelectedOrder,
   } = deps;
 
-  async function handleCreateOrder(payload: Parameters<typeof createOrder>[0]) {
+  async function handleCreateOrder(
+    payload: Parameters<typeof createOrder>[0],
+    idempotencyKey?: string,
+  ) {
     return runModuleAction<boolean>({
       module: "ordenes",
       analyticsAction: "admin_order_create",
       errorMessage: "No se pudo crear la orden",
       action: async () => {
-        await createOrder(payload);
+        await createOrder(payload, idempotencyKey);
         return true;
       },
       defaultValue: false,
@@ -69,6 +104,7 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
       },
       defaultValue: undefined,
       onSuccess: async () => {
+        invalidateCachedOrder(orderId);
         if (getSelectedOrder()?.id === orderId) {
           setSelectedOrder(null);
         }
@@ -79,12 +115,19 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
   }
 
   async function handleOpenOrder(orderId: string) {
+    const cached = getCachedOrder(orderId);
+    if (cached) {
+      setSelectedOrder(cached);
+      return cached;
+    }
+
     return runModuleAction<Order | null>({
       module: "ordenes",
       analyticsAction: "admin_order_open",
       errorMessage: "No se pudo cargar detalle de orden",
       action: async () => {
         const opened = await getOrder(orderId);
+        setCachedOrder(opened);
         setSelectedOrder(opened);
         return opened;
       },
@@ -189,6 +232,29 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
     });
   }
 
+  async function handleArchiveOrder(orderId: string, archived: boolean) {
+    return runModuleAction<Order | null>({
+      module: "ordenes",
+      requireAdmin: true,
+      analyticsAction: archived
+        ? "admin_order_archive"
+        : "admin_order_unarchive",
+      errorMessage: archived
+        ? "No se pudo archivar la orden"
+        : "No se pudo desarchivar la orden",
+      action: async () => {
+        const updated = await archiveOrder(orderId, archived);
+        mergeSelectedOrder(deps, orderId, updated);
+        return updated;
+      },
+      defaultValue: null,
+      onSuccess: async () => {
+        setNotice(archived ? "Orden archivada" : "Orden desarchivada");
+        await loadOrders();
+      },
+    });
+  }
+
   return {
     handleCreateOrder,
     handleDeleteOrder,
@@ -197,5 +263,6 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
     handleReject,
     handleStatusChange,
     handleUpdateOrder,
+    handleArchiveOrder,
   };
 }

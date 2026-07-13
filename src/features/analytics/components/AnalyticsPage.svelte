@@ -3,7 +3,7 @@
   import Analytics from "./Analytics.svelte";
 </script>
 
-<div class="space-y-6">
+<section class="space-y-4 md:space-y-6">
   <ExportTool />
   <Analytics />
-</div>
+</section>

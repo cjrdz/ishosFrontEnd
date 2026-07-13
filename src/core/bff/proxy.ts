@@ -14,6 +14,7 @@ export interface ProxyOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
   body?: unknown;
   query?: Record<string, string | number | boolean>;
+  headers?: Record<string, string>;
   isFormData?: boolean;
 }
 
@@ -75,10 +76,11 @@ export async function proxyToBackend(
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
+    ...options.headers,
   };
 
   // Only set Content-Type for non-FormData requests
-  if (!options.isFormData) {
+  if (!options.isFormData && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
 

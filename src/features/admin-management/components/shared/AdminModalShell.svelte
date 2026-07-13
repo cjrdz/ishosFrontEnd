@@ -9,6 +9,7 @@
     widthClass?: string;
     onClose: () => void;
     children: Snippet;
+    headerActions?: Snippet;
   }
 
   let {
@@ -18,6 +19,7 @@
     widthClass = "max-w-3xl",
     onClose,
     children,
+    headerActions,
   }: Props = $props();
 </script>
 
@@ -36,14 +38,19 @@
         </div>
         <h3 class="font-bold text-base leading-tight">{title}</h3>
       </div>
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        type="button"
-        onclick={onClose}
-        aria-label="Cerrar"
-      >
-        <Icon icon="lucide:x" width="16" height="16" />
-      </button>
+      <div class="flex items-center gap-1">
+        {#if headerActions}
+          {@render headerActions()}
+        {/if}
+        <button
+          class="btn btn-ghost btn-sm btn-circle"
+          type="button"
+          onclick={onClose}
+          aria-label="Cerrar"
+        >
+          <Icon icon="lucide:x" width="16" height="16" />
+        </button>
+      </div>
     </div>
 
     <div class="p-5 space-y-4">

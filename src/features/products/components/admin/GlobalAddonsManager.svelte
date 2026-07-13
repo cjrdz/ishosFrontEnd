@@ -2,6 +2,14 @@
   import type { Addon } from "@features/admin-management";
   import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
   import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
+  import AdminTableRowActions from "@features/admin-management/components/shared/AdminTableRowActions.svelte";
+  import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import {
+    closeConfirmDialog,
+    confirmDialogNow,
+    createConfirmDialogState,
+    openConfirmDialog,
+  } from "@shared/utils/confirm-dialog";
   import {
     addonGroupLabel,
     collectAddonGroupOptions,
@@ -21,7 +29,6 @@
       name: string;
       price: number;
       group_name: string;
-      display_order: number;
     }) => void | Promise<void>;
     onUpdate: (
       id: string,
@@ -62,6 +69,7 @@
   let customGroups = $state<string[]>([]);
   let customGroupName = $state("");
   let selectingCustomGroup = $state(false);
+  let confirmDialog = $state(createConfirmDialogState());
   let addonForm = $state<AddonFormState>({
     id: "",
     name: "",
@@ -177,22 +185,21 @@
     formBusy = true;
     try {
       applyPendingCustomGroup();
-      const payload = {
-        name: addonForm.name.trim(),
-        price: Number(addonForm.price),
-        group_name: normalizeAddonGroupName(addonForm.group_name),
-        display_order: Number(addonForm.display_order),
-        is_active: Boolean(addonForm.is_active),
-      };
+      const groupName = normalizeAddonGroupName(addonForm.group_name);
 
       if (addonForm.id) {
-        await onUpdate(addonForm.id, payload);
+        await onUpdate(addonForm.id, {
+          name: addonForm.name.trim(),
+          price: Number(addonForm.price),
+          group_name: groupName,
+          display_order: Number(addonForm.display_order),
+          is_active: Boolean(addonForm.is_active),
+        });
       } else {
         await onCreate({
-          name: payload.name,
-          price: payload.price,
-          group_name: payload.group_name,
-          display_order: payload.display_order,
+          name: addonForm.name.trim(),
+          price: Number(addonForm.price),
+          group_name: groupName,
         });
       }
 
@@ -202,9 +209,36 @@
     }
   }
 
-  async function requestDeleteAddon(addon: Addon) {
-    if (!confirm(`Seguro que deseas eliminar ${addon.name}?`)) return;
-    await onDelete(addon.id);
+  function requestDeleteAddon(addon: Addon) {
+    openConfirmDialog(
+      confirmDialog,
+      "Eliminar complemento",
+      `Seguro que deseas eliminar ${addon.name}?`,
+      () => onDelete(addon.id),
+    );
+  }
+
+  async function moveAddon(addon: Addon, direction: -1 | 1) {
+    const index = sortedAddons.findIndex((a) => a.id === addon.id);
+    if (index < 0) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= sortedAddons.length) return;
+
+    const target = sortedAddons[targetIndex];
+    await onUpdate(addon.id, {
+      name: addon.name,
+      price: addon.price,
+      group_name: normalizeAddonGroupName(addon.group_name),
+      display_order: target.display_order,
+      is_active: addon.is_active,
+    });
+    await onUpdate(target.id, {
+      name: target.name,
+      price: target.price,
+      group_name: normalizeAddonGroupName(target.group_name),
+      display_order: addon.display_order,
+      is_active: target.is_active,
+    });
   }
 </script>
 
@@ -254,20 +288,22 @@
                   >
                 </td>
                 <td class="text-center">
-                  <div class="flex justify-center gap-2">
-                    <button
-                      class="btn btn-xs btn-soft btn-accent"
-                      type="button"
-                      onclick={() => editAddon(addon)}
-                      disabled={busy || formBusy}>Editar</button
-                    >
-                    <button
-                      class="btn btn-xs btn-soft btn-error"
-                      type="button"
-                      onclick={() => requestDeleteAddon(addon)}
-                      disabled={busy || formBusy}>Eliminar</button
-                    >
-                  </div>
+                  <AdminTableRowActions
+                    itemName={addon.name}
+                    {busy}
+                    {formBusy}
+                    canMoveUp={sortedAddons.findIndex(
+                      (a) => a.id === addon.id,
+                    ) > 0}
+                    canMoveDown={sortedAddons.findIndex(
+                      (a) => a.id === addon.id,
+                    ) <
+                      sortedAddons.length - 1}
+                    onEdit={() => editAddon(addon)}
+                    onDelete={() => requestDeleteAddon(addon)}
+                    onMoveUp={() => moveAddon(addon, -1)}
+                    onMoveDown={() => moveAddon(addon, 1)}
+                  />
                 </td>
               </tr>
             {/each}
@@ -343,14 +379,6 @@
             </div>
           {/if}
         </div>
-        <div class="form-control">
-          <span class="label-text text-xs mb-1">Orden de visualizacion</span>
-          <input
-            type="number"
-            class="input input-bordered input-sm w-full"
-            bind:value={addonForm.display_order}
-          />
-        </div>
         {#if editingAddonId}
           <label
             class="flex items-center justify-between gap-3 rounded-lg border border-base-300/70 px-3 py-2 cursor-pointer"
@@ -375,3 +403,13 @@
     </section>
   </div>
 </AdminModalShell>
+
+<ConfirmDialog
+  open={confirmDialog.open}
+  title={confirmDialog.title}
+  message={confirmDialog.message}
+  busy={busy || formBusy}
+  variant="error"
+  onConfirm={() => confirmDialogNow(confirmDialog)}
+  onCancel={() => closeConfirmDialog(confirmDialog)}
+/>

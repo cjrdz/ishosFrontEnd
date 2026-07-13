@@ -5,15 +5,18 @@
   import {
     addonGroupLabel,
     collectAddonGroupOptions,
-    closeConfirmDialog,
-    confirmDialogNow,
-    createConfirmDialogState,
     normalizeAddonGroupName,
-    openConfirmDialog,
     PRIMARY_ADDON_GROUPS,
     sortByDisplayOrderAndName,
   } from "@features/products";
+  import {
+    closeConfirmDialog,
+    confirmDialogNow,
+    createConfirmDialogState,
+    openConfirmDialog,
+  } from "@shared/utils/confirm-dialog";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import AdminTableRowActions from "@features/admin-management/components/shared/AdminTableRowActions.svelte";
 
   interface Props {
     addons: Addon[];
@@ -23,7 +26,6 @@
       name: string;
       price: number;
       group_name: string;
-      display_order: number;
     }) => void;
     onUpdate: (
       id: string,
@@ -184,22 +186,20 @@
   function submit(event: SubmitEvent) {
     event.preventDefault();
     applyPendingCustomGroup();
-    const payload = {
-      name: form.name.trim(),
-      price: Number(form.price),
-      group_name: normalizeAddonGroupName(form.group_name),
-      display_order: Number(form.display_order),
-      is_active: Boolean(form.is_active),
-    };
 
     if (form.id) {
-      onUpdate(form.id, payload);
+      onUpdate(form.id, {
+        name: form.name.trim(),
+        price: Number(form.price),
+        group_name: normalizeAddonGroupName(form.group_name),
+        display_order: Number(form.display_order),
+        is_active: Boolean(form.is_active),
+      });
     } else {
       onCreate({
-        name: payload.name,
-        price: payload.price,
-        group_name: payload.group_name,
-        display_order: payload.display_order,
+        name: form.name.trim(),
+        price: Number(form.price),
+        group_name: normalizeAddonGroupName(form.group_name),
       });
     }
 
@@ -213,6 +213,30 @@
       `Seguro que deseas eliminar ${addon.name}?`,
       () => onDelete(addon.id),
     );
+  }
+
+  async function moveAddon(addon: Addon, direction: -1 | 1) {
+    if (addonActivityFilter !== "all") return;
+    const index = filteredAddons.findIndex((a) => a.id === addon.id);
+    if (index < 0) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= filteredAddons.length) return;
+
+    const target = filteredAddons[targetIndex];
+    await onUpdate(addon.id, {
+      name: addon.name,
+      price: addon.price,
+      group_name: normalizeAddonGroupName(addon.group_name),
+      display_order: target.display_order,
+      is_active: addon.is_active,
+    });
+    await onUpdate(target.id, {
+      name: target.name,
+      price: target.price,
+      group_name: normalizeAddonGroupName(target.group_name),
+      display_order: addon.display_order,
+      is_active: target.is_active,
+    });
   }
 </script>
 
@@ -329,7 +353,8 @@
                       >{addonGroupLabel(addon.group_name)}</span
                     ></td
                   >
-                  <td class="text-center align-middle">{addon.display_order}</td
+                  <td class="text-center align-middle"
+                    >{addon.display_order + 1}</td
                   >
                   <td class="text-center align-middle">
                     <span
@@ -339,19 +364,19 @@
                     </span>
                   </td>
                   <td class="text-center align-middle">
-                    <div
-                      class="flex w-full flex-wrap items-center justify-center gap-2"
-                    >
-                      <button
-                        class="btn btn-sm btn-soft btn-accent"
-                        onclick={() => editAddon(addon)}>Editar</button
-                      >
-                      <button
-                        class="btn btn-sm btn-soft btn-error"
-                        onclick={() => requestDeleteAddon(addon)}
-                        >Eliminar</button
-                      >
-                    </div>
+                    <AdminTableRowActions
+                      itemName={addon.name}
+                      {busy}
+                      canMoveUp={addonActivityFilter === "all" &&
+                        filteredAddons.findIndex((a) => a.id === addon.id) > 0}
+                      canMoveDown={addonActivityFilter === "all" &&
+                        filteredAddons.findIndex((a) => a.id === addon.id) <
+                          filteredAddons.length - 1}
+                      onEdit={() => editAddon(addon)}
+                      onDelete={() => requestDeleteAddon(addon)}
+                      onMoveUp={() => moveAddon(addon, -1)}
+                      onMoveDown={() => moveAddon(addon, 1)}
+                    />
                   </td>
                 </tr>
               {/each}
@@ -432,20 +457,6 @@
         placeholder="1.50"
         bind:value={form.price}
         aria-labelledby="addon-price-label"
-      />
-    </div>
-
-    <div class="form-control">
-      <span id="addon-order-label" class="label-text text-xs mb-1"
-        >Orden de visualizacion</span
-      >
-      <input
-        id="addon-order"
-        type="number"
-        class="input input-bordered input-sm w-full"
-        placeholder="0"
-        bind:value={form.display_order}
-        aria-labelledby="addon-order-label"
       />
     </div>
 

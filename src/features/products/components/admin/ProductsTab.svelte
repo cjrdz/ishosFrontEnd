@@ -1,15 +1,26 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import type {
     AdminImage,
     Category,
     Product,
+    StoreOfferItem,
   } from "@features/admin-management";
+  import {
+    getAdminStoreSettings,
+    updateAdminStoreSettings,
+  } from "@features/admin-management/lib/bff";
   import ProductList from "./ProductList.svelte";
   import ProductEditorDialog from "./ProductEditorDialog.svelte";
   import ImageGalleryPanel from "./ImageGalleryPanel.svelte";
-  import GlobalFlavorsManager from "./GlobalFlavorsManager.svelte";
-  import GlobalAddonsManager from "./GlobalAddonsManager.svelte";
+  import OfferAssignmentPanel from "./OfferAssignmentPanel.svelte";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
+  import {
+    closeConfirmDialog,
+    confirmDialogNow,
+    createConfirmDialogState,
+    openConfirmDialog,
+  } from "@shared/utils/confirm-dialog";
   import type { ProductsTabProps as Props } from "../../types/products-tab";
 
   function trackAction(action: string, metadata?: Record<string, unknown>) {
@@ -66,30 +77,38 @@
 
   let productEditorOpen = $state(false);
   let imageGalleryOpen = $state(false);
-  let globalFlavorsOpen = $state(false);
-  let globalAddonsOpen = $state(false);
-  let confirmOpen = $state(false);
-  let confirmTitle = $state("Confirmar accion");
-  let confirmMessage = $state("");
-  let confirmAction = $state<null | (() => void)>(null);
+  let confirmDialog = $state(createConfirmDialogState());
   let editingProductId = $state<string | null>(null);
-  let productVisibilityFilter = $state<"all" | "active" | "inactive">("all");
-  const filteredProducts = $derived(
-    productVisibilityFilter === "all"
-      ? products
-      : products.filter((product) =>
-          productVisibilityFilter === "active"
-            ? product.is_available
-            : !product.is_available,
-        ),
+
+  let offers = $state<StoreOfferItem[]>([]);
+  let ordersEnabled = $state(true);
+  let offerPanelOpen = $state(false);
+  let offerPanelProduct = $state<Product | null>(null);
+  let offerBusy = $state(false);
+  let offerError = $state("");
+  let offerNotice = $state("");
+
+  let pendingToggleProduct = $state<Product | null>(null);
+  let pendingToggleValue = $state(false);
+
+  const now = $state(Date.now());
+  const activeOfferByProductId = $derived(
+    new Map<string, StoreOfferItem>(
+      offers
+        .filter((offer) => new Date(offer.expires_at).getTime() > Date.now())
+        .map((offer) => [offer.product_id, offer]),
+    ),
   );
-  const productVisibilityFilterLabel = $derived(
-    productVisibilityFilter === "all"
-      ? "Todos"
-      : productVisibilityFilter === "active"
-        ? "Activos"
-        : "Inactivos",
+  const existingOfferForPanel = $derived(
+    offerPanelProduct
+      ? (offers.find((offer) => offer.product_id === offerPanelProduct.id) ??
+          null)
+      : null,
   );
+
+  onMount(() => {
+    void loadStoreSettings();
+  });
 
   let form = $state({
     id: "",
@@ -155,22 +174,6 @@
     productEditorOpen = true;
   }
 
-  function openGlobalFlavorsModal() {
-    globalFlavorsOpen = true;
-  }
-
-  function closeGlobalFlavorsModal() {
-    globalFlavorsOpen = false;
-  }
-
-  function openGlobalAddonsModal() {
-    globalAddonsOpen = true;
-  }
-
-  function closeGlobalAddonsModal() {
-    globalAddonsOpen = false;
-  }
-
   function closeProductEditor() {
     productEditorOpen = false;
     resetForm();
@@ -234,36 +237,38 @@
     closeProductEditor();
   }
 
-  function openConfirm(title: string, message: string, action: () => void) {
-    confirmTitle = title;
-    confirmMessage = message;
-    confirmAction = action;
-    confirmOpen = true;
-  }
-
-  function confirmNow() {
-    const action = confirmAction;
-    confirmAction = null;
-    confirmOpen = false;
-    if (action) action();
-  }
-
-  function closeConfirm() {
-    confirmAction = null;
-    confirmOpen = false;
-  }
-
   function requestDeleteProduct(product: Product) {
-    openConfirm(
+    openConfirmDialog(
+      confirmDialog,
       "Eliminar producto",
       `Seguro que deseas eliminar ${product.name}?`,
       () => onDelete(product.id),
     );
   }
 
-  function toggleProductAvailability(product: Product, checked: boolean) {
-    const nextAvailability = checked;
-    if (nextAvailability === product.is_available) return;
+  function requestToggleProductAvailability(
+    product: Product,
+    checked: boolean,
+  ) {
+    if (checked === product.is_available) return;
+    pendingToggleProduct = product;
+    pendingToggleValue = checked;
+    openConfirmDialog(
+      confirmDialog,
+      checked ? "Activar producto" : "Desactivar producto",
+      checked
+        ? `¿Seguro que deseas activar ${product.name}?`
+        : `¿Seguro que deseas desactivar ${product.name}?`,
+      confirmToggleProductAvailability,
+    );
+  }
+
+  function confirmToggleProductAvailability() {
+    if (!pendingToggleProduct) return;
+    const product = pendingToggleProduct;
+    const nextAvailability = pendingToggleValue;
+    pendingToggleProduct = null;
+    pendingToggleValue = false;
 
     onUpdate(product.id, {
       name: product.name,
@@ -278,6 +283,84 @@
       stock_status: product.stock_status || undefined,
     });
   }
+
+  function clearPendingToggle() {
+    pendingToggleProduct = null;
+    pendingToggleValue = false;
+  }
+
+  function setOfferNotice(message: string) {
+    offerNotice = message;
+    setTimeout(() => {
+      if (offerNotice === message) offerNotice = "";
+    }, 2500);
+  }
+
+  async function loadStoreSettings() {
+    offerBusy = true;
+    offerError = "";
+    try {
+      const settings = await getAdminStoreSettings();
+      ordersEnabled = settings.orders_enabled;
+      offers = settings.offers ?? [];
+    } catch (requestError) {
+      offerError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo cargar la configuracion de ofertas";
+    } finally {
+      offerBusy = false;
+    }
+  }
+
+  function openOfferPanel(product: Product) {
+    offerPanelProduct = product;
+    offerPanelOpen = true;
+    offerError = "";
+  }
+
+  function closeOfferPanel() {
+    offerPanelOpen = false;
+    offerPanelProduct = null;
+    offerError = "";
+  }
+
+  async function saveOffers(nextOffers: StoreOfferItem[]) {
+    offerBusy = true;
+    offerError = "";
+    try {
+      await updateAdminStoreSettings({
+        orders_enabled: ordersEnabled,
+        offers: nextOffers,
+      });
+      await loadStoreSettings();
+      setOfferNotice("Oferta guardada");
+      closeOfferPanel();
+    } catch (requestError) {
+      offerError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo guardar la oferta";
+    } finally {
+      offerBusy = false;
+    }
+  }
+
+  async function handleSaveOffer(nextOffer: StoreOfferItem) {
+    const nextOffers = offers.filter(
+      (offer) => offer.product_id !== nextOffer.product_id,
+    );
+    nextOffers.push(nextOffer);
+    await saveOffers(nextOffers);
+  }
+
+  async function handleRemoveOffer() {
+    if (!offerPanelProduct) return;
+    const nextOffers = offers.filter(
+      (offer) => offer.product_id !== offerPanelProduct!.id,
+    );
+    await saveOffers(nextOffers);
+  }
 </script>
 
 <section class="space-y-4">
@@ -285,20 +368,20 @@
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
 
+  {#if offerNotice}
+    <div class="alert alert-success shadow-sm"><span>{offerNotice}</span></div>
+  {/if}
+
   <ProductList
     {products}
-    {filteredProducts}
+    {categories}
     {busy}
-    {productVisibilityFilterLabel}
-    onOpenGlobalFlavors={openGlobalFlavorsModal}
-    onOpenGlobalAddons={openGlobalAddonsModal}
+    offerByProductId={activeOfferByProductId}
     onCreateProduct={openCreateProductModal}
-    onFilterChange={(value) => {
-      productVisibilityFilter = value;
-    }}
-    onToggleAvailability={toggleProductAvailability}
+    onToggleAvailability={requestToggleProductAvailability}
     onEdit={editProduct}
     onRequestDelete={requestDeleteProduct}
+    onOpenOfferPanel={openOfferPanel}
   />
 </section>
 
@@ -315,28 +398,6 @@
   onClose={closeProductEditor}
   onOpenImageGalleryModal={openImageGalleryModal}
   onClearSelectedImage={clearSelectedImage}
-/>
-
-<GlobalFlavorsManager
-  open={globalFlavorsOpen}
-  {flavors}
-  busy={flavorBusy}
-  error={flavorError}
-  onClose={closeGlobalFlavorsModal}
-  onCreate={onCreateFlavor}
-  onUpdate={onUpdateFlavor}
-  onDelete={onDeleteFlavor}
-/>
-
-<GlobalAddonsManager
-  open={globalAddonsOpen}
-  {addons}
-  busy={addonBusy}
-  error={addonError}
-  onClose={closeGlobalAddonsModal}
-  onCreate={onCreateAddon}
-  onUpdate={onUpdateAddon}
-  onDelete={onDeleteAddon}
 />
 
 <ImageGalleryPanel
@@ -359,11 +420,26 @@
   }}
 />
 
+<OfferAssignmentPanel
+  open={offerPanelOpen}
+  product={offerPanelProduct}
+  existingOffer={existingOfferForPanel}
+  busy={offerBusy}
+  error={offerError}
+  onClose={closeOfferPanel}
+  onSave={handleSaveOffer}
+  onRemove={handleRemoveOffer}
+/>
+
 <ConfirmDialog
-  open={confirmOpen}
-  title={confirmTitle}
-  message={confirmMessage}
+  open={confirmDialog.open}
+  title={confirmDialog.title}
+  message={confirmDialog.message}
   {busy}
-  onConfirm={confirmNow}
-  onCancel={closeConfirm}
+  variant="error"
+  onConfirm={() => confirmDialogNow(confirmDialog)}
+  onCancel={() => {
+    clearPendingToggle();
+    closeConfirmDialog(confirmDialog);
+  }}
 />

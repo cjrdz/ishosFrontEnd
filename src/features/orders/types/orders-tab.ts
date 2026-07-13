@@ -1,6 +1,8 @@
 import type {
   Addon,
+  Category,
   Employee,
+  Flavor,
   Order,
   Product,
 } from "@features/admin-management";
@@ -64,14 +66,18 @@ export interface OrdersTabProps {
   isAdmin: boolean;
   orders: Order[];
   products: Product[];
+  categories: Category[];
   employees: Employee[];
   selectedOrder: Order | null;
   busy: boolean;
   moduleError: string;
   orderStatusFilter: string;
+  showArchived: boolean;
   onFilterChange: (status: string) => void;
+  onToggleArchivedView: () => void;
   onReload: () => void;
   onOpenOrder: (id: string) => Promise<Order | null>;
+  onClearSelectedOrder: () => void;
   onApprove: (id: string, reason?: string) => Promise<Order | null>;
   onReject: (id: string, reason: string) => Promise<Order | null>;
   onStatusChange: (
@@ -83,7 +89,11 @@ export interface OrdersTabProps {
     payload: OrderUpdatePayload,
   ) => Promise<Order | null>;
   onDelete: (id: string) => void;
-  onCreate: (payload: CreateOrderPayload) => Promise<boolean>;
+  onCreate: (
+    payload: CreateOrderPayload,
+    idempotencyKey?: string,
+  ) => Promise<boolean>;
+  onArchive: (id: string, archived: boolean) => Promise<Order | null>;
   saveUserFromOrder: (payload: {
     name: string;
     user_type: "user" | "company";

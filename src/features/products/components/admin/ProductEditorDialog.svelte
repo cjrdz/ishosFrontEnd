@@ -86,271 +86,271 @@
   bind:dialogRef
   title={isEditing ? "Editar producto" : "Crear producto"}
   icon="lucide:package"
-  widthClass="max-w-5xl"
+  widthClass="max-w-4xl"
   {onClose}
 >
-  <form
-    class="grid items-start gap-6 md:grid-cols-[1.15fr_0.85fr]"
-    onsubmit={onSubmit}
-  >
-    <div class="grid gap-5">
-      <div class="grid items-start gap-4 md:grid-cols-2">
-        <div class="form-control md:col-span-2">
-          <span id="product-name-label" class="label-text text-xs mb-1"
-            >Nombre</span
-          >
-          <input
-            id="product-name"
-            class="input input-bordered input-sm w-full"
-            placeholder="Helado de vainilla"
-            bind:value={form.name}
-            required
-            aria-labelledby="product-name-label"
-          />
-        </div>
-
-        <div class="form-control">
-          <span id="product-price-label" class="label-text text-xs mb-1"
-            >Precio</span
-          >
-          <input
-            id="product-price"
-            class="input input-bordered input-sm w-full"
-            placeholder="0.00"
-            type="number"
-            min="0"
-            step="0.01"
-            bind:value={form.price}
-            required
-            aria-labelledby="product-price-label"
-          />
-        </div>
-
-        <div class="form-control">
-          <span id="product-category-label" class="label-text text-xs mb-1"
-            >Categoria</span
-          >
-          <select
-            id="product-category"
-            class="select select-bordered select-sm w-full"
-            bind:value={form.category_id}
-            required
-            aria-labelledby="product-category-label"
-          >
-            {#if categories.length === 0}
-              <option value="" disabled>Sin categorias</option>
-            {:else}
-              {#each categories as category}
-                <option value={category.id}>{category.name}</option>
-              {/each}
-            {/if}
-          </select>
-        </div>
-
-        <div class="form-control md:col-span-2">
-          <span class="label-text text-xs mb-1">Estado</span>
-          <label
-            class="label h-9 w-full cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-3"
-          >
-            <input
-              id="product-is-available"
-              class="toggle toggle-sm"
-              type="checkbox"
-              bind:checked={form.is_available}
-              aria-labelledby="product-is-available-label"
-            />
-            <span id="product-is-available-label" class="label-text text-sm"
-              >Disponible</span
+  <form class="grid items-stretch gap-5 md:grid-cols-2" onsubmit={onSubmit}>
+    <!-- Left column -->
+    <div class="space-y-4">
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend text-sm">Información básica</legend>
+        <div class="space-y-3">
+          <div class="form-control">
+            <span id="product-name-label" class="label-text text-xs mb-1"
+              >Nombre</span
             >
-          </label>
-        </div>
-
-        <div class="form-control md:col-span-2">
-          <span class="label-text text-xs mb-1">Asignacion global</span>
-          <div class="space-y-2 rounded-lg border border-base-300/70 p-3">
-            <label class="label cursor-pointer justify-start gap-2 p-0">
-              <input
-                class="checkbox checkbox-sm"
-                type="checkbox"
-                bind:checked={form.exclude_global_flavors}
-              />
-              <span class="label-text text-sm"
-                >Excluir este producto de sabores globales</span
-              >
-            </label>
-            <label class="label cursor-pointer justify-start gap-2 p-0">
-              <input
-                class="checkbox checkbox-sm"
-                type="checkbox"
-                bind:checked={form.exclude_global_addons}
-              />
-              <span class="label-text text-sm"
-                >Excluir este producto de complementos globales</span
-              >
-            </label>
+            <input
+              id="product-name"
+              class="input input-bordered input-sm w-full"
+              placeholder="Helado de vainilla"
+              bind:value={form.name}
+              required
+              aria-labelledby="product-name-label"
+            />
           </div>
-        </div>
 
-        <div class="form-control md:col-span-2">
-          <span class="label-text text-xs mb-1"
-            >Configuracion de Inventario</span
-          >
-          <div class="space-y-3 rounded-lg border border-base-300/70 p-3">
-            <!-- Ball Based Toggle -->
-            <label class="label cursor-pointer justify-start gap-2 p-0">
-              <input
-                class="toggle toggle-sm"
-                type="checkbox"
-                bind:checked={form.ball_based}
-              />
-              <span class="label-text text-sm">Basado en bolas</span>
-            </label>
-
-            {#if form.ball_based}
-              <!-- Ball Quantity -->
-              <div class="space-y-2">
-                <span class="text-sm text-base-content/70"
-                  >Cantidad de bolas</span
-                >
-                <div class="flex flex-wrap gap-2">
-                  {#each ballQuantityOptions as qty (qty)}
-                    <label
-                      class="label cursor-pointer gap-1.5 rounded-lg border border-base-300 px-3 py-1.5 hover:bg-base-200/50"
-                    >
-                      <input
-                        type="radio"
-                        class="radio radio-sm"
-                        name="ball_quantity"
-                        value={qty}
-                        checked={form.ball_quantity === qty}
-                        onchange={() => (form.ball_quantity = qty)}
-                      />
-                      <span class="label-text">{qty}</span>
-                    </label>
-                  {/each}
-                  <label
-                    class="label cursor-pointer gap-1.5 rounded-lg border border-base-300 px-3 py-1.5 hover:bg-base-200/50"
-                  >
-                    <input
-                      type="radio"
-                      class="radio radio-sm"
-                      name="ball_quantity"
-                      value="custom"
-                      checked={isCustomBallQuantity}
-                      onchange={() => (form.ball_quantity = "custom")}
-                    />
-                    <span class="label-text">Custom</span>
-                  </label>
-                </div>
-                {#if isCustomBallQuantity}
-                  <input
-                    type="number"
-                    class="input input-bordered input-sm w-full"
-                    placeholder="Ej: 5"
-                    min="1"
-                    bind:value={form.custom_ball_quantity}
-                  />
-                {/if}
-              </div>
-
-              <!-- Mixed Flavors -->
-              {#if showMixedFlavors}
-                <label class="label cursor-pointer justify-start gap-2 p-0">
-                  <input
-                    class="toggle toggle-sm"
-                    type="checkbox"
-                    bind:checked={form.allows_mixed_flavors}
-                  />
-                  <span class="label-text text-sm">Permitir sabores mixtos</span
-                  >
-                </label>
-              {/if}
-            {/if}
-
-            <!-- Stock Status -->
-            <div class="form-control w-full">
-              <span class="label-text mb-1 text-xs">Estado de stock</span>
-              <select
-                class="select select-bordered select-sm w-full"
-                bind:value={form.stock_status}
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-control">
+              <span id="product-price-label" class="label-text text-xs mb-1"
+                >Precio</span
               >
-                {#each stockStatusOptions as opt (opt.value)}
-                  <option value={opt.value}>{opt.label}</option>
-                {/each}
+              <input
+                id="product-price"
+                class="input input-bordered input-sm w-full"
+                placeholder="0.00"
+                type="number"
+                min="0"
+                step="0.01"
+                bind:value={form.price}
+                required
+                aria-labelledby="product-price-label"
+              />
+            </div>
+
+            <div class="form-control">
+              <span id="product-category-label" class="label-text text-xs mb-1"
+                >Categoria</span
+              >
+              <select
+                id="product-category"
+                class="select select-bordered select-sm w-full"
+                bind:value={form.category_id}
+                required
+                aria-labelledby="product-category-label"
+              >
+                {#if categories.length === 0}
+                  <option value="" disabled>Sin categorias</option>
+                {:else}
+                  {#each categories as category}
+                    <option value={category.id}>{category.name}</option>
+                  {/each}
+                {/if}
               </select>
             </div>
           </div>
-        </div>
 
-        <div class="form-control md:col-span-2">
-          <span class="label-text text-xs mb-1">Imagen del producto</span>
-          <div class="rounded-lg border border-base-300/70 p-3 space-y-3">
-            {#if selectedGalleryImage}
-              <div
-                class="flex items-center gap-3 rounded-lg border border-base-300/70 p-2"
+          <div class="form-control">
+            <span class="label-text text-xs mb-1">Estado</span>
+            <label
+              class="label h-9 w-full cursor-pointer justify-start gap-2 rounded-lg border border-base-300/70 px-3"
+            >
+              <input
+                id="product-is-available"
+                class="toggle toggle-sm"
+                type="checkbox"
+                bind:checked={form.is_available}
+                aria-labelledby="product-is-available-label"
+              />
+              <span id="product-is-available-label" class="label-text text-sm"
+                >Disponible</span
               >
-                <img
-                  src={selectedGalleryImage.url}
-                  alt={selectedGalleryImage.name}
-                  class="h-12 w-12 rounded object-cover border border-base-300/70"
-                  loading="lazy"
-                />
-                <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium">
-                    {selectedGalleryImage.name}
-                  </div>
-                </div>
-              </div>
-            {:else}
-              <p class="text-sm text-base-content/70">
-                No hay imagen seleccionada.
-              </p>
-            {/if}
-
-            <div class="flex flex-wrap gap-2">
-              <button
-                class="btn btn-outline btn-sm"
-                type="button"
-                onclick={onOpenImageGalleryModal}
-                disabled={busy || galleryBusy || galleryActionBusy}
-              >
-                Seleccionar imagen
-              </button>
-              <button
-                class="btn btn-ghost btn-sm"
-                type="button"
-                onclick={onClearSelectedImage}
-                disabled={busy ||
-                  galleryBusy ||
-                  galleryActionBusy ||
-                  !form.image_path}
-              >
-                Quitar
-              </button>
-            </div>
+            </label>
           </div>
         </div>
-      </div>
+      </fieldset>
 
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend text-sm">Asignación global</legend>
+        <div class="space-y-2">
+          <label class="label cursor-pointer justify-start gap-2 p-0">
+            <input
+              class="checkbox checkbox-sm"
+              type="checkbox"
+              bind:checked={form.exclude_global_flavors}
+            />
+            <span class="label-text text-sm"
+              >Excluir este producto de sabores globales</span
+            >
+          </label>
+          <label class="label cursor-pointer justify-start gap-2 p-0">
+            <input
+              class="checkbox checkbox-sm"
+              type="checkbox"
+              bind:checked={form.exclude_global_addons}
+            />
+            <span class="label-text text-sm"
+              >Excluir este producto de complementos globales</span
+            >
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend text-sm"
+          >Configuración de inventario</legend
+        >
+        <div class="space-y-3">
+          <label class="label cursor-pointer justify-start gap-2 p-0">
+            <input
+              class="toggle toggle-sm"
+              type="checkbox"
+              bind:checked={form.ball_based}
+            />
+            <span class="label-text text-sm">Basado en bolas</span>
+          </label>
+
+          {#if form.ball_based}
+            <div class="space-y-2">
+              <span class="label-text text-xs">Cantidad de bolas</span>
+              <div class="join">
+                {#each ballQuantityOptions as qty (qty)}
+                  <input
+                    class="join-item btn btn-sm"
+                    type="radio"
+                    name="ball_quantity"
+                    value={qty}
+                    checked={form.ball_quantity === qty}
+                    onchange={() => (form.ball_quantity = qty)}
+                    aria-label={String(qty)}
+                  />
+                {/each}
+                <input
+                  class="join-item btn btn-sm"
+                  type="radio"
+                  name="ball_quantity"
+                  value="custom"
+                  checked={isCustomBallQuantity}
+                  onchange={() => (form.ball_quantity = "custom")}
+                  aria-label="Custom"
+                />
+              </div>
+              {#if isCustomBallQuantity}
+                <input
+                  type="number"
+                  class="input input-bordered input-sm w-full"
+                  placeholder="Ej: 5"
+                  min="1"
+                  bind:value={form.custom_ball_quantity}
+                />
+              {/if}
+            </div>
+
+            {#if showMixedFlavors}
+              <label class="label cursor-pointer justify-start gap-2 p-0">
+                <input
+                  class="toggle toggle-sm"
+                  type="checkbox"
+                  bind:checked={form.allows_mixed_flavors}
+                />
+                <span class="label-text text-sm">Permitir sabores mixtos</span>
+              </label>
+            {/if}
+          {/if}
+
+          <div class="form-control w-full">
+            <span class="label-text text-xs mb-1">Estado de stock</span>
+            <select
+              class="select select-bordered select-sm w-full"
+              bind:value={form.stock_status}
+            >
+              {#each stockStatusOptions as opt (opt.value)}
+                <option value={opt.value}>{opt.label}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+
+    <!-- Right column -->
+    <div class="flex flex-col gap-4 h-full">
+      <fieldset class="fieldset flex-1 flex flex-col">
+        <legend class="fieldset-legend text-sm">Descripción</legend>
+        <div class="form-control flex-1 flex flex-col">
+          <textarea
+            id="product-description"
+            class="textarea textarea-bordered w-full flex-1 min-h-[180px] resize-none"
+            placeholder="Descripcion del producto"
+            bind:value={form.description}
+            required
+            aria-labelledby="product-description-label"
+          ></textarea>
+          <span id="product-description-label" class="sr-only">Descripcion</span
+          >
+        </div>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend text-sm">Imagen del producto</legend>
+        <div class="space-y-3">
+          {#if selectedGalleryImage}
+            <div
+              class="flex items-center gap-3 rounded-lg border border-base-300/70 p-2"
+            >
+              <img
+                src={selectedGalleryImage.url}
+                alt={selectedGalleryImage.name}
+                class="h-14 w-14 rounded-lg object-cover border border-base-300/70"
+                loading="lazy"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="truncate text-sm font-medium">
+                  {selectedGalleryImage.name}
+                </div>
+              </div>
+            </div>
+          {:else}
+            <div
+              class="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-base-300/70 p-4 text-center"
+            >
+              <span class="text-sm text-base-content/60">
+                No hay imagen seleccionada.
+              </span>
+            </div>
+          {/if}
+
+          <div class="flex flex-wrap gap-2">
+            <button
+              class="btn btn-outline btn-sm"
+              type="button"
+              onclick={onOpenImageGalleryModal}
+              disabled={busy || galleryBusy || galleryActionBusy}
+            >
+              Seleccionar imagen
+            </button>
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              onclick={onClearSelectedImage}
+              disabled={busy ||
+                galleryBusy ||
+                galleryActionBusy ||
+                !form.image_path}
+            >
+              Quitar
+            </button>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+
+    <!-- Actions -->
+    <div class="md:col-span-2 border-t border-base-200 pt-4">
       <AdminFormActions
         submitLabel={isEditing ? "Actualizar" : "Crear"}
         onCancel={onClose}
         {busy}
       />
-    </div>
-
-    <div class="form-control self-start pt-0">
-      <span id="product-description-label" class="label-text text-xs mb-1"
-        >Descripcion</span
-      >
-      <textarea
-        id="product-description"
-        class="textarea textarea-bordered w-full h-50 resize-none"
-        placeholder="Descripcion del producto"
-        bind:value={form.description}
-        required
-        aria-labelledby="product-description-label"
-      ></textarea>
     </div>
   </form>
 </AdminModalShell>

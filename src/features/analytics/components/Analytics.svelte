@@ -12,6 +12,7 @@
     TitleComponent,
     DatasetComponent,
     TooltipComponent,
+    MarkLineComponent,
   } from "echarts/components";
   import { CanvasRenderer } from "echarts/renderers";
   import type { EChartsOption } from "echarts";
@@ -37,6 +38,7 @@
     ToolboxComponent,
     DatasetComponent,
     TooltipComponent,
+    MarkLineComponent,
   ]);
 
   let loading = $state(true);
@@ -455,30 +457,17 @@
   });
 </script>
 
-<section class="space-y-4">
+<section class="space-y-4 md:space-y-6">
   <!-- Header -->
-  <div class="card bg-base-100 shadow border border-base-300/60">
-    <div class="card-body py-4">
-      <div
-        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div class="flex items-center gap-3">
-          <div
-            class="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"
-          >
-            <Icon icon="lucide:bar-chart-2" class="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h2 class="card-title text-base leading-tight">
-              Analítica de órdenes
-            </h2>
-            <p class="text-xs text-base-content/55">
-              Tendencia y rendimiento operacional
-            </p>
-          </div>
-        </div>
+  <div class="card bg-base-100 shadow">
+    <div class="card-body gap-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="card-title shrink-0 mr-1">Analítica de órdenes</h2>
+
+        <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+
         <!-- Quick range: segmented join for compactness -->
-        <div class="join self-start sm:self-auto">
+        <div class="join">
           {#each Object.entries(quickRangeConfig) as [key, cfg]}
             <button
               class="btn btn-sm join-item"
@@ -494,42 +483,34 @@
   </div>
 
   <!-- Body -->
-  <div class="card bg-base-100 shadow border border-base-300/60">
-    <div class="card-body space-y-5">
+  <div class="card bg-base-100 shadow">
+    <div class="card-body gap-4">
       {#if error}
-        <div class="alert alert-error">
-          <span>{error}</span>
-          <button
-            type="button"
-            class="btn btn-ghost btn-xs ml-auto"
-            onclick={() => (error = "")}>&#x2715;</button
-          >
-        </div>
+        <div class="alert alert-warning"><span>{error}</span></div>
       {/if}
 
       <!-- Controls row -->
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-start">
-        <!-- Group by: compact button group instead of full-width select -->
-        <div class="flex flex-col gap-1">
-          <span class="text-xs font-medium text-base-content/60 ml-0.5"
-            >Agrupar por</span
-          >
-          <div class="join">
-            {#each [["day", "Día"], ["week", "Semana"], ["month", "Mes"]] as [val, lbl]}
-              <button
-                class="btn btn-sm join-item"
-                class:btn-neutral={groupBy === val}
-                class:btn-ghost={groupBy !== val}
-                onclick={() => {
-                  groupBy = val as "day" | "week" | "month";
-                }}>{lbl}</button
-              >
-            {/each}
-          </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="card-title shrink-0 mr-1">Tendencias</h2>
+
+        <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+
+        <!-- Group by -->
+        <div class="join">
+          {#each [["day", "Día"], ["week", "Semana"], ["month", "Mes"]] as [val, lbl]}
+            <button
+              class="btn btn-sm join-item"
+              class:btn-primary={groupBy === val}
+              class:btn-ghost={groupBy !== val}
+              onclick={() => {
+                groupBy = val as "day" | "week" | "month";
+              }}>{lbl}</button
+            >
+          {/each}
         </div>
 
         <!-- Custom range toggle -->
-        <label class="flex cursor-pointer items-center gap-2 w-fit lg:mt-6">
+        <label class="flex cursor-pointer items-center gap-2 w-fit">
           <input
             type="checkbox"
             class="toggle toggle-primary toggle-sm"
@@ -541,7 +522,7 @@
         </label>
 
         <button
-          class="btn btn-primary btn-sm gap-2 lg:ml-auto lg:mt-6"
+          class="btn btn-sm btn-primary gap-2 shrink-0 sm:ml-auto"
           onclick={fetchAnalytics}
           disabled={loading}
         >
@@ -556,7 +537,7 @@
 
       <!-- Custom date inputs -->
       {#if useCustomRange}
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 animate-fadeIn">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label class="flex items-center gap-3">
             <span class="w-24 shrink-0 text-sm font-medium text-base-content/60"
               >Fecha inicio</span
@@ -564,7 +545,7 @@
             <input
               id="analytics-start-date"
               type="date"
-              class="input input-bordered h-11 w-full"
+              class="input input-sm input-bordered w-full"
               bind:value={startDate}
             />
           </label>
@@ -575,7 +556,7 @@
             <input
               id="analytics-end-date"
               type="date"
-              class="input input-bordered h-11 w-full"
+              class="input input-sm input-bordered w-full"
               bind:value={endDate}
             />
           </label>
@@ -584,44 +565,36 @@
 
       <!-- KPI cards -->
       {#if loading}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           {#each Array(3) as _}
-            <div
-              class="stat bg-base-200/50 border border-base-300/50 rounded-box animate-pulse"
-            >
-              <div class="h-4 bg-base-300 rounded w-20 mb-3"></div>
-              <div class="h-8 bg-base-300 rounded w-28"></div>
+            <div class="stat bg-base-200/30 rounded-box py-3 animate-pulse">
+              <div class="h-3 bg-base-300 rounded w-20 mb-3"></div>
+              <div class="h-7 bg-base-300 rounded w-28"></div>
             </div>
           {/each}
         </div>
       {:else}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div
-            class="stat bg-base-200/40 border border-base-300/50 rounded-box"
-          >
-            <div class="stat-title">Órdenes</div>
-            <div class="stat-value text-primary">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="stat bg-base-200/30 rounded-box py-3">
+            <div class="stat-title text-xs">Órdenes</div>
+            <div class="stat-value text-primary text-2xl">
               {overview?.total_orders ?? 0}
             </div>
-            <div class="stat-desc">{getActivePeriodDescription()}</div>
+            <div class="stat-desc text-xs">{getActivePeriodDescription()}</div>
           </div>
-          <div
-            class="stat bg-base-200/40 border border-base-300/50 rounded-box"
-          >
-            <div class="stat-title">Ingresos</div>
+          <div class="stat bg-base-200/30 rounded-box py-3">
+            <div class="stat-title text-xs">Ingresos</div>
             <div class="stat-value text-success text-2xl">
               {formatCurrency(overview?.total_revenue ?? 0)}
             </div>
-            <div class="stat-desc">Sin órdenes canceladas</div>
+            <div class="stat-desc text-xs">Sin órdenes canceladas</div>
           </div>
-          <div
-            class="stat bg-base-200/40 border border-base-300/50 rounded-box"
-          >
-            <div class="stat-title">Ticket promedio</div>
+          <div class="stat bg-base-200/30 rounded-box py-3">
+            <div class="stat-title text-xs">Ticket promedio</div>
             <div class="stat-value text-info text-2xl">
               {formatCurrency(overview?.avg_order_value ?? 0)}
             </div>
-            <div class="stat-desc">Por orden completada</div>
+            <div class="stat-desc text-xs">Por orden completada</div>
           </div>
         </div>
       {/if}
@@ -630,7 +603,7 @@
       {#if loading}
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {#each Array(4) as _}
-            <div class="card bg-base-100 border border-base-300/50">
+            <div class="card bg-base-100 shadow">
               <div class="card-body">
                 <div class="h-4 bg-base-200 rounded w-36 mb-4"></div>
                 <div
@@ -667,7 +640,7 @@
         </div>
       {:else}
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div class="card bg-base-100 border border-base-300/50">
+          <div class="card bg-base-100 shadow">
             <div class="card-body">
               <h4 class="text-sm font-semibold flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-primary inline-block"
@@ -680,7 +653,7 @@
             </div>
           </div>
 
-          <div class="card bg-base-100 border border-base-300/50">
+          <div class="card bg-base-100 shadow">
             <div class="card-body">
               <h4 class="text-sm font-semibold flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-success inline-block"
@@ -693,7 +666,7 @@
             </div>
           </div>
 
-          <div class="card bg-base-100 border border-base-300/50">
+          <div class="card bg-base-100 shadow">
             <div class="card-body">
               <h4 class="text-sm font-semibold flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-warning inline-block"
@@ -719,7 +692,7 @@
             </div>
           </div>
 
-          <div class="card bg-base-100 border border-base-300/50">
+          <div class="card bg-base-100 shadow">
             <div class="card-body">
               <h4 class="text-sm font-semibold flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-info inline-block"
@@ -744,19 +717,3 @@
     </div>
   </div>
 </section>
-
-<style>
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  .animate-fadeIn {
-    animation: fadeIn 0.18s ease-out;
-  }
-</style>

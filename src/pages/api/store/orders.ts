@@ -26,9 +26,17 @@ export const POST: APIRoute = async (context) => {
       );
     }
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    const idempotencyKey = context.request.headers.get("Idempotency-Key");
+    if (idempotencyKey) {
+      headers["Idempotency-Key"] = idempotencyKey;
+    }
+
     const response = await fetch(`${getServerApiBaseUrl(context)}/orders`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(parsed.data),
     });
 

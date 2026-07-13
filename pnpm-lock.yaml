@@ -5,13 +5,18 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  h3: '>=1.15.6'
-  picomatch: '>=4.0.4'
   defu: '>=6.1.5'
   devalue: '>=5.6.4'
-  svelte: '>=5.53.5'
+  h3: '>=1.15.6'
+  picomatch: '>=4.0.4'
   smol-toml: '>=1.6.1'
+  svelte: '>=5.53.5'
   yaml: '>=2.8.3'
+
+patchedDependencies:
+  svelte-echarts:
+    hash: 0cf3433be7d3859152ebaccd5bd6cabf6fecb50bb9d96eb9990d7d207e298c38
+    path: patches/svelte-echarts.patch
 
 importers:
 
@@ -55,7 +60,7 @@ importers:
         version: 5.55.4
       svelte-echarts:
         specifier: ^1.0.0
-        version: 1.0.0(echarts@5.6.0)(svelte@5.55.4)
+        version: 1.0.0(patch_hash=0cf3433be7d3859152ebaccd5bd6cabf6fecb50bb9d96eb9990d7d207e298c38)(echarts@5.6.0)(svelte@5.55.4)
       tailwindcss:
         specifier: ^4.1.18
         version: 4.2.0
@@ -5640,7 +5645,7 @@ snapshots:
     dependencies:
       has-flag: 4.0.0
 
-  svelte-echarts@1.0.0(echarts@5.6.0)(svelte@5.55.4):
+  svelte-echarts@1.0.0(patch_hash=0cf3433be7d3859152ebaccd5bd6cabf6fecb50bb9d96eb9990d7d207e298c38)(echarts@5.6.0)(svelte@5.55.4):
     dependencies:
       echarts: 5.6.0
       svelte: 5.55.4

@@ -174,44 +174,34 @@
   }
 </script>
 
-<section class="space-y-4">
+<section class="space-y-4 md:space-y-6">
   <!-- Header — collapsible -->
-  <div class="card bg-base-100 shadow border border-base-300/60">
-    <div class="card-body py-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+  <div class="card bg-base-100 shadow">
+    <div class="card-body gap-4">
+      <div class="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          class="flex items-center gap-3 text-left hover:opacity-75 transition-opacity"
+          class="flex items-center gap-2 text-left hover:opacity-75 transition-opacity"
           onclick={() => (isCollapsed = !isCollapsed)}
           aria-expanded={!isCollapsed}
         >
-          <div
-            class="w-9 h-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0"
-          >
-            <Icon icon="lucide:upload" class="h-5 w-5 text-warning" />
-          </div>
-          <div>
-            <h2 class="card-title text-base leading-tight">
-              Exportación y mantenimiento
-            </h2>
-            <p class="text-xs text-base-content/55">
-              Exporta datos y libera espacio en la BD
-            </p>
-          </div>
+          <h2 class="card-title shrink-0 mr-1">Exportación y mantenimiento</h2>
           <span
-            class="h-4 w-4 text-base-content/40 transition-transform duration-200 ml-1 flex items-center"
+            class="h-4 w-4 text-base-content/40 transition-transform duration-200 flex items-center"
             class:rotate-180={!isCollapsed}
           >
             <Icon icon="lucide:chevron-down" />
           </span>
         </button>
 
+        <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
+
         <div class="join">
           {#each [[7, "7d"], [30, "30d"], [90, "90d"]] as [days, lbl]}
             <button
               type="button"
               class="btn btn-sm join-item"
-              class:btn-neutral={startDate && endDate && getDaysDiff() === days}
+              class:btn-primary={startDate && endDate && getDaysDiff() === days}
               class:btn-ghost={!startDate || !endDate || getDaysDiff() !== days}
               onclick={() => applyPreset(days as 7 | 30 | 90)}>{lbl}</button
             >
@@ -223,19 +213,10 @@
 
   <!-- Collapsible body -->
   {#if !isCollapsed}
-    <div
-      class="card bg-base-100 shadow border border-base-300/60 animate-fadeIn"
-    >
-      <div class="card-body space-y-5">
+    <div class="card bg-base-100 shadow">
+      <div class="card-body gap-4">
         {#if error}
-          <div class="alert alert-error">
-            <span>{error}</span>
-            <button
-              type="button"
-              class="btn btn-ghost btn-xs ml-auto"
-              onclick={() => (error = "")}>✕</button
-            >
-          </div>
+          <div class="alert alert-warning"><span>{error}</span></div>
         {/if}
 
         {#if notice}
@@ -262,7 +243,7 @@
             <input
               id="export-start-date"
               type="date"
-              class="input input-bordered h-11 w-full"
+              class="input input-sm input-bordered w-full"
               bind:value={startDate}
             />
           </label>
@@ -273,7 +254,7 @@
             <input
               id="export-end-date"
               type="date"
-              class="input input-bordered h-11 w-full"
+              class="input input-sm input-bordered w-full"
               bind:value={endDate}
             />
           </label>
@@ -297,7 +278,7 @@
           class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:flex-wrap"
         >
           <button
-            class="btn btn-primary gap-2 w-full sm:w-auto"
+            class="btn btn-sm btn-primary gap-2 w-full sm:w-auto"
             disabled={exporting || deleting || !startDate || !endDate}
             onclick={() => handleExport("csv")}
           >
@@ -309,7 +290,7 @@
           </button>
 
           <button
-            class="btn btn-outline gap-2 w-full sm:w-auto"
+            class="btn btn-sm btn-outline gap-2 w-full sm:w-auto"
             disabled={exporting || deleting || !startDate || !endDate}
             onclick={() => handleExport("json")}
           >
@@ -320,11 +301,11 @@
             Exportar JSON
           </button>
 
-          <div class="divider divider-horizontal hidden sm:flex my-0 h-9"></div>
+          <div class="divider divider-horizontal hidden sm:flex my-0 h-8"></div>
 
           <div class="flex flex-col items-end gap-1 w-full sm:w-auto">
             <button
-              class="btn btn-error btn-outline gap-2 w-full sm:w-auto"
+              class="btn btn-sm btn-error btn-outline gap-2 w-full sm:w-auto"
               disabled={deleting || exporting || !hasExportForCurrentRange()}
               onclick={openPurgeModal}
             >

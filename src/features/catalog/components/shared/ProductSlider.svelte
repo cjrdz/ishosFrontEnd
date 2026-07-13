@@ -1,0 +1,262 @@
+<script lang="ts" generics="T extends { id: string }">
+  import { onMount, onDestroy } from "svelte";
+  import { animate } from "motion";
+  import Icon from "@shared/components/AppIcon.svelte";
+  import type { Snippet } from "svelte";
+
+  interface Props {
+    items: T[];
+    card: Snippet<[item: T, index: number]>;
+    ariaLabel?: string;
+    autoSlideMs?: number;
+    minCardWidth?: number;
+    showArrows?: boolean;
+    showDots?: boolean;
+    maxCards?: number;
+  }
+
+  let {
+    items,
+    card,
+    ariaLabel = "Carrusel de productos",
+    autoSlideMs = 4500,
+    minCardWidth = 300,
+    showArrows = true,
+    showDots = true,
+    maxCards = 4,
+  }: Props = $props();
+
+  let activeIndex = $state(0);
+  let trackEl = $state<HTMLDivElement | null>(null);
+  let viewportEl = $state<HTMLDivElement | null>(null);
+  let sectionEl = $state<HTMLElement | null>(null);
+  let cardsPerView = $state(1);
+
+  let isDragging = $state(false);
+  let dragStartX = 0;
+  let dragCurrentX = 0;
+  let dragOffset = $state(0);
+
+  let slideTimer: ReturnType<typeof setInterval> | null = null;
+  let isPaused = false;
+
+  const DRAG_THRESHOLD = 40;
+
+  const maxIndex = $derived(Math.max(0, items.length - cardsPerView));
+  const slideWidthPct = $derived(100 / cardsPerView);
+
+  let resizeObserver: ResizeObserver | null = null;
+
+  function computeCardsPerView(containerWidth: number): number {
+    return Math.max(
+      1,
+      Math.min(maxCards, Math.floor(containerWidth / minCardWidth)),
+    );
+  }
+
+  onMount(() => {
+    if (viewportEl) {
+      cardsPerView = computeCardsPerView(viewportEl.clientWidth);
+    }
+    resizeObserver = new ResizeObserver((entries) => {
+      const width = entries[0].contentRect.width;
+      const next = computeCardsPerView(width);
+      if (next !== cardsPerView) {
+        cardsPerView = next;
+        if (activeIndex > maxIndex) activeIndex = maxIndex;
+        startAutoSlide();
+      }
+    });
+    if (viewportEl) resizeObserver.observe(viewportEl);
+    startAutoSlide();
+
+    void animate(
+      sectionEl,
+      { opacity: [0, 1], transform: ["translateY(20px)", "translateY(0)"] },
+      { duration: 0.45, ease: [0, 0, 0.2, 1] },
+    );
+  });
+
+  onDestroy(() => {
+    resizeObserver?.disconnect();
+    stopAutoSlide();
+  });
+
+  function startAutoSlide() {
+    stopAutoSlide();
+    if (maxIndex < 1) return;
+    slideTimer = setInterval(() => {
+      if (!isPaused) goTo(activeIndex < maxIndex ? activeIndex + 1 : 0);
+    }, autoSlideMs);
+  }
+
+  function stopAutoSlide() {
+    if (slideTimer) {
+      clearInterval(slideTimer);
+      slideTimer = null;
+    }
+  }
+
+  function goTo(index: number) {
+    activeIndex = Math.max(0, Math.min(index, maxIndex));
+  }
+
+  function prev() {
+    goTo(activeIndex > 0 ? activeIndex - 1 : maxIndex);
+    startAutoSlide();
+  }
+
+  function next() {
+    goTo(activeIndex < maxIndex ? activeIndex + 1 : 0);
+    startAutoSlide();
+  }
+
+  function onDragStart(clientX: number) {
+    isDragging = true;
+    isPaused = true;
+    dragStartX = clientX;
+    dragCurrentX = clientX;
+    dragOffset = 0;
+  }
+
+  function onDragMove(clientX: number) {
+    if (!isDragging) return;
+    dragCurrentX = clientX;
+    dragOffset = dragCurrentX - dragStartX;
+  }
+
+  function onDragEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    const delta = dragCurrentX - dragStartX;
+    if (delta < -DRAG_THRESHOLD) next();
+    else if (delta > DRAG_THRESHOLD) prev();
+    dragOffset = 0;
+    isPaused = false;
+    startAutoSlide();
+  }
+
+  function handleMouseDown(e: MouseEvent) {
+    onDragStart(e.clientX);
+  }
+  function handleMouseMove(e: MouseEvent) {
+    if (isDragging) {
+      e.preventDefault();
+      onDragMove(e.clientX);
+    }
+  }
+  function handleMouseUp() {
+    onDragEnd();
+  }
+  function handleMouseLeave() {
+    if (isDragging) onDragEnd();
+  }
+
+  function handleTouchStart(e: TouchEvent) {
+    onDragStart(e.touches[0].clientX);
+  }
+  function handleTouchMove(e: TouchEvent) {
+    onDragMove(e.touches[0].clientX);
+  }
+  function handleTouchEnd() {
+    onDragEnd();
+  }
+
+  function handleMouseEnter() {
+    isPaused = true;
+  }
+  function handleMouseExitArea() {
+    if (!isDragging) isPaused = false;
+  }
+
+  const translateX = $derived(
+    `calc(${-activeIndex * slideWidthPct}% + ${dragOffset}px)`,
+  );
+</script>
+
+<section
+  class="w-full mx-auto px-4 py-4 select-none"
+  bind:this={sectionEl}
+  onmouseenter={handleMouseEnter}
+  onmouseleave={handleMouseExitArea}
+  aria-label={ariaLabel}
+>
+  <div
+    class="relative w-full overflow-hidden rounded-2xl"
+    bind:this={viewportEl}
+  >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div
+      bind:this={trackEl}
+      class="flex w-full"
+      class:transition-transform={!isDragging}
+      class:duration-300={!isDragging}
+      class:ease-out={!isDragging}
+      class:cursor-grabbing={isDragging}
+      class:cursor-grab={!isDragging}
+      style="transform: translateX({translateX});"
+      role="list"
+      onmousedown={handleMouseDown}
+      onmousemove={handleMouseMove}
+      onmouseup={handleMouseUp}
+      onmouseleave={handleMouseLeave}
+      ontouchstart={handleTouchStart}
+      ontouchmove={handleTouchMove}
+      ontouchend={handleTouchEnd}
+    >
+      {#each items as item, index (item.id)}
+        <div
+          class="shrink-0 flex justify-center px-2 transition-transform duration-200 hover:scale-[1.02]"
+          style="width: {slideWidthPct}%"
+          role="listitem"
+        >
+          <div class="w-full">
+            {@render card(item, index)}
+          </div>
+        </div>
+      {/each}
+    </div>
+
+    {#if showArrows && maxIndex > 0}
+      <button
+        class="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30
+             btn btn-circle btn-sm bg-base-100/80 border-base-300/60
+             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-[var(--ishos-teal)]"
+        aria-label="Anterior"
+        onclick={prev}
+      >
+        <Icon icon="lucide:chevron-left" class="size-4" />
+      </button>
+      <button
+        class="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30
+             btn btn-circle btn-sm bg-base-100/80 border-base-300/60
+             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-[var(--ishos-teal)]"
+        aria-label="Siguiente"
+        onclick={next}
+      >
+        <Icon icon="lucide:chevron-right" class="size-4" />
+      </button>
+    {/if}
+  </div>
+
+  {#if showDots && maxIndex > 0}
+    <div class="flex items-center justify-center gap-2 mt-3" role="tablist">
+      {#each { length: maxIndex + 1 } as _, i}
+        <button
+          class="h-1.75 rounded-full border-none p-0 cursor-pointer transition-all duration-200
+               {activeIndex === i
+            ? 'w-[1.1rem]'
+            : 'w-1.75 bg-base-content/20 hover:bg-base-content/40'}"
+          style={activeIndex === i ? "background: var(--ishos-teal);" : ""}
+          role="tab"
+          aria-selected={activeIndex === i}
+          aria-label={`Página ${i + 1}`}
+          onclick={() => {
+            goTo(i);
+            startAutoSlide();
+          }}
+        ></button>
+      {/each}
+    </div>
+  {/if}
+</section>

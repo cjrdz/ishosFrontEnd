@@ -117,6 +117,10 @@ export function amountColumnLabel(status: Order["status"]): string {
   return status === "lista" || status === "entregada" ? "Total" : "Subtotal";
 }
 
+export function isOrderEditable(status: Order["status"]): boolean {
+  return !["recibida", "lista", "entregada", "cancelada"].includes(status);
+}
+
 export function orderTypeLabel(orderType: Order["order_type"]): string {
   return orderType === "en_local" ? "En local" : "Para llevar";
 }

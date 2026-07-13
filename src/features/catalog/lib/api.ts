@@ -147,10 +147,17 @@ export async function listPublicProducts(): Promise<PublicProduct[]> {
 
 export async function createPublicOrder(
   payload: PublicOrderCreatePayload,
+  idempotencyKey?: string,
 ): Promise<PublicOrderCreateResponse> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
   return bffRequest<PublicOrderCreateResponse>("/api/store/orders", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
   });
 }
@@ -189,6 +196,8 @@ export interface StoreOfferItem {
   label: string;
   note?: string;
   discount_price?: number;
+  flavor_id?: string;
+  flavor_ids?: string[];
   expires_at: string;
 }
 

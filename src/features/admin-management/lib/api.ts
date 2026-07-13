@@ -93,6 +93,7 @@ export interface Order {
   tracking_token_expires_at?: string | null;
   tracking_url?: string | null;
   status_timestamps?: Record<string, string>;
+  is_archived?: boolean;
 }
 
 export interface OrderItem {
@@ -326,12 +327,17 @@ export async function createOrder(
       customizations?: Record<string, unknown>;
     }>;
   },
+  idempotencyKey?: string,
 ): Promise<{
   order_number: string;
   status: string;
   total: number;
   message: string;
 }> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers["Idempotency-Key"] = idempotencyKey;
+  }
   return apiRequest<{
     order_number: string;
     status: string;
@@ -340,6 +346,7 @@ export async function createOrder(
   }>("/orders", {
     method: "POST",
     token,
+    headers,
     body: payload,
   });
 }

@@ -47,11 +47,7 @@ export interface ProductsTabProps {
     },
   ) => void;
   onDelete: (id: string) => void;
-  onCreateFlavor: (payload: {
-    name: string;
-    display_order: number;
-    is_seasonal: boolean;
-  }) => void;
+  onCreateFlavor: (payload: { name: string; is_seasonal: boolean }) => void;
   onUpdateFlavor: (
     id: string,
     payload: {
@@ -66,7 +62,6 @@ export interface ProductsTabProps {
     name: string;
     price: number;
     group_name: string;
-    display_order: number;
   }) => void;
   onUpdateAddon: (
     id: string,
