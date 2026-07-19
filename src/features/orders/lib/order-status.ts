@@ -6,7 +6,7 @@ export type LinearOrderStatus =
   | "en_proceso"
   | "lista"
   | "entregada";
-export type CanceledOrderStatus = "pendiente_revision" | "cancelada";
+type CanceledOrderStatus = "pendiente_revision" | "cancelada";
 
 export const linearStatuses: LinearOrderStatus[] = [
   "pendiente_revision",

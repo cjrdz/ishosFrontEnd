@@ -1,7 +1,7 @@
 import type { Order } from "@features/admin-management";
 
 /** Save user form data */
-export interface SaveUserFormData {
+interface SaveUserFormData {
   name: string;
   user_type: "user" | "company";
   phone: string;
@@ -30,21 +30,6 @@ export function prefillSaveUserFormFromOrder(order: Order): SaveUserFormData {
     user_type: "user",
     phone: order.customer_phone.trim(),
     email: (order.customer_email ?? "").trim(),
-    status: "active",
-  };
-}
-
-/** Pre-fills save user form from order form fields */
-export function prefillSaveUserFormFromOrderForm(
-  customerName: string,
-  customerPhone: string,
-  customerEmail: string,
-): SaveUserFormData {
-  return {
-    name: customerName.trim(),
-    user_type: "user",
-    phone: customerPhone.trim(),
-    email: customerEmail.trim(),
     status: "active",
   };
 }

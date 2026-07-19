@@ -2,7 +2,7 @@ import type { Order } from "@features/admin-management";
 import { formatCurrency } from "@shared/utils/formatters";
 import { amountColumnLabel } from "./order-status";
 
-export function renderReceipt(order: Order): string {
+function renderReceipt(order: Order): string {
   const itemsMarkup = (order.items || [])
     .map((item) => {
       let details = "";

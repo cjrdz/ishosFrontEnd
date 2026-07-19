@@ -58,7 +58,15 @@ function mergeSelectedOrder(
 ) {
   const selected = deps.getSelectedOrder();
   if (selected?.id === orderId) {
-    deps.setSelectedOrder({ ...selected, ...updated });
+    const merged = { ...selected, ...updated };
+    // Status/approve/reject endpoints return an order without items; preserve
+    // the already-loaded items instead of replacing them with an empty list.
+    if (!updated.items || updated.items.length === 0) {
+      merged.items = selected.items;
+    }
+    deps.setSelectedOrder(merged);
+    setCachedOrder(merged);
+    return;
   }
   setCachedOrder(updated);
 }
@@ -235,7 +243,6 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
   async function handleArchiveOrder(orderId: string, archived: boolean) {
     return runModuleAction<Order | null>({
       module: "ordenes",
-      requireAdmin: true,
       analyticsAction: archived
         ? "admin_order_archive"
         : "admin_order_unarchive",

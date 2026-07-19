@@ -21,22 +21,20 @@ import {
   upsertUser,
 } from "./bff";
 import type { RunModuleAction } from "./module-action";
+import type { TrackActionFn, TrackErrorFn } from "@shared/utils/analytics";
 
 interface CrudHandlerDeps {
   runModuleAction: RunModuleAction;
   loadCategories: () => Promise<void>;
   loadProducts: () => Promise<void>;
+  loadAllProducts: () => Promise<void>;
   loadFlavors: () => Promise<void>;
   loadAddons: () => Promise<void>;
   loadEmployees: () => Promise<void>;
   loadUsers: () => Promise<void>;
   setNotice: (message: string) => void;
-  trackAction: (action: string, metadata?: Record<string, unknown>) => void;
-  trackError: (
-    error: unknown,
-    context: string,
-    metadata?: Record<string, unknown>,
-  ) => void;
+  trackAction: TrackActionFn;
+  trackError: TrackErrorFn;
 }
 
 export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
@@ -44,6 +42,7 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
     runModuleAction,
     loadCategories,
     loadProducts,
+    loadAllProducts,
     loadFlavors,
     loadAddons,
     loadEmployees,
@@ -121,6 +120,7 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
         trackAction("admin_product_create_success", { name: payload.name });
         setNotice("Producto creado");
         await loadProducts();
+        await loadAllProducts();
       },
       onError: (requestError) => {
         trackError(requestError, "AdminDashboard.handleCreateProduct", {
@@ -146,6 +146,7 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
         trackAction("admin_product_update_success", { id });
         setNotice("Producto actualizado");
         await loadProducts();
+        await loadAllProducts();
       },
       onError: (requestError) => {
         trackError(requestError, "AdminDashboard.handleUpdateProduct", { id });
@@ -166,6 +167,7 @@ export function createDashboardCrudHandlers(deps: CrudHandlerDeps) {
         trackAction("admin_product_delete_success", { id });
         setNotice("Producto eliminado");
         await loadProducts();
+        await loadAllProducts();
       },
       onError: (requestError) => {
         trackError(requestError, "AdminDashboard.handleDeleteProduct", { id });

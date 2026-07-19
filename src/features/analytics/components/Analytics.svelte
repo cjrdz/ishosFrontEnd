@@ -17,9 +17,7 @@
   import { CanvasRenderer } from "echarts/renderers";
   import type { EChartsOption } from "echarts";
   import {
-    getAnalyticsOrdersOverTime,
-    getAnalyticsOverview,
-    getAnalyticsTopProducts,
+    getAnalyticsDashboard,
     type AnalyticsOverview,
     type AnalyticsTimelinePoint,
     type AnalyticsTopProduct,
@@ -137,23 +135,6 @@
       return `${formatDateDisplay(startDate)} – ${formatDateDisplay(endDate)}`;
     }
     return quickRangeConfig[quickRange].label;
-  }
-
-  function resolveOverviewPeriod(
-    start: string,
-    end: string,
-  ): "week" | "month" | "year" {
-    const days = Math.max(
-      1,
-      Math.round(
-        (new Date(`${end}T00:00:00`).getTime() -
-          new Date(`${start}T00:00:00`).getTime()) /
-          86400000,
-      ),
-    );
-    if (days <= 14) return "week";
-    if (days <= 180) return "month";
-    return "year";
   }
 
   function syncChartThemeColors() {
@@ -412,20 +393,11 @@
         return;
       }
 
-      const overviewPeriod = useCustomRange
-        ? resolveOverviewPeriod(start, end)
-        : period;
+      const dashboard = await getAnalyticsDashboard(start, end, groupBy, 10);
 
-      const [overviewResult, timelineResult, topProductsResult] =
-        await Promise.all([
-          getAnalyticsOverview(overviewPeriod),
-          getAnalyticsOrdersOverTime(start, end, groupBy),
-          getAnalyticsTopProducts(10, start, end),
-        ]);
-
-      overview = overviewResult;
-      ordersOverTime = timelineResult;
-      topProducts = topProductsResult;
+      overview = dashboard.overview;
+      ordersOverTime = dashboard.orders_over_time;
+      topProducts = dashboard.top_products;
     } catch (err) {
       error =
         err instanceof Error ? err.message : "No se pudo cargar la analítica";

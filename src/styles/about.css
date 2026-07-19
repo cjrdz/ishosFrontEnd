@@ -5,7 +5,11 @@
 /* ── Theme-aware design tokens ────────────────────────────────────── */
 :root {
   --about-pill-teal-bg: color-mix(in srgb, var(--ishos-teal) 12%, transparent);
-  --about-pill-maroon-bg: color-mix(in srgb, var(--ishos-maroon) 10%, transparent);
+  --about-pill-maroon-bg: color-mix(
+    in srgb,
+    var(--ishos-maroon) 10%,
+    transparent
+  );
   --about-icon-teal-bg: color-mix(in srgb, var(--ishos-teal) 12%, transparent);
   --about-icon-pink-bg: color-mix(in srgb, var(--ishos-pink) 18%, transparent);
   --about-schedule-bg: color-mix(in srgb, var(--ishos-yellow) 35%, transparent);
@@ -25,7 +29,11 @@
 /* ── Dark theme (night) adjustments ───────────────────────────────── */
 [data-theme="night"] {
   --about-pill-teal-bg: color-mix(in srgb, var(--ishos-teal) 20%, transparent);
-  --about-pill-maroon-bg: color-mix(in srgb, var(--ishos-maroon) 18%, transparent);
+  --about-pill-maroon-bg: color-mix(
+    in srgb,
+    var(--ishos-maroon) 18%,
+    transparent
+  );
   --about-icon-teal-bg: color-mix(in srgb, var(--ishos-teal) 22%, transparent);
   --about-icon-pink-bg: color-mix(in srgb, var(--ishos-pink) 25%, transparent);
   --about-schedule-bg: color-mix(in srgb, var(--ishos-yellow) 45%, transparent);
@@ -44,9 +52,15 @@
 
 /* ── Animated gradient border on hero card ────────────────────────── */
 @keyframes borderSpin {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .hero-card-border {
@@ -62,19 +76,6 @@
   padding: 2px;
   border-radius: 1.5rem;
 }
-
-/* ── Stagger fade-in ──────────────────────────────────────────────── */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.fade-up   { animation: fadeUp 0.6s ease forwards; opacity: 0; }
-.fade-up-1 { animation-delay: 0.1s; }
-.fade-up-2 { animation-delay: 0.25s; }
-.fade-up-3 { animation-delay: 0.4s; }
-.fade-up-4 { animation-delay: 0.55s; }
-.fade-up-5 { animation-delay: 0.7s; }
 
 /* ── Value card hover glow ────────────────────────────────────────── */
 .value-card:hover {
@@ -103,9 +104,13 @@
 /* ── Hero background blobs ────────────────────────────────────────── */
 .hero-blob-teal {
   opacity: var(--about-hero-teal-opacity);
+  transform: scale(0);
+  will-change: transform;
 }
 .hero-blob-pink {
   opacity: var(--about-hero-pink-opacity);
+  transform: scale(0);
+  will-change: transform;
 }
 
 /* ── Section divider wave ─────────────────────────────────────────── */
@@ -139,4 +144,22 @@
 .section-pill--maroon {
   background: var(--about-pill-maroon-bg);
   color: var(--ishos-maroon);
+}
+
+/* ── Anime.js reveal helpers ──────────────────────────────────────── */
+[data-anime-reveal] {
+  opacity: 0;
+  transform: translateY(24px);
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-anime-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+  .hero-blob-teal,
+  .hero-blob-pink {
+    transform: none;
+  }
 }

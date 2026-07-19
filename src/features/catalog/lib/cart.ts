@@ -38,7 +38,7 @@ const CART_KEY = "ishos_storefront_cart_items";
 const CART_COUNT_KEY = "ishos_storefront_cart_count";
 const MAX_ITEM_QUANTITY = 100;
 
-export function normalizeCartQuantity(value: number, minimum = 1): number {
+function normalizeCartQuantity(value: number, minimum = 1): number {
   if (!Number.isFinite(value)) return minimum;
   return Math.min(MAX_ITEM_QUANTITY, Math.max(minimum, Math.floor(value)));
 }
@@ -164,17 +164,6 @@ export function replaceCartItem(
   setCartItems(nextItems);
   notifyCartAdded(normalized);
   return nextItems;
-}
-
-export function upsertCartItem(
-  next: StoreCartItem,
-  previous?: StoreCartItem,
-): StoreCartItem[] {
-  if (previous) {
-    return replaceCartItem(previous, next);
-  }
-  addCartItem(next);
-  return getCartItems();
 }
 
 export function updateCartItemQuantity(

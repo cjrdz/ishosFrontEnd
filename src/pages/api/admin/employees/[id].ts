@@ -8,6 +8,7 @@
  */
 
 import type { APIRoute } from "astro";
+import { employeeUpdateSchema, parseJsonBody } from "@core/bff/validation";
 import { requireAction, requireSafePathParam } from "@core/bff/params";
 import { proxyToBackend } from "@core/bff/proxy";
 
@@ -16,18 +17,16 @@ export const prerender = false;
 export const PATCH: APIRoute = async (context) => {
   const id = requireSafePathParam(context, "id");
   if (id instanceof Response) return id;
-  try {
-    const body = await context.request.json();
-    return proxyToBackend(context, `/employees/${id}`, {
-      method: "PATCH",
-      body,
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+
+  const parsed = await parseJsonBody(context, employeeUpdateSchema);
+  if (!parsed.success) {
+    return parsed.response;
   }
+
+  return proxyToBackend(context, `/employees/${id}`, {
+    method: "PATCH",
+    body: parsed.data,
+  });
 };
 
 export const DELETE: APIRoute = async (context) => {
@@ -52,16 +51,7 @@ export const POST: APIRoute = async (context) => {
   ]);
   if (action instanceof Response) return action;
 
-  try {
-    const body = await context.request.json().catch(() => ({}));
-    return proxyToBackend(context, `/employees/${id}/${action}`, {
-      method: "POST",
-      body,
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: "Invalid request" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  return proxyToBackend(context, `/employees/${id}/${action}`, {
+    method: "POST",
+  });
 };

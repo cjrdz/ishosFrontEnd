@@ -4,6 +4,7 @@
  */
 
 import type { APIRoute } from "astro";
+import { parseJsonBody, storeSettingsUpdateSchema } from "@core/bff/validation";
 import { proxyToBackend } from "@core/bff/proxy";
 
 export const prerender = false;
@@ -13,9 +14,13 @@ export const GET: APIRoute = async (context) => {
 };
 
 export const PATCH: APIRoute = async (context) => {
-  const body = await context.request.json();
+  const parsed = await parseJsonBody(context, storeSettingsUpdateSchema);
+  if (!parsed.success) {
+    return parsed.response;
+  }
+
   return proxyToBackend(context, "/settings/store", {
     method: "PATCH",
-    body,
+    body: parsed.data,
   });
 };

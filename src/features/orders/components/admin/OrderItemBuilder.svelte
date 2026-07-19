@@ -269,19 +269,23 @@
   }
 </script>
 
-<section class="rounded-xl border border-base-300 bg-base-100 p-4 space-y-4">
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+<section
+  class="rounded-xl border border-base-300 bg-base-100 p-3 overflow-hidden"
+>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 h-[55vh] max-h-[55vh]">
     <!-- Left: product finder -->
-    <ProductSelector
-      {products}
-      {categories}
-      selectedProductId={orderForm.product_id}
-      {recentProducts}
-      onProductChange={handleProductChange}
-    />
+    <div class="h-full min-w-0 overflow-y-auto pr-1">
+      <ProductSelector
+        {products}
+        {categories}
+        selectedProductId={orderForm.product_id}
+        {recentProducts}
+        onProductChange={handleProductChange}
+      />
+    </div>
 
     <!-- Right: configuration panel -->
-    <div class="space-y-4 min-w-0 flex flex-col">
+    <div class="space-y-3 min-w-0 flex flex-col h-full overflow-y-auto pr-1">
       {#if !selectedProduct}
         <div
           class="rounded-lg border border-base-300 bg-base-200/40 px-3 py-6 text-center text-sm text-base-content/60 flex-1 flex items-center justify-center"
@@ -289,25 +293,23 @@
           Selecciona un producto para configurarlo.
         </div>
       {:else}
-        <!-- Selected product header -->
-        <div class="rounded-lg border border-base-300 bg-base-200/30 p-3">
-          <div class="flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <p class="text-sm font-semibold truncate">
-                {selectedProduct.name}
-              </p>
-              <p class="text-xs text-base-content/60">
-                {formatCurrency(selectedProduct.price)} unidad
-              </p>
-            </div>
-            <p class="text-lg font-bold text-primary whitespace-nowrap">
-              {formatCurrency(totalPreview)}
+        <!-- Compact product header -->
+        <div class="flex items-center justify-between gap-2 px-1">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold truncate">
+              {selectedProduct.name}
+            </p>
+            <p class="text-xs text-base-content/60">
+              {formatCurrency(selectedProduct.price)} / unidad
             </p>
           </div>
+          <p class="text-lg font-bold text-primary whitespace-nowrap">
+            {formatCurrency(totalPreview)}
+          </p>
         </div>
 
         {#if hasCustomizationOptions}
-          <div class="space-y-4">
+          <div class="space-y-3">
             {#if flavorMode !== "none"}
               <FlavorSelector
                 flavors={selectedProductFlavors}
@@ -322,127 +324,106 @@
               />
             {/if}
 
-            {#if toppingAddons.length > 0 || jaleaAddons.length > 0}
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {#if toppingAddons.length > 0}
-                  <AddonChipGroup
-                    items={toppingAddons}
-                    includedId={includedToppingId}
-                    selectedIds={isExtraInAddons(toppingAddons)}
-                    noneId={NONE_CUSTOMIZATION}
-                    noneLabel="Sin topping"
-                    label="Topping"
-                    required={true}
-                    error={requiresToppingSelection
-                      ? "Selecciona un topping o 'Sin topping'"
-                      : ""}
-                    onIncludedChange={onChangeIncludedTopping}
-                    onToggleExtra={onToggleExtraAddonSelection}
-                  />
-                {/if}
-                {#if jaleaAddons.length > 0}
-                  <AddonChipGroup
-                    items={jaleaAddons}
-                    includedId={includedJaleaId}
-                    selectedIds={isExtraInAddons(jaleaAddons)}
-                    noneId={NONE_CUSTOMIZATION}
-                    noneLabel="Sin jalea"
-                    label="Jalea"
-                    required={true}
-                    error={requiresJaleaSelection
-                      ? "Selecciona una jalea o 'Sin jalea'"
-                      : ""}
-                    onIncludedChange={onChangeIncludedJalea}
-                    onToggleExtra={onToggleExtraAddonSelection}
-                  />
-                {/if}
-              </div>
+            {#if toppingAddons.length > 0}
+              <AddonChipGroup
+                items={toppingAddons}
+                includedId={includedToppingId}
+                selectedIds={isExtraInAddons(toppingAddons)}
+                noneId={NONE_CUSTOMIZATION}
+                noneLabel="Sin topping"
+                label="Topping"
+                required={true}
+                error={requiresToppingSelection
+                  ? "Selecciona un topping o 'Sin topping'"
+                  : ""}
+                onIncludedChange={onChangeIncludedTopping}
+                onToggleExtra={onToggleExtraAddonSelection}
+              />
+            {/if}
+
+            {#if jaleaAddons.length > 0}
+              <AddonChipGroup
+                items={jaleaAddons}
+                includedId={includedJaleaId}
+                selectedIds={isExtraInAddons(jaleaAddons)}
+                noneId={NONE_CUSTOMIZATION}
+                noneLabel="Sin jalea"
+                label="Jalea"
+                required={true}
+                error={requiresJaleaSelection
+                  ? "Selecciona una jalea o 'Sin jalea'"
+                  : ""}
+                onIncludedChange={onChangeIncludedJalea}
+                onToggleExtra={onToggleExtraAddonSelection}
+              />
             {/if}
 
             {#each paidAddonGroups as group}
-              <div class="card card-sm card-bordered bg-base-100">
-                <div class="card-body p-3 space-y-2">
-                  <h4 class="text-sm font-semibold text-base-content/80">
-                    {group.label}
-                  </h4>
-                  <AddonChipGroup
-                    items={group.items}
-                    selectedIds={isExtraInGroup(group)}
-                    label=""
-                    variant="multi"
-                    onToggleExtra={onToggleExtraAddonSelection}
-                  />
-                </div>
-              </div>
+              <AddonChipGroup
+                items={group.items}
+                selectedIds={isExtraInGroup(group)}
+                label={group.label}
+                variant="multi"
+                onToggleExtra={onToggleExtraAddonSelection}
+              />
             {/each}
           </div>
         {/if}
 
-        <!-- Quantity + summary + Add -->
-        <div class="card card-sm card-bordered bg-base-200/30">
-          <div class="card-body p-3 space-y-3">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-sm font-medium text-base-content/80"
-                >Cantidad</span
-              >
-              <div class="join">
-                <button
-                  class="btn btn-sm join-item"
-                  type="button"
-                  aria-label="Disminuir cantidad"
-                  onclick={decreaseQuantity}
-                  disabled={orderForm.quantity <= 1}
-                >
-                  −
-                </button>
-                <span
-                  class="btn btn-sm join-item no-animation min-w-10 text-sm"
-                  aria-label={`Cantidad: ${orderForm.quantity}`}
-                >
-                  {orderForm.quantity}
-                </span>
-                <button
-                  class="btn btn-sm join-item"
-                  type="button"
-                  aria-label="Aumentar cantidad"
-                  onclick={increaseQuantity}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            <div class="text-xs text-base-content/60 truncate">
-              {configurationSummary}
-            </div>
-
+        <!-- Quantity + Add -->
+        <div class="flex items-center gap-2 px-1">
+          <div class="join">
             <button
-              class="btn btn-primary w-full"
+              class="btn btn-sm join-item"
               type="button"
-              onclick={handleAddDraftItem}
-              disabled={!canAddCurrentItem}
+              aria-label="Disminuir cantidad"
+              onclick={decreaseQuantity}
+              disabled={orderForm.quantity <= 1}
             >
-              {draftItemEditIndex !== null ? "Guardar cambios" : "Agregar"}
-              <span class="ml-1 text-sm opacity-90">
-                {formatCurrency(totalPreview)}
-              </span>
+              −
             </button>
-
-            {#if draftItemEditIndex !== null}
-              <button
-                class="btn btn-ghost btn-sm w-full"
-                type="button"
-                onclick={onCancelDraftItemEdit}
-              >
-                Cancelar edición
-              </button>
-            {/if}
+            <span
+              class="btn btn-sm join-item no-animation min-w-9 text-sm"
+              aria-label={`Cantidad: ${orderForm.quantity}`}
+            >
+              {orderForm.quantity}
+            </span>
+            <button
+              class="btn btn-sm join-item"
+              type="button"
+              aria-label="Aumentar cantidad"
+              onclick={increaseQuantity}
+            >
+              +
+            </button>
           </div>
+
+          <button
+            class="btn btn-primary btn-sm flex-1"
+            type="button"
+            onclick={handleAddDraftItem}
+            disabled={!canAddCurrentItem}
+          >
+            {draftItemEditIndex !== null ? "Guardar cambios" : "Agregar"}
+            <span class="ml-1 text-xs opacity-90">
+              {formatCurrency(totalPreview)}
+            </span>
+          </button>
         </div>
+
+        {#if draftItemEditIndex !== null}
+          <button
+            class="btn btn-ghost btn-xs w-fit"
+            type="button"
+            onclick={onCancelDraftItemEdit}
+          >
+            Cancelar edición
+          </button>
+        {/if}
       {/if}
 
       {#if addItemError}
-        <p class="text-xs text-error">{addItemError}</p>
+        <p class="text-xs text-error px-1">{addItemError}</p>
       {/if}
 
       {#if draftItemEditIndex !== null}

@@ -1,7 +1,11 @@
 <script lang="ts">
   import {
     getCurrentRowsPerTable,
+    getCurrentAdminId,
+    getAdminLocalSettings,
+    saveAdminRowsPerTable,
     type Employee,
+    type RowsPerTableTabKey,
   } from "@features/admin-management";
   import Icon from "@shared/components/AppIcon.svelte";
 
@@ -27,6 +31,7 @@
 
   const rowLimitOptions = [5, 10, 25, 50, 100] as const;
   let employeeRowLimit = $state<number>(5);
+  let currentPage = $state(1);
 
   let searchQuery = $state("");
   let debouncedSearchQuery = $state("");
@@ -34,6 +39,7 @@
 
   function handleSearchInput(value: string) {
     searchQuery = value;
+    currentPage = 1;
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       debouncedSearchQuery = value;
@@ -73,11 +79,38 @@
     }),
   );
 
+  const totalPages = $derived(
+    employeeRowLimit <= 0
+      ? 1
+      : Math.max(1, Math.ceil(filteredEmployees.length / employeeRowLimit)),
+  );
+
   const visibleEmployees = $derived(
     employeeRowLimit <= 0
       ? filteredEmployees
-      : filteredEmployees.slice(0, employeeRowLimit),
+      : filteredEmployees.slice(
+          (currentPage - 1) * employeeRowLimit,
+          currentPage * employeeRowLimit,
+        ),
   );
+
+  const startItem = $derived(
+    filteredEmployees.length === 0
+      ? 0
+      : (currentPage - 1) * employeeRowLimit + 1,
+  );
+
+  const endItem = $derived(
+    employeeRowLimit <= 0
+      ? filteredEmployees.length
+      : Math.min(currentPage * employeeRowLimit, filteredEmployees.length),
+  );
+
+  $effect(() => {
+    if (currentPage > totalPages) {
+      currentPage = totalPages || 1;
+    }
+  });
 
   const stateFilterLabel = $derived(
     stateFilter === "all"
@@ -91,12 +124,30 @@
     employeeRowLimit <= 0 ? "Todos" : String(employeeRowLimit),
   );
 
+  function persistRowsPerTable(tab: RowsPerTableTabKey, limit: number) {
+    const adminId = getCurrentAdminId();
+    if (!adminId) return;
+    const current = getAdminLocalSettings(adminId);
+    saveAdminRowsPerTable(adminId, {
+      ...current.rows_per_table,
+      [tab]: limit,
+    });
+  }
+
+  function goToPage(page: number) {
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+  }
+
   function setEmployeeRowLimit(limit: number) {
     employeeRowLimit = limit;
+    currentPage = 1;
+    persistRowsPerTable("empleados", limit);
   }
 
   function setStateFilter(value: "all" | "active" | "inactive") {
     stateFilter = value;
+    currentPage = 1;
   }
 </script>
 
@@ -251,11 +302,36 @@
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
       <span class="text-sm text-base-content/60">
-        Mostrando {visibleEmployees.length} de {filteredEmployees.length}
+        {filteredEmployees.length === 0
+          ? "0 resultados"
+          : `${startItem}-${endItem} de ${filteredEmployees.length}`}
       </span>
 
       <div class="flex items-center gap-2">
-        <span class="text-sm text-base-content/60">Filas</span>
+        <button
+          class="btn btn-sm btn-outline"
+          type="button"
+          onclick={() => goToPage(currentPage - 1)}
+          disabled={busy || currentPage <= 1}
+          aria-label="Página anterior"
+        >
+          <Icon icon="lucide:chevron-left" class="h-4 w-4" />
+        </button>
+
+        <span class="text-sm text-base-content/60">
+          Página {currentPage} de {totalPages}
+        </span>
+
+        <button
+          class="btn btn-sm btn-outline"
+          type="button"
+          onclick={() => goToPage(currentPage + 1)}
+          disabled={busy || currentPage >= totalPages}
+          aria-label="Página siguiente"
+        >
+          <Icon icon="lucide:chevron-right" class="h-4 w-4" />
+        </button>
+
         <div class="dropdown w-full sm:w-auto dropdown-top dropdown-end">
           <div
             tabindex="0"

@@ -1,10 +1,12 @@
 {
   "extends": "./node_modules/astro/tsconfigs/strict",
   "compilerOptions": {
+    "verbatimModuleSyntax": true,
     "paths": {
       "@core/*": ["./src/core/*"],
       "@shared/*": ["./src/shared/*"],
-      "@features/*": ["./src/features/*"]
+      "@features/*": ["./src/features/*"],
+      "@api-types/*": ["./src/types/*"]
     },
     "types": ["astro/client", "node"]
   },

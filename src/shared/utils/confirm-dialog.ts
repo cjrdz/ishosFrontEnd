@@ -1,6 +1,6 @@
-export type ConfirmAction = () => void;
+type ConfirmAction = () => void;
 
-export type ConfirmDialogState = {
+type ConfirmDialogState = {
   open: boolean;
   title: string;
   message: string;

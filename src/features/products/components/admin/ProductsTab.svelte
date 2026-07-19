@@ -22,27 +22,7 @@
     openConfirmDialog,
   } from "@shared/utils/confirm-dialog";
   import type { ProductsTabProps as Props } from "../../types/products-tab";
-
-  function trackAction(action: string, metadata?: Record<string, unknown>) {
-    if (!import.meta.env.DEV) return;
-    console.debug("[analytics]", action, metadata ?? {});
-  }
-
-  function trackError(
-    error: unknown,
-    context: string,
-    metadata?: Record<string, unknown>,
-  ) {
-    if (!import.meta.env.DEV) return;
-    const normalized =
-      error instanceof Error
-        ? { message: error.message }
-        : { message: String(error) };
-    console.error("[analytics]", context, {
-      ...normalized,
-      ...(metadata ?? {}),
-    });
-  }
+  import { trackAction, trackError } from "@shared/utils/analytics";
 
   let {
     categories,
@@ -53,6 +33,7 @@
     busy,
     galleryBusy,
     moduleError,
+    pagination,
     onCreate,
     onUpdate,
     onDelete,
@@ -73,6 +54,8 @@
     onReloadGallery,
     onUploadGalleryImage,
     onDeleteGalleryImage,
+    onPageChange,
+    onPerPageChange,
   }: Props = $props();
 
   let productEditorOpen = $state(false);
@@ -222,14 +205,13 @@
       allows_mixed_flavors: form.allows_mixed_flavors,
     };
 
-    if (form.stock_status && form.stock_status !== "auto") {
-      payload.stock_status = form.stock_status;
-    }
-
     if (form.id) {
       trackAction("products_tab_submit_update", { productId: form.id });
       onUpdate(form.id, payload);
     } else {
+      if (form.stock_status && form.stock_status !== "auto") {
+        payload.stock_status = form.stock_status;
+      }
       trackAction("products_tab_submit_create", { name: payload.name });
       onCreate(payload);
     }
@@ -280,7 +262,6 @@
       ball_based: product.ball_based,
       ball_quantity: product.ball_quantity,
       allows_mixed_flavors: product.allows_mixed_flavors,
-      stock_status: product.stock_status || undefined,
     });
   }
 
@@ -376,12 +357,15 @@
     {products}
     {categories}
     {busy}
+    {pagination}
     offerByProductId={activeOfferByProductId}
     onCreateProduct={openCreateProductModal}
     onToggleAvailability={requestToggleProductAvailability}
     onEdit={editProduct}
     onRequestDelete={requestDeleteProduct}
     onOpenOfferPanel={openOfferPanel}
+    {onPageChange}
+    {onPerPageChange}
   />
 </section>
 

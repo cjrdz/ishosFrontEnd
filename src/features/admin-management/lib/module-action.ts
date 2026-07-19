@@ -1,4 +1,4 @@
-export type ModuleKey =
+type ModuleKey =
   | "categorias"
   | "productos"
   | "sabores"

@@ -78,32 +78,3 @@ export class ValidationError extends Error {
     return Object.values(this.fields).flat().join(", ");
   }
 }
-
-/**
- * Authorization error
- */
-export class AuthorizationError extends ApiError {
-  constructor(
-    message: string = "You do not have permission to perform this action",
-  ) {
-    super(message, 403, "FORBIDDEN");
-  }
-}
-
-/**
- * Authentication error
- */
-export class AuthenticationError extends ApiError {
-  constructor(message: string = "Authentication required") {
-    super(message, 401, "UNAUTHORIZED");
-  }
-}
-
-/**
- * Not found error
- */
-export class NotFoundError extends ApiError {
-  constructor(resource: string = "Resource") {
-    super(`${resource} not found`, 404, "NOT_FOUND");
-  }
-}

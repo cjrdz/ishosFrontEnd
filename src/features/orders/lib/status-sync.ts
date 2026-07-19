@@ -1,6 +1,6 @@
 const ORDER_STATUS_SYNC_KEY = "ishos.order.status.sync.v1";
 
-export interface OrderStatusSyncEvent {
+interface OrderStatusSyncEvent {
   orderId: string;
   orderNumber: string;
   status: string;

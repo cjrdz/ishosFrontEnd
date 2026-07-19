@@ -1,4 +1,12 @@
 import type { PublicOrderStatus } from "@features/catalog";
+import {
+  trackAction,
+  trackError,
+  type TrackActionFn,
+  type TrackErrorFn,
+} from "@shared/utils/analytics";
+
+export { trackAction, trackError, type TrackActionFn, type TrackErrorFn };
 
 const TRACKING_KEY = "ishos_public_order_tracker";
 const RECENT_TRACKING_KEY = "ishos_public_order_recent_tracker";
@@ -14,30 +22,6 @@ export interface RecentTrackingOrder {
   totalAmount: number;
   updatedAt: string;
   savedAt: number;
-}
-
-export function trackAction(
-  action: string,
-  metadata?: Record<string, unknown>,
-) {
-  if (!import.meta.env.DEV) return;
-  console.debug("[analytics]", action, metadata ?? {});
-}
-
-export function trackError(
-  error: unknown,
-  context: string,
-  metadata?: Record<string, unknown>,
-) {
-  if (!import.meta.env.DEV) return;
-  const normalized =
-    error instanceof Error
-      ? { message: error.message }
-      : { message: String(error) };
-  console.error("[analytics]", context, {
-    ...normalized,
-    ...(metadata ?? {}),
-  });
 }
 
 export const TRACKING_STATUS_FLOW: PublicOrderStatus[] = [

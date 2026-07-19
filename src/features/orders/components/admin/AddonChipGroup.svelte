@@ -121,19 +121,17 @@
   });
 </script>
 
-<div class="space-y-2">
+<fieldset class="fieldset space-y-2">
   {#if label}
-    <div class="flex items-center justify-between gap-2">
-      <div class="flex items-center gap-1.5">
-        <span class="text-xs font-medium text-base-content/80">{label}</span>
-        {#if required}
-          <span class="text-error">*</span>
-        {/if}
-      </div>
+    <legend class="fieldset-legend flex items-center gap-1.5">
+      <span class="text-sm font-semibold text-base-content/90">{label}</span>
+      {#if required}
+        <span class="text-error">*</span>
+      {/if}
       {#if canClear}
         <button
           type="button"
-          class="btn btn-ghost btn-xs btn-square text-error"
+          class="btn btn-ghost btn-xs btn-square text-error ml-1"
           aria-label={`Borrar ${label.toLowerCase()}`}
           title={`Borrar ${label.toLowerCase()}`}
           onclick={clearSelection}
@@ -141,12 +139,12 @@
           <Icon icon="lucide:trash-2" width="12" height="12" />
         </button>
       {/if}
-    </div>
+    </legend>
   {/if}
 
   <div
     bind:this={groupRef}
-    class="flex flex-wrap gap-2"
+    class="flex flex-wrap gap-1.5"
     role="listbox"
     tabindex="0"
     aria-label={label}
@@ -157,10 +155,8 @@
       <button
         type="button"
         data-chip
-        class={`btn btn-sm min-h-10 ${
-          isNoneSelected()
-            ? "btn-primary"
-            : "btn-ghost border-base-300 hover:border-base-300"
+        class={`btn btn-sm h-9 min-h-9 ${
+          isNoneSelected() ? "btn-primary" : "btn-ghost"
         }`}
         role="option"
         aria-selected={isNoneSelected()}
@@ -177,12 +173,8 @@
       <button
         type="button"
         data-chip
-        class={`btn btn-sm min-h-10 ${
-          included
-            ? "btn-primary"
-            : extra
-              ? "btn-secondary"
-              : "btn-outline btn-ghost border-base-300 hover:border-base-300"
+        class={`btn btn-sm h-9 min-h-9 ${
+          included ? "btn-primary" : extra ? "btn-secondary" : "btn-ghost"
         }`}
         role="option"
         aria-selected={included || extra}
@@ -192,14 +184,11 @@
       >
         <span class="max-w-[8rem] truncate">{item.name}</span>
         {#if isDouble}
-          <span class="badge badge-ghost badge-xs ml-1">x2</span>
-          <span class="badge badge-ghost badge-xs ml-1">
-            +{formatCurrency(item.price)}
-          </span>
+          <span class="badge badge-ghost badge-xs ml-0.5">x2</span>
         {:else if included}
-          <span class="badge badge-ghost badge-xs ml-1">Incluido</span>
+          <span class="badge badge-ghost badge-xs ml-0.5">incl.</span>
         {:else if extra}
-          <span class="badge badge-ghost badge-xs ml-1">
+          <span class="badge badge-ghost badge-xs ml-0.5">
             +{formatCurrency(item.price)}
           </span>
         {/if}
@@ -208,6 +197,6 @@
   </div>
 
   {#if error}
-    <p class="text-xs text-error">{error}</p>
+    <p class="label text-error text-xs">{error}</p>
   {/if}
-</div>
+</fieldset>

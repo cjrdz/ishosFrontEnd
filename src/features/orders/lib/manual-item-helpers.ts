@@ -1,9 +1,6 @@
 import type { Addon, Flavor, Product } from "@features/admin-management";
 import { normalizeAddonGroupName } from "@features/products";
-import type {
-  CreateOrderPayload,
-  ManualOrderItemDraft,
-} from "../types/orders-tab";
+import type { ManualOrderItemDraft } from "../types/orders-tab";
 
 /** Resolves a flavor name by product and flavor ID */
 export function resolveFlavorName(
@@ -140,16 +137,4 @@ export function buildCustomizationsFromDraft(
   }
 
   return Object.keys(customizations).length > 0 ? customizations : undefined;
-}
-
-/** Converts manual items to the CreateOrderPayload items format */
-export function manualItemsToPayloadItems(
-  items: ManualOrderItemDraft[],
-  products: Product[] = [],
-): CreateOrderPayload["items"] {
-  return items.map((item) => ({
-    product_id: item.product_id,
-    quantity: item.quantity,
-    customizations: buildCustomizationsFromDraft(item, products),
-  }));
 }

@@ -1,5 +1,4 @@
 const defaultApiBaseUrl = "http://localhost:8080/api/v1";
-const defaultAuthCookieTTLHours = 24;
 const defaultAdminImageUploadMaxMB = 15;
 
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
@@ -20,14 +19,6 @@ export function getApiBaseUrl(): string {
     return defaultApiBaseUrl;
   }
   return value.replace(/\/$/, "");
-}
-
-export function getAuthCookieTTLSeconds(): number {
-  const ttlHours = parsePositiveInt(
-    import.meta.env.PUBLIC_AUTH_COOKIE_TTL_HOURS,
-    defaultAuthCookieTTLHours,
-  );
-  return ttlHours * 60 * 60;
 }
 
 export function getAdminImageUploadMaxMB(): number {

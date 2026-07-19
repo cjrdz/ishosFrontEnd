@@ -5,15 +5,11 @@ export type ActiveOffer = StoreOfferItem & {
   expiresMs: number;
 };
 
-export function offerExpiryMs(offer: StoreOfferItem): number {
-  return new Date(offer.expires_at).getTime();
-}
-
 export function isOfferActive(
   offer: StoreOfferItem,
   now = Date.now(),
 ): boolean {
-  return offerExpiryMs(offer) > now;
+  return new Date(offer.expires_at).getTime() > now;
 }
 
 export function buildActiveOfferMap(
@@ -41,7 +37,7 @@ export function resolveActiveOffers(
       const product = products.find(
         (candidate) => candidate.id === offer.product_id,
       );
-      const expiresMs = offerExpiryMs(offer);
+      const expiresMs = new Date(offer.expires_at).getTime();
       if (!product || expiresMs <= now) {
         return null;
       }
