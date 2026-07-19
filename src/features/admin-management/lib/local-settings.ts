@@ -28,7 +28,7 @@ export type RowsPerTableConfig = {
 export type InventoryStockFilter = "all" | "ok" | "low-stock" | "out-of-stock";
 export type InventoryTypeFilter = "all" | "flavor" | "unit";
 
-export type InventoryFilterState = {
+type InventoryFilterState = {
   stockFilter: InventoryStockFilter;
   typeFilter: InventoryTypeFilter;
 };
@@ -40,7 +40,7 @@ export const DEFAULT_PANEL_CONFIG: PanelConfigValues = {
   inactivity_logout_seconds: 900,
 };
 
-export const DEFAULT_STORE_SETTINGS: {
+const DEFAULT_STORE_SETTINGS: {
   orders_enabled: boolean;
   offers: StoreOfferItem[];
 } = {
@@ -48,7 +48,7 @@ export const DEFAULT_STORE_SETTINGS: {
   offers: [],
 };
 
-export const DEFAULT_ROWS_PER_TABLE = 5;
+const DEFAULT_ROWS_PER_TABLE = 5;
 
 export const DEFAULT_ROWS_PER_TABLE_CONFIG: RowsPerTableConfig = {
   default: DEFAULT_ROWS_PER_TABLE,
@@ -60,14 +60,13 @@ export const DEFAULT_ROWS_PER_TABLE_CONFIG: RowsPerTableConfig = {
   inventario: DEFAULT_ROWS_PER_TABLE,
 };
 
-export const DEFAULT_INVENTORY_FILTER_STATE: InventoryFilterState = {
+const DEFAULT_INVENTORY_FILTER_STATE: InventoryFilterState = {
   stockFilter: "all",
   typeFilter: "all",
 };
 
-export type AdminLocalSettings = {
+type AdminLocalSettings = {
   tab_order: TabKey[];
-  panel_config: PanelConfigValues;
   store_settings: {
     orders_enabled: boolean;
     offers: StoreOfferItem[];
@@ -83,7 +82,6 @@ function getStorageKey(adminId: string): string {
 function cloneDefaults(): AdminLocalSettings {
   return {
     tab_order: [...DEFAULT_TAB_ORDER],
-    panel_config: { ...DEFAULT_PANEL_CONFIG },
     store_settings: {
       orders_enabled: DEFAULT_STORE_SETTINGS.orders_enabled,
       offers: [...DEFAULT_STORE_SETTINGS.offers],
@@ -95,34 +93,6 @@ function cloneDefaults(): AdminLocalSettings {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function normalizePanelConfig(value: unknown): PanelConfigValues {
-  if (!isObject(value)) return { ...DEFAULT_PANEL_CONFIG };
-
-  const cookie = Number(value.auth_cookie_ttl_hours);
-  const auth = Number(value.auth_token_ttl_hours);
-  const tracking = Number(value.tracking_token_ttl_hours);
-  const inactivity = Number(value.inactivity_logout_seconds);
-
-  return {
-    auth_cookie_ttl_hours:
-      Number.isFinite(cookie) && cookie > 0
-        ? Math.round(cookie)
-        : DEFAULT_PANEL_CONFIG.auth_cookie_ttl_hours,
-    auth_token_ttl_hours:
-      Number.isFinite(auth) && auth > 0
-        ? Math.round(auth)
-        : DEFAULT_PANEL_CONFIG.auth_token_ttl_hours,
-    tracking_token_ttl_hours:
-      Number.isFinite(tracking) && tracking > 0
-        ? Math.round(tracking)
-        : DEFAULT_PANEL_CONFIG.tracking_token_ttl_hours,
-    inactivity_logout_seconds:
-      Number.isFinite(inactivity) && inactivity > 0
-        ? Math.round(inactivity)
-        : DEFAULT_PANEL_CONFIG.inactivity_logout_seconds,
-  };
 }
 
 function normalizeStoreSettings(value: unknown): {
@@ -247,7 +217,6 @@ export function getAdminLocalSettings(adminId: string): AdminLocalSettings {
 
     return {
       tab_order: normalizeTabOrder(parsedTabOrder),
-      panel_config: normalizePanelConfig(parsed.panel_config),
       store_settings: normalizeStoreSettings(parsed.store_settings),
       rows_per_table: normalizeRowsPerTableConfig(parsed.rows_per_table),
       inventory_filter_state: normalizeInventoryFilterState(
@@ -259,13 +228,12 @@ export function getAdminLocalSettings(adminId: string): AdminLocalSettings {
   }
 }
 
-export function saveAdminLocalSettings(
+function saveAdminLocalSettings(
   adminId: string,
   settings: AdminLocalSettings,
 ): AdminLocalSettings {
   const normalized: AdminLocalSettings = {
     tab_order: normalizeTabOrder(settings.tab_order),
-    panel_config: normalizePanelConfig(settings.panel_config),
     store_settings: normalizeStoreSettings(settings.store_settings),
     rows_per_table: normalizeRowsPerTableConfig(settings.rows_per_table),
     inventory_filter_state: normalizeInventoryFilterState(
@@ -294,18 +262,6 @@ export function saveAdminTabOrder(
     tab_order: normalizeTabOrder(tabOrder),
   });
   return next.tab_order;
-}
-
-export function saveAdminPanelConfig(
-  adminId: string,
-  panelConfig: PanelConfigValues,
-): PanelConfigValues {
-  const current = getAdminLocalSettings(adminId);
-  const next = saveAdminLocalSettings(adminId, {
-    ...current,
-    panel_config: normalizePanelConfig(panelConfig),
-  });
-  return next.panel_config;
 }
 
 export function saveAdminStoreSettings(

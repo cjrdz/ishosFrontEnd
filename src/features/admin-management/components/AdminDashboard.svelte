@@ -8,6 +8,7 @@
     listUserOrders,
     listUsers,
     listOrders,
+    pollOrders,
     listProducts,
     uploadAdminImage,
     linkProductFlavor,
@@ -25,6 +26,7 @@
     Order,
     UserOrderHistoryItem,
   } from "@features/admin-management/lib/api";
+  import type { PaginationInfo } from "@api-types/api";
   import AdminHeader from "./AdminHeader.svelte";
   import AdminTabPanels from "./AdminTabPanels.svelte";
   import { createDashboardCrudHandlers } from "../lib/crud-handlers";
@@ -35,6 +37,7 @@
     type PollingController,
     type SessionRefreshController,
   } from "../lib/polling-helpers";
+  import { createInactivityTracking } from "../lib/inactivity-tracking";
   import {
     adminData,
     adminDashboardUi,
@@ -52,7 +55,12 @@
     getAdminLocalSettings,
     DEFAULT_PANEL_CONFIG,
     setCurrentAdminContext,
+    saveAdminRowsPerTable,
+    getCurrentAdminId,
+    type RowsPerTableTabKey,
   } from "@features/admin-management/lib/local-settings";
+  import { getAdminPanelConfig } from "@features/admin-management/lib/bff";
+  import { trackAction, trackError } from "@shared/utils/analytics";
 
   type Session = {
     id: string;
@@ -63,29 +71,6 @@
     active?: boolean;
   };
   type LazyTabKey = Exclude<TabKey, "ordenes" | "analitica">;
-
-  function trackAction(action: string, metadata?: Record<string, unknown>) {
-    if (import.meta.env.DEV) {
-      console.debug("[analytics]", action, metadata ?? {});
-    }
-  }
-
-  function trackError(
-    error: unknown,
-    context: string,
-    metadata?: Record<string, unknown>,
-  ) {
-    if (import.meta.env.DEV) {
-      const normalized =
-        error instanceof Error
-          ? { message: error.message }
-          : { message: String(error) };
-      console.error("[analytics]", context, {
-        ...normalized,
-        ...(metadata ?? {}),
-      });
-    }
-  }
 
   function getTabFromUrl(): TabKey | null {
     if (typeof window === "undefined") return null;
@@ -102,6 +87,7 @@
 
   const categories = $derived($adminData.categories);
   const products = $derived($adminData.products);
+  const allProducts = $derived($adminData.allProducts);
   const productImages = $derived($adminData.productImages);
   const orders = $derived($adminData.orders);
   const employees = $derived($adminData.employees);
@@ -114,6 +100,26 @@
   const orderStatusFilter = $derived($adminDashboardUi.orderStatusFilter);
   let showArchivedOrders = $state(false);
   const productGalleryBusy = $derived($adminDashboardUi.productGalleryBusy);
+
+  // Pagination state for server-paginated lists
+  let ordersPage = $state(1);
+  let ordersPerPage = $state(20);
+  let ordersPagination = $state<PaginationInfo>({
+    page: 1,
+    perPage: 20,
+    total: 0,
+    totalPages: 1,
+  });
+  let ordersLastModified = $state<string | null>(null);
+  let productsPage = $state(1);
+  let productsPerPage = $state(20);
+  let productsPagination = $state<PaginationInfo>({
+    page: 1,
+    perPage: 20,
+    total: 0,
+    totalPages: 1,
+  });
+
   let hasLoadedOrdersOnce = false;
   let knownOrderIds = new Set<string>();
   let newOrdersToast = $state<{ count: number; orderNumber?: string } | null>(
@@ -123,13 +129,8 @@
   let inactivityWarningToast = $state<{ secondsRemaining: number } | null>(
     null,
   );
-  let inactivityWarningTimer: ReturnType<typeof setTimeout> | null = null;
-  let inactivityWarningCountdownTimer: ReturnType<typeof setInterval> | null =
-    null;
   let ordersPollingController: PollingController | null = null;
   let sessionRefreshController: SessionRefreshController | null = null;
-  let inactivityLogoutTimer: ReturnType<typeof setTimeout> | null = null;
-  let inactivityListenersAttached = false;
   let lazyLoadedModules = new Set<string>();
   let lazyLoadingModules = new Set<string>();
   const DEFAULT_TAB_LAZY_STATE: Record<
@@ -144,7 +145,7 @@
   let tabLazyState = $state(structuredClone(DEFAULT_TAB_LAZY_STATE));
   let tabOrder = $state<TabKey[]>([...DEFAULT_TAB_ORDER]);
   let panelConfig = $state<PanelConfigValues>({ ...DEFAULT_PANEL_CONFIG });
-  const ORDERS_POLLING_INTERVAL_MS = 15000;
+  const ORDERS_POLLING_INTERVAL_MS = 25_000;
   const SESSION_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 
   const moduleErrors = $derived($adminDashboardUi.moduleErrors);
@@ -325,113 +326,22 @@
     sessionRefreshController = null;
   }
 
-  function stopInactivityLogoutTracking() {
-    if (inactivityLogoutTimer) {
-      clearTimeout(inactivityLogoutTimer);
-      inactivityLogoutTimer = null;
-    }
-
-    if (inactivityWarningTimer) {
-      clearTimeout(inactivityWarningTimer);
-      inactivityWarningTimer = null;
-    }
-
-    if (inactivityWarningCountdownTimer) {
-      clearInterval(inactivityWarningCountdownTimer);
-      inactivityWarningCountdownTimer = null;
-    }
-
-    inactivityWarningToast = null;
-
-    if (typeof window !== "undefined" && inactivityListenersAttached) {
-      for (const eventName of [
-        "mousemove",
-        "mousedown",
-        "keydown",
-        "scroll",
-        "touchstart",
-      ]) {
-        window.removeEventListener(eventName, resetInactivityLogoutTimer, true);
-      }
-      inactivityListenersAttached = false;
-    }
-  }
-
-  function scheduleInactivityLogout() {
-    if (!session || typeof window === "undefined") return;
-
-    const timeoutSeconds = Math.max(
-      1,
-      panelConfig.inactivity_logout_seconds ||
-        DEFAULT_PANEL_CONFIG.inactivity_logout_seconds,
-    );
-    const timeoutMs = timeoutSeconds * 1000;
-
-    if (inactivityLogoutTimer) {
-      clearTimeout(inactivityLogoutTimer);
-    }
-
-    if (inactivityWarningTimer) {
-      clearTimeout(inactivityWarningTimer);
-      inactivityWarningTimer = null;
-    }
-
-    if (inactivityWarningCountdownTimer) {
-      clearInterval(inactivityWarningCountdownTimer);
-      inactivityWarningCountdownTimer = null;
-    }
-
-    inactivityWarningToast = null;
-
-    if (timeoutSeconds > 30) {
-      inactivityWarningTimer = setTimeout(
-        () => {
-          inactivityWarningToast = { secondsRemaining: 30 };
-          inactivityWarningCountdownTimer = setInterval(() => {
-            if (!inactivityWarningToast) return;
-            if (inactivityWarningToast.secondsRemaining <= 1) {
-              clearInterval(inactivityWarningCountdownTimer!);
-              inactivityWarningCountdownTimer = null;
-              return;
-            }
-
-            inactivityWarningToast = {
-              secondsRemaining: inactivityWarningToast.secondsRemaining - 1,
-            };
-          }, 1000);
-        },
-        timeoutMs - 30 * 1000,
+  const inactivityTracking = createInactivityTracking({
+    getTimeoutSeconds: () => {
+      if (!session) return null;
+      return (
+        panelConfig.inactivity_logout_seconds ||
+        DEFAULT_PANEL_CONFIG.inactivity_logout_seconds
       );
-    }
-
-    inactivityLogoutTimer = setTimeout(() => {
-      inactivityWarningToast = null;
+    },
+    onWarningChange: (secondsRemaining) => {
+      inactivityWarningToast =
+        secondsRemaining === null ? null : { secondsRemaining };
+    },
+    onTimeout: () => {
       void handleLogout();
-    }, timeoutMs);
-  }
-
-  function resetInactivityLogoutTimer() {
-    scheduleInactivityLogout();
-  }
-
-  function startInactivityLogoutTracking() {
-    if (typeof window === "undefined" || !session) return;
-
-    if (!inactivityListenersAttached) {
-      for (const eventName of [
-        "mousemove",
-        "mousedown",
-        "keydown",
-        "scroll",
-        "touchstart",
-      ]) {
-        window.addEventListener(eventName, resetInactivityLogoutTimer, true);
-      }
-      inactivityListenersAttached = true;
-    }
-
-    scheduleInactivityLogout();
-  }
+    },
+  });
 
   async function runLazyModuleLoad(key: string, loader: () => Promise<void>) {
     if (lazyLoadedModules.has(key) || lazyLoadingModules.has(key)) return;
@@ -524,7 +434,6 @@
     ordersPollingController = createPollingInterval(async () => {
       if (!session) return;
       if (typeof document !== "undefined" && document.hidden) return;
-      console.debug("[admin-polling] orders", new Date().toISOString());
       void loadOrders({ silent: true });
     }, ORDERS_POLLING_INTERVAL_MS);
   }
@@ -534,10 +443,6 @@
     sessionRefreshController = createSessionRefresh(async () => {
       if (!session) return;
       await refreshSession();
-      console.debug(
-        "[admin-polling] session-refresh",
-        new Date().toISOString(),
-      );
       trackAction("admin_session_refresh_success", {
         at: new Date().toISOString(),
       });
@@ -587,6 +492,18 @@
     loading = false;
     trackAction("admin_session_loaded", { role: session?.role ?? "unknown" });
 
+    // Restore local settings early so server-paginated lists use the configured
+    // rows-per-table values on first load.
+    const localSettings = session?.id
+      ? getAdminLocalSettings(session.id)
+      : null;
+    if (localSettings) {
+      tabOrder = normalizeTabOrder(localSettings.tab_order);
+      ordersPerPage = localSettings.rows_per_table.ordenes;
+      productsPerPage = localSettings.rows_per_table.productos;
+      setCurrentAdminContext(session.id, localSettings.rows_per_table.default);
+    }
+
     // Restore tab from URL query parameter
     const urlTab = getTabFromUrl();
     if (urlTab && (session?.role === "admin" || urlTab === "ordenes")) {
@@ -602,6 +519,9 @@
         runLazyModuleLoad("productos-core", async () => {
           await loadProducts();
         }),
+        runLazyModuleLoad("all-products", async () => {
+          await loadAllProducts();
+        }),
         runLazyModuleLoad("categorias", async () => {
           await loadCategories();
         }),
@@ -616,7 +536,7 @@
       // Prefetch data only for the currently visible tab after initial paint.
       await ensureTabDataLoaded(activeTab);
 
-      startInactivityLogoutTracking();
+      inactivityTracking.start();
       startOrdersPolling();
       startSessionRefresh();
     })();
@@ -625,7 +545,7 @@
   async function handleLogout() {
     stopOrdersPolling();
     stopSessionRefresh();
-    stopInactivityLogoutTracking();
+    inactivityTracking.stop();
     try {
       await fetch("/api/admin/logout", { method: "POST" });
     } catch {}
@@ -650,12 +570,17 @@
     }
   }
 
-  async function loadProducts() {
+  async function loadProducts(options?: { page?: number; perPage?: number }) {
     setBusy("productos", true);
     clearModuleError("productos");
     try {
-      const nextProducts = await listProducts();
-      patchAdminData({ products: nextProducts });
+      const page = options?.page ?? productsPage;
+      const perPage = options?.perPage ?? productsPerPage;
+      const result = await listProducts({ page, perPage });
+      productsPage = result.pagination.page;
+      productsPerPage = result.pagination.perPage;
+      productsPagination = result.pagination;
+      patchAdminData({ products: result.products });
     } catch (requestError) {
       setModuleError(
         "productos",
@@ -666,6 +591,46 @@
     } finally {
       setBusy("productos", false);
     }
+  }
+
+  async function loadAllProducts() {
+    setBusy("productos", true);
+    clearModuleError("productos");
+    try {
+      const result = await listProducts({ all: true });
+      patchAdminData({ allProducts: result.products });
+    } catch (requestError) {
+      setModuleError(
+        "productos",
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudieron cargar productos",
+      );
+    } finally {
+      setBusy("productos", false);
+    }
+  }
+
+  function saveRowsPerTableSetting(tab: RowsPerTableTabKey, value: number) {
+    const adminId = getCurrentAdminId();
+    if (!adminId) return;
+    const current = getAdminLocalSettings(adminId);
+    saveAdminRowsPerTable(adminId, {
+      ...current.rows_per_table,
+      [tab]: value,
+    });
+  }
+
+  function handleProductsPageChange(page: number) {
+    productsPage = page;
+    void loadProducts();
+  }
+
+  function handleProductsPerPageChange(perPage: number) {
+    productsPage = 1;
+    productsPerPage = perPage;
+    saveRowsPerTableSetting("productos", perPage);
+    void loadProducts();
   }
 
   async function loadProductImages() {
@@ -687,7 +652,11 @@
     }
   }
 
-  async function loadOrders(options?: { silent?: boolean }) {
+  async function loadOrders(options?: {
+    silent?: boolean;
+    page?: number;
+    perPage?: number;
+  }) {
     const silent = options?.silent ?? false;
     if (!silent) {
       setBusy("ordenes", true);
@@ -695,10 +664,43 @@
     }
 
     try {
-      const response = await listOrders(orderStatusFilter, showArchivedOrders);
-      const incomingOrders = response.orders;
+      const page = options?.page ?? ordersPage;
+      const perPage = options?.perPage ?? ordersPerPage;
 
-      if (hasLoadedOrdersOnce && silent) {
+      let incomingOrders: Order[];
+
+      if (silent && ordersLastModified) {
+        const poll = await pollOrders(
+          orderStatusFilter,
+          showArchivedOrders,
+          page,
+          perPage,
+          ordersLastModified,
+        );
+        if (poll.lastModified) {
+          ordersLastModified = poll.lastModified;
+        }
+        if (poll.notModified) {
+          return;
+        }
+        incomingOrders = poll.orders;
+        ordersPage = poll.pagination.page;
+        ordersPerPage = poll.pagination.perPage;
+        ordersPagination = poll.pagination;
+      } else {
+        const response = await listOrders(
+          orderStatusFilter,
+          showArchivedOrders,
+          page,
+          perPage,
+        );
+        incomingOrders = response.orders;
+        ordersPage = response.pagination.page;
+        ordersPerPage = response.pagination.perPage;
+        ordersPagination = response.pagination;
+      }
+
+      if (hasLoadedOrdersOnce && silent && page === 1) {
         const freshOrders = incomingOrders.filter(
           (order: Order) => !knownOrderIds.has(order.id),
         );
@@ -727,6 +729,20 @@
         setBusy("ordenes", false);
       }
     }
+  }
+
+  function handleOrdersPageChange(page: number) {
+    ordersPage = page;
+    ordersLastModified = null;
+    void loadOrders();
+  }
+
+  function handleOrdersPerPageChange(perPage: number) {
+    ordersPage = 1;
+    ordersPerPage = perPage;
+    ordersLastModified = null;
+    saveRowsPerTableSetting("ordenes", perPage);
+    void loadOrders();
   }
 
   async function loadEmployees() {
@@ -795,10 +811,14 @@
 
   async function loadPanelConfig() {
     if (!isAdmin || !session?.id) return;
+    try {
+      panelConfig = await getAdminPanelConfig();
+    } catch {
+      panelConfig = { ...DEFAULT_PANEL_CONFIG };
+    }
     const settings = getAdminLocalSettings(session.id);
-    panelConfig = settings.panel_config;
     setCurrentAdminContext(session.id, settings.rows_per_table.default);
-    startInactivityLogoutTracking();
+    inactivityTracking.schedule();
   }
 
   async function loadFlavors() {
@@ -808,7 +828,7 @@
       patchAdminData({ flavors: nextFlavors });
     } catch (requestError) {
       // Silently fail for flavors as they're supplementary
-      console.error("Error loading flavors:", requestError);
+      trackError(requestError, "AdminDashboard.loadFlavors");
     }
   }
 
@@ -819,7 +839,7 @@
       patchAdminData({ addons: nextAddons });
     } catch (requestError) {
       // Silently fail for addons as they're supplementary
-      console.error("Error loading addons:", requestError);
+      trackError(requestError, "AdminDashboard.loadAddons");
     }
   }
 
@@ -941,6 +961,7 @@
       await params.action();
       setNotice(params.successNotice);
       await loadProducts();
+      await loadAllProducts();
       trackAction(`${params.actionName}_success`);
     } catch (requestError) {
       trackError(requestError, `AdminDashboard.${params.actionName}`);
@@ -1027,6 +1048,7 @@
     runModuleAction,
     loadCategories,
     loadProducts,
+    loadAllProducts,
     loadFlavors,
     loadAddons,
     loadEmployees,
@@ -1038,11 +1060,15 @@
 
   function handleFilterChange(status: string) {
     setOrderStatusFilter(status);
-    loadOrders();
+    ordersPage = 1;
+    ordersLastModified = null;
+    void loadOrders();
   }
 
   function handleToggleArchivedView() {
     showArchivedOrders = !showArchivedOrders;
+    ordersPage = 1;
+    ordersLastModified = null;
     void loadOrders();
   }
 
@@ -1075,15 +1101,19 @@
     isAdmin,
     orders,
     products,
+    allProducts,
     employees,
     selectedOrder,
     busy: busy.ordenes,
     moduleError: moduleErrors.ordenes,
     orderStatusFilter,
     showArchived: showArchivedOrders,
+    pagination: ordersPagination,
     onFilterChange: handleFilterChange,
     onToggleArchivedView: handleToggleArchivedView,
     onReload: loadOrders,
+    onPageChange: handleOrdersPageChange,
+    onPerPageChange: handleOrdersPerPageChange,
     onOpenOrder: handleOpenOrder,
     onClearSelectedOrder: handleClearSelectedOrder,
     onApprove: handleApprove,
@@ -1110,6 +1140,7 @@
     busy: busy.productos,
     galleryBusy: productGalleryBusy,
     moduleError: moduleErrors.productos,
+    pagination: productsPagination,
     onCreate: handleCreateProduct,
     onUpdate: handleUpdateProduct,
     onDelete: handleDeleteProduct,
@@ -1130,6 +1161,8 @@
     onReloadGallery: loadProductImages,
     onUploadGalleryImage: handleUploadProductImage,
     onDeleteGalleryImage: handleDeleteProductImage,
+    onPageChange: handleProductsPageChange,
+    onPerPageChange: handleProductsPerPageChange,
   });
   const employeesPanelProps = $derived({
     employees,
@@ -1176,18 +1209,10 @@
   onDestroy(() => {
     stopOrdersPolling();
     stopSessionRefresh();
-    stopInactivityLogoutTracking();
+    inactivityTracking.stop();
     if (newOrdersToastTimer) {
       clearTimeout(newOrdersToastTimer);
       newOrdersToastTimer = null;
-    }
-    if (inactivityWarningTimer) {
-      clearTimeout(inactivityWarningTimer);
-      inactivityWarningTimer = null;
-    }
-    if (inactivityWarningCountdownTimer) {
-      clearInterval(inactivityWarningCountdownTimer);
-      inactivityWarningCountdownTimer = null;
     }
   });
 </script>

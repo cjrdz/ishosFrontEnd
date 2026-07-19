@@ -68,6 +68,7 @@
     isAdmin,
     orders,
     products,
+    allProducts,
     categories,
     employees,
     selectedOrder,
@@ -75,9 +76,12 @@
     moduleError,
     orderStatusFilter,
     showArchived,
+    pagination,
     onFilterChange,
     onToggleArchivedView,
     onReload,
+    onPageChange,
+    onPerPageChange,
     onOpenOrder,
     onClearSelectedOrder,
     onApprove,
@@ -241,13 +245,16 @@
         order_type: snapshot.orderForm.order_type ?? "para_llevar",
         table_number: snapshot.orderForm.table_number ?? "",
         notes: snapshot.orderForm.notes ?? "",
-        product_id: snapshot.orderForm.product_id ?? products[0]?.id ?? "",
+        product_id:
+          snapshot.orderForm.product_id ?? orderEditorProducts[0]?.id ?? "",
         quantity: snapshot.orderForm.quantity ?? 1,
       };
       manualItems = Array.isArray(snapshot.manualItems)
         ? snapshot.manualItems.map((item) => {
             const includedIds = normalizeIdList(item.included_addon_ids ?? []);
-            const product = products.find((p) => p.id === item.product_id);
+            const product = orderEditorProducts.find(
+              (p) => p.id === item.product_id,
+            );
             const toppingAddons = (product?.addons ?? []).filter(
               (a) =>
                 a.is_active &&
@@ -315,8 +322,8 @@
   }
 
   $effect(() => {
-    if (!orderForm.product_id && products.length > 0) {
-      orderForm.product_id = products[0].id;
+    if (!orderForm.product_id && orderEditorProducts.length > 0) {
+      orderForm.product_id = orderEditorProducts[0].id;
     }
   });
 
@@ -341,8 +348,11 @@
     persistManualDraft();
   });
 
+  const orderEditorProducts = $derived(allProducts ?? products);
   const selectedProduct = $derived(
-    products.find((product) => product.id === orderForm.product_id) || null,
+    orderEditorProducts.find(
+      (product) => product.id === orderForm.product_id,
+    ) || null,
   );
   const selectedProductFlavors = $derived(
     (selectedProduct?.flavors ?? [])
@@ -428,7 +438,7 @@
     ),
   );
   const manualOrderTotal = $derived(
-    ManualItemHelpers.manualOrderTotal(manualItems, products),
+    ManualItemHelpers.manualOrderTotal(manualItems, orderEditorProducts),
   );
 
   function readCustomizationStringArray(
@@ -477,8 +487,9 @@
         );
 
         const fallbackProductID =
-          products.find((product) => product.name === item.product_name)?.id ??
-          "";
+          orderEditorProducts.find(
+            (product) => product.name === item.product_name,
+          )?.id ?? "";
         const productID = (item.product_id || "").trim() || fallbackProductID;
 
         const toppingSelectionRaw = customizations?.topping_selection;
@@ -509,7 +520,7 @@
   }
 
   function productById(productId: string): Product | undefined {
-    return products.find((product) => product.id === productId);
+    return orderEditorProducts.find((product) => product.id === productId);
   }
 
   function activeFlavors(product: Product | null | undefined): ProductFlavor[] {
@@ -527,25 +538,36 @@
     productId: string,
     flavorId: string | undefined,
   ): string | null {
-    return ManualItemHelpers.resolveFlavorName(productId, flavorId, products);
+    return ManualItemHelpers.resolveFlavorName(
+      productId,
+      flavorId,
+      orderEditorProducts,
+    );
   }
 
   function resolveAddonNames(productId: string, addonIds: string[]): string[] {
-    return ManualItemHelpers.resolveAddonNames(productId, addonIds, products);
+    return ManualItemHelpers.resolveAddonNames(
+      productId,
+      addonIds,
+      orderEditorProducts,
+    );
   }
 
   function manualItemUnitPrice(item: ManualOrderItemDraft): number {
-    return ManualItemHelpers.manualItemUnitPrice(item, products);
+    return ManualItemHelpers.manualItemUnitPrice(item, orderEditorProducts);
   }
 
   function manualItemSubtotal(item: ManualOrderItemDraft): number {
-    return ManualItemHelpers.manualItemSubtotal(item, products);
+    return ManualItemHelpers.manualItemSubtotal(item, orderEditorProducts);
   }
 
   function buildCustomizationsFromDraft(
     item: ManualOrderItemDraft,
   ): Record<string, unknown> | undefined {
-    return ManualItemHelpers.buildCustomizationsFromDraft(item, products);
+    return ManualItemHelpers.buildCustomizationsFromDraft(
+      item,
+      orderEditorProducts,
+    );
   }
 
   function buildCurrentDraftItem(): ManualOrderItemDraft | null {
@@ -557,7 +579,7 @@
       includedToppingId,
       includedJaleaId,
       selectedExtraAddonIds,
-      products,
+      orderEditorProducts,
     );
     if (result.item) return result.item;
     editError = result.error;
@@ -624,7 +646,9 @@
     const targetItem = manualItems[index];
     if (!targetItem) return;
 
-    const product = productById(targetItem.product_id);
+    const product = orderEditorProducts.find(
+      (product) => product.id === targetItem.product_id,
+    );
     const includedIds = new Set(targetItem.included_addon_ids ?? []);
 
     const toppingId =
@@ -822,7 +846,7 @@
       order_type: "para_llevar",
       table_number: "",
       notes: "",
-      product_id: products[0]?.id || "",
+      product_id: orderEditorProducts[0]?.id || "",
       quantity: 1,
     };
   }
@@ -934,7 +958,7 @@
       const items = OrderSubmission.prepareOrderItems(
         manualItems,
         fallbackItem,
-        products,
+        orderEditorProducts,
       );
       if (!items) {
         editError = "Agrega al menos un producto a la orden";
@@ -972,7 +996,7 @@
     const items = OrderSubmission.prepareOrderItems(
       manualItems,
       fallbackItem,
-      products,
+      orderEditorProducts,
     );
 
     if (!items) {
@@ -1090,7 +1114,9 @@
     if (!order) return;
     const draftItems = mapOrderItemsToDraft(order);
     const defaultProductId =
-      draftItems[0]?.product_id || products[0]?.id || orderForm.product_id;
+      draftItems[0]?.product_id ||
+      orderEditorProducts[0]?.id ||
+      orderForm.product_id;
 
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
@@ -1188,12 +1214,15 @@
     {statusLabels}
     {statusBadgeClass}
     {showArchived}
+    {pagination}
     onSearchChange={(value) => {
       orderSearch = value;
     }}
     {onFilterChange}
     {onToggleArchivedView}
     {onReload}
+    {onPageChange}
+    {onPerPageChange}
     onCreateOrder={openCreateOrderModal}
     onOpenOrder={(orderId) => {
       void onOpenOrder(orderId);
@@ -1285,7 +1314,7 @@
   {isEditing}
   {selectedOrder}
   {busy}
-  {products}
+  products={orderEditorProducts}
   {categories}
   {orderForm}
   {manualItems}

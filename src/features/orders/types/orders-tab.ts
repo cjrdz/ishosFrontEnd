@@ -1,11 +1,10 @@
 import type {
-  Addon,
   Category,
   Employee,
-  Flavor,
   Order,
   Product,
 } from "@features/admin-management";
+import type { PaginationInfo } from "@api-types/api";
 
 export interface CreateOrderPayload {
   customer_name: string;
@@ -66,6 +65,7 @@ export interface OrdersTabProps {
   isAdmin: boolean;
   orders: Order[];
   products: Product[];
+  allProducts?: Product[];
   categories: Category[];
   employees: Employee[];
   selectedOrder: Order | null;
@@ -73,9 +73,12 @@ export interface OrdersTabProps {
   moduleError: string;
   orderStatusFilter: string;
   showArchived: boolean;
+  pagination: PaginationInfo;
   onFilterChange: (status: string) => void;
   onToggleArchivedView: () => void;
   onReload: () => void;
+  onPageChange: (page: number) => void;
+  onPerPageChange: (perPage: number) => void;
   onOpenOrder: (id: string) => Promise<Order | null>;
   onClearSelectedOrder: () => void;
   onApprove: (id: string, reason?: string) => Promise<Order | null>;

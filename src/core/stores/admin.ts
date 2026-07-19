@@ -21,6 +21,7 @@ export const adminState = writable({ ...defaultAdminState });
 
 export const defaultAdminData = {
   products: [] as Product[],
+  allProducts: [] as Product[],
   orders: [] as Order[],
   categories: [] as Category[],
   employees: [] as Employee[],

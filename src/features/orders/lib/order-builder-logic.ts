@@ -1,4 +1,4 @@
-export interface AddonSelection {
+interface AddonSelection {
   includedId: string | null;
   extraIds: string[];
 }

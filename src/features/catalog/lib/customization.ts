@@ -8,8 +8,6 @@ import type {
   PublicProduct,
 } from "@features/catalog/lib/api";
 
-export type SelectionState = "none" | "selected";
-
 const MAX_ITEM_QUANTITY = 100;
 
 function toSafeNumber(value: unknown): number {
@@ -23,8 +21,8 @@ export interface ProductCustomizationDraft {
   flavor_ids?: string[]; // For mixed flavors (multiple flavor selections)
   included_addon_ids?: string[];
   extra_addon_ids?: string[];
-  topping_selection?: SelectionState;
-  jalea_selection?: SelectionState;
+  topping_selection?: "none" | "selected";
+  jalea_selection?: "none" | "selected";
 }
 
 export function normalizeSelectionIds(values?: string[]): string[] {
@@ -48,7 +46,7 @@ export function activeFlavors(product?: PublicProduct): PublicFlavor[] {
     );
 }
 
-export function activeAddons(product?: PublicProduct): PublicAddon[] {
+function activeAddons(product?: PublicProduct): PublicAddon[] {
   return (product?.addons ?? [])
     .filter((addon) => addon.is_active)
     .slice()

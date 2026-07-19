@@ -51,9 +51,9 @@
   }
 </script>
 
-<div class="space-y-4">
+<div class="flex flex-col h-full space-y-3">
   <!-- Search -->
-  <div class="form-control">
+  <div class="form-control shrink-0">
     <span id="order-product-label" class="label-text text-xs mb-1"
       >Buscar producto</span
     >
@@ -80,15 +80,13 @@
   </div>
 
   <!-- Categories -->
-  <div class="space-y-1.5">
+  <div class="space-y-1 shrink-0">
     <span class="text-xs font-medium text-base-content/70">Categorías</span>
-    <div class="flex items-center gap-2 overflow-x-auto pb-1">
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-1">
       <button
         type="button"
-        class={`btn btn-xs ${
-          selectedCategoryId === "all"
-            ? "btn-primary"
-            : "btn-outline btn-ghost border-base-300"
+        class={`btn btn-xs whitespace-nowrap ${
+          selectedCategoryId === "all" ? "btn-primary" : "btn-ghost"
         }`}
         onclick={() => selectCategory("all")}
       >
@@ -98,9 +96,7 @@
         <button
           type="button"
           class={`btn btn-xs whitespace-nowrap ${
-            selectedCategoryId === category.id
-              ? "btn-primary"
-              : "btn-outline btn-ghost border-base-300"
+            selectedCategoryId === category.id ? "btn-primary" : "btn-ghost"
           }`}
           onclick={() => selectCategory(category.id)}
         >
@@ -112,16 +108,14 @@
 
   <!-- Recent products -->
   {#if recentProducts.length > 0}
-    <div class="space-y-1.5">
+    <div class="space-y-1 shrink-0">
       <span class="text-xs font-medium text-base-content/70">Rápidos</span>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap gap-1.5">
         {#each recentProducts as product (product.id)}
           <button
             type="button"
-            class={`btn btn-xs ${
-              selectedProductId === product.id
-                ? "btn-primary"
-                : "btn-outline btn-ghost border-base-300"
+            class={`btn btn-xs gap-1 ${
+              selectedProductId === product.id ? "btn-primary" : "btn-ghost"
             }`}
             onclick={() => onProductChange(product.id)}
           >
@@ -133,9 +127,10 @@
     </div>
   {/if}
 
-  <!-- Product grid -->
-  <div class="form-control space-y-1.5 min-w-0">
-    <span class="label-text text-xs">Productos</span>
+  <!-- Product list -->
+  <div class="form-control space-y-1 min-w-0 flex-1 min-h-0">
+    <span class="label-text text-xs">Productos ({filteredProducts.length})</span
+    >
     {#if filteredProducts.length === 0}
       <div
         class="rounded-lg border border-base-300 bg-base-200/40 px-3 py-4 text-center text-sm text-base-content/60"
@@ -143,50 +138,62 @@
         {products.length === 0 ? "Sin productos" : "Sin coincidencias"}
       </div>
     {:else}
-      <div
-        class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-96 overflow-y-auto rounded-lg border border-base-300 bg-base-200/20 p-2"
+      <ul
+        class="list bg-base-200/20 rounded-lg border border-base-300 flex-1 min-h-0 overflow-y-auto"
         role="listbox"
         aria-label="Productos"
       >
         {#each filteredProducts as product (product.id)}
-          <button
-            type="button"
-            class={`flex items-center gap-3 px-3 py-2.5 text-left rounded-lg border transition-colors ${
-              selectedProductId === product.id
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-base-300 bg-base-100 hover:bg-base-200/70"
-            }`}
+          {@const isSelected = selectedProductId === product.id}
+          <li
+            class="list-row gap-3 cursor-pointer rounded-lg transition-colors p-2.5 hover:bg-base-200/70 ${isSelected
+              ? 'bg-primary/10'
+              : ''}"
             role="option"
-            aria-selected={selectedProductId === product.id}
+            aria-selected={isSelected}
+            tabindex="0"
             onclick={() => onProductChange(product.id)}
+            onkeydown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onProductChange(product.id);
+              }
+            }}
           >
             {#if product.image_url}
               <img
                 src={product.image_url}
                 alt=""
-                class="h-10 w-10 rounded-md object-cover border border-base-300 shrink-0"
+                class="h-9 w-9 rounded-md object-cover border border-base-300 shrink-0"
               />
             {:else}
               <span
-                class="h-10 w-10 rounded-md border border-base-300 bg-base-200/60 flex items-center justify-center shrink-0"
+                class="h-9 w-9 rounded-md border border-base-300 bg-base-200/60 flex items-center justify-center shrink-0"
               >
                 <Icon
                   icon="lucide:package"
-                  class="h-5 w-5 text-base-content/40"
+                  class="h-4 w-4 text-base-content/40"
                 />
               </span>
             {/if}
-            <div class="min-w-0 flex-1">
-              <span class="block w-full truncate text-sm font-medium">
-                {product.name}
-              </span>
-              <span class="text-xs opacity-80">
+            <div
+              class="list-col-grow min-w-0 flex items-center justify-between gap-2"
+            >
+              <div class="min-w-0">
+                <p
+                  class={`text-sm font-medium truncate ${isSelected ? "text-primary" : ""}`}
+                  title={product.name}
+                >
+                  {product.name}
+                </p>
+              </div>
+              <span class="text-xs text-base-content/60 whitespace-nowrap">
                 {formatCurrency(product.price)}
               </span>
             </div>
-          </button>
+          </li>
         {/each}
-      </div>
+      </ul>
     {/if}
   </div>
 </div>

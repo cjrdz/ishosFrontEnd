@@ -5,7 +5,7 @@
 /**
  * User role
  */
-export type UserRole = "admin" | "manager" | "staff";
+export type UserRole = "admin" | "manager" | "staff" | "employee";
 
 /**
  * Authenticated user/employee session

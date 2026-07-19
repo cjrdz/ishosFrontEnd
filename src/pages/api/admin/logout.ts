@@ -2,12 +2,11 @@
  * POST /api/admin/logout
  * Frontend logout endpoint (BFF layer)
  *
- * Clears session cache and calls backend logout
- * Backend will clear HttpOnly cookie
+ * Calls backend logout and clears the HttpOnly auth cookie.
  */
 
 import type { APIRoute } from "astro";
-import { clearCachedSession, logout } from "@features/auth";
+import { logout } from "@features/auth";
 
 export const prerender = false;
 
@@ -36,9 +35,6 @@ export const POST: APIRoute = async (context) => {
     const isSecure =
       (forwardedProto ?? context.url.protocol.replace(":", "")) === "https";
 
-    // Clear cached session immediately
-    clearCachedSession();
-
     // Clear same-origin auth cookie used by middleware.
     context.cookies.delete("auth_token", {
       path: "/",
@@ -56,9 +52,8 @@ export const POST: APIRoute = async (context) => {
       },
     });
   } catch (error) {
-    // Even if backend logout fails, we've cleared the cache
-    // Client should redirect to login
-    clearCachedSession();
+    // Even if backend logout fails, clear the cookie so the client
+    // can no longer access protected routes.
     context.cookies.delete("auth_token", {
       path: "/",
     });

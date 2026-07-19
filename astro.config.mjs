@@ -22,6 +22,7 @@ export default defineConfig({
         sessionKVBindingName: 'ishosfactory-session',
       }),
   output: 'server',
+  devToolbar: { enabled: false },
   server: {
     host: true,
   },

@@ -2,11 +2,10 @@
  * Admin dashboard types
  */
 
-import type { UserRole } from "./auth";
 import type {
   Category,
   Employee as ApiEmployee,
-  Order as ApiOrder,
+  Product,
   User,
   UserOrderHistoryItem,
   TabKey,
@@ -14,62 +13,7 @@ import type {
 import type { OrdersTabProps } from "@features/orders";
 import type { ProductsTabProps } from "@features/products";
 
-/**
- * Employee record (admin/staff)
- */
-export interface Employee {
-  id: string;
-  email: string;
-  name: string;
-  phone: string;
-  role: UserRole;
-  active: boolean;
-  created_at: string;
-}
-
-/**
- * Employee create/update request
- */
-export interface CreateEmployeeRequest {
-  email: string;
-  password: string;
-  name: string;
-  phone: string;
-  role: UserRole;
-}
-
-/**
- * Employee update request (no password)
- */
-export interface UpdateEmployeeRequest {
-  name: string;
-  phone: string;
-  role: UserRole;
-  active: boolean;
-}
-
-/**
- * Admin order view (with more details)
- */
-export interface AdminOrder extends ApiOrder {
-  prepared_by?: string;
-  completed_at?: string;
-}
-
-/**
- * Dashboard statistics
- */
-export interface DashboardStats {
-  total_orders: number;
-  total_revenue: number;
-  orders_today: number;
-  pending_orders: number;
-  products_count: number;
-  categories_count: number;
-  employees_count: number;
-}
-
-export interface AdminBusyState {
+interface AdminBusyState {
   categorias: boolean;
   productos: boolean;
   inventario: boolean;
@@ -81,7 +25,7 @@ export interface AdminBusyState {
   configuracion: boolean;
 }
 
-export interface AdminModuleErrors {
+interface AdminModuleErrors {
   ordenes: string;
   categorias: string;
   productos: string;
@@ -93,7 +37,7 @@ export interface AdminModuleErrors {
   configuracion: string;
 }
 
-export interface TabPanelSharedProps {
+interface TabPanelSharedProps {
   isAdmin: boolean;
   activeTab: TabKey;
   busy: AdminBusyState;
@@ -106,11 +50,13 @@ export interface TabPanelSharedProps {
   };
 }
 
-export interface OrdersPanelProps extends OrdersTabProps {}
+interface OrdersPanelProps extends OrdersTabProps {
+  allProducts: Product[];
+}
 
-export interface ProductsPanelProps extends ProductsTabProps {}
+interface ProductsPanelProps extends ProductsTabProps {}
 
-export interface CategoriesPanelProps {
+interface CategoriesPanelProps {
   categories: Category[];
   onCreate: (payload: {
     name: string;
@@ -134,7 +80,7 @@ export interface CategoriesPanelProps {
   onDelete: (id: string) => void;
 }
 
-export interface EmployeesPanelProps {
+interface EmployeesPanelProps {
   employees: ApiEmployee[];
   onCreate: (payload: {
     email: string;
@@ -160,7 +106,7 @@ export interface EmployeesPanelProps {
   }) => void;
 }
 
-export interface UsersPanelProps {
+interface UsersPanelProps {
   users: User[];
   selectedUserOrders: UserOrderHistoryItem[];
   usersHistoryBusy: boolean;
@@ -185,7 +131,7 @@ export interface UsersPanelProps {
   onLoadUserOrders: (userId: string) => void;
 }
 
-export interface InventoryPanelProps {
+interface InventoryPanelProps {
   busy: boolean;
   moduleError: string;
   flavors: import("@features/admin-management").Flavor[];

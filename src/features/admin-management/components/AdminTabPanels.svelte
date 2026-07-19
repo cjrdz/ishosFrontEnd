@@ -16,6 +16,8 @@
     employees,
     users,
   }: AdminTabsProps = $props();
+
+  const orderEditorProducts = $derived(orders.allProducts ?? orders.products);
 </script>
 
 {#if shared.activeTab === "ordenes"}
@@ -23,6 +25,7 @@
     isAdmin={orders.isAdmin}
     orders={orders.orders}
     products={orders.products}
+    allProducts={orders.allProducts}
     categories={categories.categories}
     employees={orders.employees}
     selectedOrder={orders.selectedOrder}
@@ -30,9 +33,12 @@
     moduleError={orders.moduleError}
     orderStatusFilter={orders.orderStatusFilter}
     showArchived={orders.showArchived}
+    pagination={orders.pagination}
     onFilterChange={orders.onFilterChange}
     onToggleArchivedView={orders.onToggleArchivedView}
     onReload={orders.onReload}
+    onPageChange={orders.onPageChange}
+    onPerPageChange={orders.onPerPageChange}
     onOpenOrder={orders.onOpenOrder}
     onClearSelectedOrder={orders.onClearSelectedOrder}
     onApprove={orders.onApprove}
@@ -122,12 +128,15 @@
       busy={products.busy}
       galleryBusy={products.galleryBusy}
       moduleError={products.moduleError}
+      pagination={products.pagination}
       onCreate={products.onCreate}
       onUpdate={products.onUpdate}
       onDelete={products.onDelete}
       onReloadGallery={products.onReloadGallery}
       onUploadGalleryImage={products.onUploadGalleryImage}
       onDeleteGalleryImage={products.onDeleteGalleryImage}
+      onPageChange={products.onPageChange}
+      onPerPageChange={products.onPerPageChange}
       onLinkFlavor={products.onLinkFlavor}
       onUnlinkFlavor={products.onUnlinkFlavor}
       onLinkAddon={products.onLinkAddon}

@@ -143,11 +143,49 @@
 
   const rowLimitOptions = [5, 10, 25, 50, 100] as const;
   let rowLimit = $state<number>(getCurrentRowsPerTable("inventario"));
+  let currentPage = $state(1);
 
   const rowLimitLabel = $derived(rowLimit <= 0 ? "Todos" : String(rowLimit));
 
+  const totalPages = $derived(
+    rowLimit <= 0
+      ? 1
+      : Math.max(1, Math.ceil(filteredItems().length / rowLimit)),
+  );
+
+  const visibleItems = $derived(
+    rowLimit <= 0
+      ? filteredItems()
+      : filteredItems().slice(
+          (currentPage - 1) * rowLimit,
+          currentPage * rowLimit,
+        ),
+  );
+
+  const startItem = $derived(
+    filteredItems().length === 0 ? 0 : (currentPage - 1) * rowLimit + 1,
+  );
+
+  const endItem = $derived(
+    rowLimit <= 0
+      ? filteredItems().length
+      : Math.min(currentPage * rowLimit, filteredItems().length),
+  );
+
+  $effect(() => {
+    if (currentPage > totalPages) {
+      currentPage = totalPages || 1;
+    }
+  });
+
+  function goToPage(page: number) {
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+  }
+
   function setRowLimit(limit: number) {
     rowLimit = limit;
+    currentPage = 1;
     const adminId = getCurrentAdminId();
     if (!adminId) return;
     const current = getAdminLocalSettings(adminId);
@@ -156,10 +194,6 @@
       inventario: limit,
     });
   }
-
-  const visibleItems = $derived(
-    rowLimit <= 0 ? filteredItems() : filteredItems().slice(0, rowLimit),
-  );
 
   // Chart theme colors
   let chartTextColor = $state("#d1d5db");
@@ -712,8 +746,10 @@
             type="text"
             placeholder="Buscar item"
             value={searchQuery}
-            oninput={(event) =>
-              (searchQuery = (event.currentTarget as HTMLInputElement).value)}
+            oninput={(event) => {
+              searchQuery = (event.currentTarget as HTMLInputElement).value;
+              currentPage = 1;
+            }}
           />
 
           <!-- Stock filter -->
@@ -722,7 +758,10 @@
               class="btn btn-sm join-item"
               class:btn-primary={tableFilter === "all"}
               class:btn-ghost={tableFilter !== "all"}
-              onclick={() => (tableFilter = "all")}
+              onclick={() => {
+                tableFilter = "all";
+                currentPage = 1;
+              }}
             >
               Todos
             </button>
@@ -730,7 +769,10 @@
               class="btn btn-sm join-item"
               class:btn-primary={tableFilter === "ok"}
               class:btn-ghost={tableFilter !== "ok"}
-              onclick={() => (tableFilter = "ok")}
+              onclick={() => {
+                tableFilter = "ok";
+                currentPage = 1;
+              }}
             >
               OK
               {#if okCount > 0}
@@ -741,7 +783,10 @@
               class="btn btn-sm join-item"
               class:btn-primary={tableFilter === "low-stock"}
               class:btn-ghost={tableFilter !== "low-stock"}
-              onclick={() => (tableFilter = "low-stock")}
+              onclick={() => {
+                tableFilter = "low-stock";
+                currentPage = 1;
+              }}
             >
               Stock bajo
               {#if lowStockCount > 0}
@@ -754,7 +799,10 @@
               class="btn btn-sm join-item"
               class:btn-primary={tableFilter === "out-of-stock"}
               class:btn-ghost={tableFilter !== "out-of-stock"}
-              onclick={() => (tableFilter = "out-of-stock")}
+              onclick={() => {
+                tableFilter = "out-of-stock";
+                currentPage = 1;
+              }}
             >
               Agotado
               {#if outOfStockCount > 0}
@@ -790,7 +838,10 @@
               class="btn btn-sm join-item"
               class:btn-primary={tableTypeFilter === "all"}
               class:btn-ghost={tableTypeFilter !== "all"}
-              onclick={() => (tableTypeFilter = "all")}
+              onclick={() => {
+                tableTypeFilter = "all";
+                currentPage = 1;
+              }}
             >
               Todos ({allItems.length})
             </button>
@@ -798,7 +849,10 @@
               class="btn btn-sm join-item"
               class:btn-primary={tableTypeFilter === "flavor"}
               class:btn-ghost={tableTypeFilter !== "flavor"}
-              onclick={() => (tableTypeFilter = "flavor")}
+              onclick={() => {
+                tableTypeFilter = "flavor";
+                currentPage = 1;
+              }}
             >
               Sabores ({flavorItems.length})
             </button>
@@ -806,7 +860,10 @@
               class="btn btn-sm join-item"
               class:btn-primary={tableTypeFilter === "unit"}
               class:btn-ghost={tableTypeFilter !== "unit"}
-              onclick={() => (tableTypeFilter = "unit")}
+              onclick={() => {
+                tableTypeFilter = "unit";
+                currentPage = 1;
+              }}
             >
               Unitarios ({unitItems.length})
             </button>
@@ -927,11 +984,36 @@
           class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
         >
           <span class="text-sm text-base-content/60">
-            Mostrando {visibleItems.length} de {filteredItems().length}
+            {filteredItems().length === 0
+              ? "0 resultados"
+              : `${startItem}-${endItem} de ${filteredItems().length}`}
           </span>
 
           <div class="flex items-center gap-2">
-            <span class="text-sm text-base-content/60">Filas</span>
+            <button
+              class="btn btn-sm btn-outline"
+              type="button"
+              onclick={() => goToPage(currentPage - 1)}
+              disabled={loading || busy || currentPage <= 1}
+              aria-label="Página anterior"
+            >
+              <Icon icon="lucide:chevron-left" class="h-4 w-4" />
+            </button>
+
+            <span class="text-sm text-base-content/60">
+              Página {currentPage} de {totalPages}
+            </span>
+
+            <button
+              class="btn btn-sm btn-outline"
+              type="button"
+              onclick={() => goToPage(currentPage + 1)}
+              disabled={loading || busy || currentPage >= totalPages}
+              aria-label="Página siguiente"
+            >
+              <Icon icon="lucide:chevron-right" class="h-4 w-4" />
+            </button>
+
             <div class="dropdown w-full sm:w-auto dropdown-top dropdown-end">
               <div
                 tabindex="0"

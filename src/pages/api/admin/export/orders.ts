@@ -1,81 +1,131 @@
 import type { APIRoute } from "astro";
-import { getApiBaseUrl } from "@core/config";
+import { proxyToBackend, proxyToBackendStream } from "@core/bff/proxy";
 
 export const prerender = false;
 
-function unauthorized() {
-  return new Response(
-    JSON.stringify({ error: "Unauthorized", code: "UNAUTHORIZED" }),
-    { status: 401, headers: { "Content-Type": "application/json" } },
-  );
+const MAX_EXPORT_RANGE_DAYS = 90;
+
+function jsonResponse(body: Record<string, unknown>, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
-function buildBackendUrl(requestUrl: URL): URL {
-  const backendUrl = new URL(`${getApiBaseUrl()}/export/orders`);
-  const start = requestUrl.searchParams.get("start");
-  const end = requestUrl.searchParams.get("end");
-  const format = requestUrl.searchParams.get("format");
-  const statuses = requestUrl.searchParams.get("statuses");
+function parseQueryParams(url: URL) {
+  return {
+    start: url.searchParams.get("start") ?? undefined,
+    end: url.searchParams.get("end") ?? undefined,
+    format: url.searchParams.get("format") ?? undefined,
+    statuses: url.searchParams.get("statuses") ?? undefined,
+  };
+}
 
-  if (start) backendUrl.searchParams.set("start", start);
-  if (end) backendUrl.searchParams.set("end", end);
-  if (format) backendUrl.searchParams.set("format", format);
-  if (statuses) backendUrl.searchParams.set("statuses", statuses);
+function buildQuery(
+  params: ReturnType<typeof parseQueryParams>,
+): Record<string, string> {
+  const query: Record<string, string> = {};
+  if (params.start) query.start = params.start;
+  if (params.end) query.end = params.end;
+  if (params.format) query.format = params.format;
+  if (params.statuses) query.statuses = params.statuses;
+  return query;
+}
 
-  return backendUrl;
+function validateExportParams(
+  params: ReturnType<typeof parseQueryParams>,
+): { ok: true } | { ok: false; response: Response } {
+  if (!params.start || !params.end) {
+    return {
+      ok: false,
+      response: jsonResponse(
+        { error: "start and end are required", code: "MISSING_PARAMS" },
+        400,
+      ),
+    };
+  }
+
+  if (params.format && !["csv", "json"].includes(params.format)) {
+    return {
+      ok: false,
+      response: jsonResponse(
+        { error: "format must be csv or json", code: "INVALID_FORMAT" },
+        400,
+      ),
+    };
+  }
+
+  const startDate = new Date(params.start);
+  const endDate = new Date(params.end);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return {
+      ok: false,
+      response: jsonResponse(
+        { error: "Invalid date range", code: "INVALID_DATE_RANGE" },
+        400,
+      ),
+    };
+  }
+
+  if (endDate < startDate) {
+    return {
+      ok: false,
+      response: jsonResponse(
+        {
+          error: "end date must be after start date",
+          code: "INVALID_DATE_RANGE",
+        },
+        400,
+      ),
+    };
+  }
+
+  const diffDays =
+    (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+  if (diffDays > MAX_EXPORT_RANGE_DAYS) {
+    return {
+      ok: false,
+      response: jsonResponse(
+        {
+          error: `Export range cannot exceed ${MAX_EXPORT_RANGE_DAYS} days`,
+          code: "RANGE_TOO_LARGE",
+          max_days: MAX_EXPORT_RANGE_DAYS,
+        },
+        400,
+      ),
+    };
+  }
+
+  return { ok: true };
 }
 
 export const GET: APIRoute = async (context) => {
-  const token = context.cookies.get("auth_token")?.value;
-  if (!token) return unauthorized();
-
-  const backendUrl = buildBackendUrl(context.url);
-  const backendResponse = await fetch(backendUrl.toString(), {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  const contentType =
-    backendResponse.headers.get("content-type") || "application/octet-stream";
-  const disposition =
-    backendResponse.headers.get("content-disposition") || undefined;
-  const body = await backendResponse.arrayBuffer();
-
-  const headers: Record<string, string> = {
-    "Content-Type": contentType,
-    "Cache-Control": "no-store, no-cache, must-revalidate, private",
-  };
-  if (disposition) {
-    headers["Content-Disposition"] = disposition;
+  const params = parseQueryParams(context.url);
+  const validation = validateExportParams(params);
+  if (!validation.ok) {
+    return validation.response;
   }
 
-  return new Response(body, {
-    status: backendResponse.status,
-    headers,
+  return proxyToBackendStream(context, "/export/orders", {
+    query: buildQuery(params),
+    timeoutMs: 110_000,
   });
 };
 
 export const DELETE: APIRoute = async (context) => {
-  const token = context.cookies.get("auth_token")?.value;
-  if (!token) return unauthorized();
+  const params = parseQueryParams(context.url);
+  const validation = validateExportParams(params);
+  if (!validation.ok) {
+    return validation.response;
+  }
 
-  const backendUrl = buildBackendUrl(context.url);
-  const backendResponse = await fetch(backendUrl.toString(), {
+  return proxyToBackend(context, "/export/orders", {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  const data = await backendResponse.text();
-  return new Response(data, {
-    status: backendResponse.status,
-    headers: {
-      "Content-Type":
-        backendResponse.headers.get("content-type") || "application/json",
-      "Cache-Control": "no-store, no-cache, must-revalidate, private",
-    },
+    query: buildQuery(params),
+    timeoutMs: 110_000,
   });
 };

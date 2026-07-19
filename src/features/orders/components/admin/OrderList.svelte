@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Order } from "@features/admin-management";
-  import { getCurrentRowsPerTable } from "@features/admin-management";
+  import type { PaginationInfo } from "@api-types/api";
   import Icon from "@shared/components/AppIcon.svelte";
   import { formatCurrency } from "@shared/utils/formatters";
   import { isOrderEditable } from "../../lib/order-status";
@@ -14,9 +14,12 @@
     orderStatusFilterLabel: string;
     statusLabels: Record<Order["status"], string>;
     statusBadgeClass: Record<Order["status"], string>;
+    pagination: PaginationInfo;
     onSearchChange: (value: string) => void;
     onFilterChange: (value: string) => void;
     onReload: () => void;
+    onPageChange: (page: number) => void;
+    onPerPageChange: (perPage: number) => void;
     onCreateOrder: () => void;
     onOpenOrder: (orderId: string) => void;
     onPrintOrder: (orderId: string) => void;
@@ -39,9 +42,12 @@
     orderStatusFilterLabel,
     statusLabels,
     statusBadgeClass,
+    pagination,
     onSearchChange,
     onFilterChange,
     onReload,
+    onPageChange,
+    onPerPageChange,
     onCreateOrder,
     onOpenOrder,
     onPrintOrder,
@@ -55,27 +61,30 @@
     onToggleArchivedView,
   }: Props = $props();
 
-  const rowLimitOptions = [5, 10, 25, 50, 100] as const;
-  let rowLimit = $state<number>(5);
+  const perPageOptions = [5, 10, 25, 50, 100] as const;
 
-  $effect(() => {
-    rowLimit = getCurrentRowsPerTable("ordenes");
-  });
-
-  const visibleOrders = $derived(
-    rowLimit <= 0 ? filteredOrders : filteredOrders.slice(0, rowLimit),
-  );
-
-  const rowLimitLabel = $derived(rowLimit <= 0 ? "Todos" : String(rowLimit));
-
-  function setRowLimit(limit: number) {
-    rowLimit = limit;
-  }
+  const visibleOrders = $derived(filteredOrders);
 
   function setOrderStatusFilter(value: string) {
     onFilterChange(value);
     onReload();
   }
+
+  function goToPage(page: number) {
+    if (page < 1 || page > pagination.totalPages) return;
+    onPageChange(page);
+  }
+
+  function changePerPage(perPage: number) {
+    onPerPageChange(perPage);
+  }
+
+  const startItem = $derived(
+    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.perPage + 1,
+  );
+  const endItem = $derived(
+    Math.min(pagination.page * pagination.perPage, pagination.total),
+  );
 </script>
 
 <div class="card bg-base-100 shadow">
@@ -302,36 +311,36 @@
                     >
                       <Icon icon="lucide:printer" class="h-4 w-4" />
                     </button>
+                    {#if order.is_archived}
+                      <button
+                        class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-warning"
+                        type="button"
+                        onclick={(event: MouseEvent) => {
+                          event.stopPropagation();
+                          onRequestUnarchive(order);
+                        }}
+                        disabled={busy}
+                        aria-label="Desarchivar orden"
+                        title="Desarchivar"
+                      >
+                        <Icon icon="lucide:archive-restore" class="h-4 w-4" />
+                      </button>
+                    {:else}
+                      <button
+                        class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-warning"
+                        type="button"
+                        onclick={(event: MouseEvent) => {
+                          event.stopPropagation();
+                          onRequestArchive(order);
+                        }}
+                        disabled={busy}
+                        aria-label="Archivar orden"
+                        title="Archivar"
+                      >
+                        <Icon icon="lucide:archive" class="h-4 w-4" />
+                      </button>
+                    {/if}
                     {#if isAdmin}
-                      {#if order.is_archived}
-                        <button
-                          class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-warning"
-                          type="button"
-                          onclick={(event: MouseEvent) => {
-                            event.stopPropagation();
-                            onRequestUnarchive(order);
-                          }}
-                          disabled={busy}
-                          aria-label="Desarchivar orden"
-                          title="Desarchivar"
-                        >
-                          <Icon icon="lucide:archive-restore" class="h-4 w-4" />
-                        </button>
-                      {:else}
-                        <button
-                          class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-warning"
-                          type="button"
-                          onclick={(event: MouseEvent) => {
-                            event.stopPropagation();
-                            onRequestArchive(order);
-                          }}
-                          disabled={busy}
-                          aria-label="Archivar orden"
-                          title="Archivar"
-                        >
-                          <Icon icon="lucide:archive" class="h-4 w-4" />
-                        </button>
-                      {/if}
                       <button
                         class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-error"
                         type="button"
@@ -360,35 +369,56 @@
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
       <span class="text-sm text-base-content/60">
-        Mostrando {visibleOrders.length} de {filteredOrders.length}
+        {pagination.total === 0
+          ? "0 resultados"
+          : `${startItem}-${endItem} de ${pagination.total}`}
       </span>
 
       <div class="flex items-center gap-2">
-        <span class="text-sm text-base-content/60">Filas</span>
+        <button
+          class="btn btn-sm btn-outline"
+          type="button"
+          onclick={() => goToPage(pagination.page - 1)}
+          disabled={busy || pagination.page <= 1}
+          aria-label="Página anterior"
+        >
+          <Icon icon="lucide:chevron-left" class="h-4 w-4" />
+        </button>
+
+        <span class="text-sm text-base-content/60">
+          Página {pagination.page} de {pagination.totalPages}
+        </span>
+
+        <button
+          class="btn btn-sm btn-outline"
+          type="button"
+          onclick={() => goToPage(pagination.page + 1)}
+          disabled={busy || pagination.page >= pagination.totalPages}
+          aria-label="Página siguiente"
+        >
+          <Icon icon="lucide:chevron-right" class="h-4 w-4" />
+        </button>
+
         <div class="dropdown w-full sm:w-auto dropdown-top dropdown-end">
           <div
             tabindex="0"
             role="button"
             class="btn btn-sm btn-outline w-full sm:w-24 justify-between"
           >
-            {rowLimitLabel}
+            {pagination.perPage}
             <Icon icon="lucide:chevron-down" class="h-4 w-4 opacity-50" />
           </div>
           <ul
             tabindex="-1"
             class="dropdown-content menu bg-base-100 rounded-box z-100 w-full sm:w-32 p-2 mb-1 shadow-xl border border-base-300"
           >
-            {#each rowLimitOptions as option}
+            {#each perPageOptions as option}
               <li>
-                <button type="button" onclick={() => setRowLimit(option)}
+                <button type="button" onclick={() => changePerPage(option)}
                   >{option}</button
                 >
               </li>
             {/each}
-            <li>
-              <button type="button" onclick={() => setRowLimit(0)}>Todos</button
-              >
-            </li>
           </ul>
         </div>
       </div>

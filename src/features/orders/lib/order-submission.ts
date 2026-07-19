@@ -1,4 +1,4 @@
-import type { Order, Product } from "@features/admin-management";
+import type { Product } from "@features/admin-management";
 import type {
   CreateOrderPayload,
   ManualOrderItemDraft,

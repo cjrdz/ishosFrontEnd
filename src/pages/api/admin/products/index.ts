@@ -7,28 +7,31 @@
  */
 
 import type { APIRoute } from "astro";
+import { parseJsonBody, productCreateSchema } from "@core/bff/validation";
 import { proxyToBackend } from "@core/bff/proxy";
 
 export const prerender = false;
 
 export const GET: APIRoute = async (context) => {
   const includeAll = context.url.searchParams.get("all") === "true";
-  return proxyToBackend(context, "/products", {
-    query: { all: includeAll },
-  });
+  const page = context.url.searchParams.get("page");
+  const perPage = context.url.searchParams.get("per_page");
+
+  const query: Record<string, string | boolean> = { all: includeAll };
+  if (page) query.page = page;
+  if (perPage) query.per_page = perPage;
+
+  return proxyToBackend(context, "/products", { query });
 };
 
 export const POST: APIRoute = async (context) => {
-  try {
-    const body = await context.request.json();
-    return proxyToBackend(context, "/products", {
-      method: "POST",
-      body,
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+  const parsed = await parseJsonBody(context, productCreateSchema);
+  if (!parsed.success) {
+    return parsed.response;
   }
+
+  return proxyToBackend(context, "/products", {
+    method: "POST",
+    body: parsed.data,
+  });
 };

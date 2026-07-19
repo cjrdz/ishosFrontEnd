@@ -25,6 +25,12 @@ pnpm-debug.log*
 .idea/
 .wrangler/
 
+# Playwright CLI tool snapshots / logs
+.playwright-cli/
+
+# OpenAPI-generated types (generated locally from ../ishosBackEnd/api/openapi.yaml)
+src/types/api-generated.ts
+
 # githints local change-tracking store (store.db, salt, and rendered markdown)
 .githints/
 AGENTS.md

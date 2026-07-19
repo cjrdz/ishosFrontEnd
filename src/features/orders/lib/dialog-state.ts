@@ -90,7 +90,7 @@ export function closePrintPrompt(): PrintPromptDialogState {
 }
 
 /** Creates a default save user form */
-export function createDefaultSaveUserForm(): SaveUserDialogState["form"] {
+function createDefaultSaveUserForm(): SaveUserDialogState["form"] {
   return {
     name: "",
     user_type: "user",

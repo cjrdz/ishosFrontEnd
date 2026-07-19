@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import ThemeToggle from "@shared/components/ThemeToggle.svelte";
   import {
+    createInactivityTracking,
     getAdminLocalSettings,
-    saveAdminPanelConfig,
     saveAdminRowsPerTable,
     saveAdminStoreSettings,
     saveAdminTabOrder,
@@ -14,6 +14,8 @@
     getOrderArchiveConfig,
     updateOrderArchiveConfig,
     runArchive,
+    getAdminPanelConfig,
+    updateAdminPanelConfig,
     type RowsPerTableConfig,
     type PanelConfigValues,
     type StoreOfferItem,
@@ -25,6 +27,7 @@
     type TabKey,
   } from "@features/admin-management";
   import SettingsTab from "../../admin-management/components/SettingsTab.svelte";
+  import { trackAction, trackError } from "@shared/utils/analytics";
 
   type Session = {
     id: string;
@@ -34,29 +37,6 @@
     role: "admin" | "employee";
     active?: boolean;
   };
-
-  function trackAction(action: string, metadata?: Record<string, unknown>) {
-    if (import.meta.env.DEV) {
-      console.debug("[analytics]", action, metadata ?? {});
-    }
-  }
-
-  function trackError(
-    error: unknown,
-    context: string,
-    metadata?: Record<string, unknown>,
-  ) {
-    if (import.meta.env.DEV) {
-      const normalized =
-        error instanceof Error
-          ? { message: error.message }
-          : { message: String(error) };
-      console.error("[analytics]", context, {
-        ...normalized,
-        ...(metadata ?? {}),
-      });
-    }
-  }
 
   const SEARCH_ITEMS = [
     {
@@ -144,6 +124,48 @@
   let searchDialog = $state<HTMLDialogElement | null>(null);
   let searchInput = $state<HTMLInputElement | null>(null);
 
+  let inactivityWarningToast = $state<{ secondsRemaining: number } | null>(
+    null,
+  );
+
+  /**
+   * Keep the backend inactivity tracker fresh while the user is actively
+   * working on this page. Any protected endpoint records activity; the panel
+   * config read is the cheapest admin-only one available here.
+   */
+  async function keepSessionAlive() {
+    try {
+      await fetch("/api/admin/settings/panel-config", {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      });
+    } catch {
+      // Best-effort keepalive; ignore network errors.
+    }
+  }
+
+  const inactivityTracking = createInactivityTracking({
+    getTimeoutSeconds: () => {
+      if (!session) return null;
+      return (
+        panelConfig.inactivity_logout_seconds ||
+        DEFAULT_PANEL_CONFIG.inactivity_logout_seconds
+      );
+    },
+    onWarningChange: (secondsRemaining) => {
+      inactivityWarningToast =
+        secondsRemaining === null ? null : { secondsRemaining };
+    },
+    onTimeout: () => {
+      void handleInactivityLogout();
+    },
+    onActivity: () => {
+      void keepSessionAlive();
+    },
+  });
+
   const filteredItems = $derived.by(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [...SEARCH_ITEMS];
@@ -171,6 +193,10 @@
 
     document.addEventListener("keydown", handleGlobalKeydown);
     return () => document.removeEventListener("keydown", handleGlobalKeydown);
+  });
+
+  onDestroy(() => {
+    inactivityTracking.stop();
   });
 
   function openSearch() {
@@ -249,6 +275,7 @@
         role: currentSession.role,
       });
       await loadSettings();
+      inactivityTracking.start();
     } catch (requestError) {
       trackError(requestError, "AdminSettingsPage.loadPage");
       sessionError =
@@ -276,9 +303,14 @@
 
     const settings = getAdminLocalSettings(session.id);
     tabOrder = normalizeTabOrder(settings.tab_order);
-    panelConfig = settings.panel_config;
     rowsPerTable = settings.rows_per_table;
     setCurrentAdminContext(session.id, rowsPerTable.default);
+
+    try {
+      panelConfig = await getAdminPanelConfig();
+    } catch {
+      panelConfig = { ...DEFAULT_PANEL_CONFIG };
+    }
 
     try {
       const storeSettings = await getAdminStoreSettings();
@@ -331,11 +363,11 @@
       if (!session?.id) {
         throw new Error("No se pudo identificar la sesion de administrador");
       }
-      panelConfig = saveAdminPanelConfig(session.id, nextPanelConfig);
+      panelConfig = await updateAdminPanelConfig(nextPanelConfig);
       setNotice("Configuracion de seguridad actualizada");
       trackAction(
         "admin_settings_panel_config_saved",
-        nextPanelConfig as unknown as Record<string, unknown>,
+        panelConfig as unknown as Record<string, unknown>,
       );
     } catch (requestError) {
       trackError(
@@ -455,6 +487,7 @@
   }
 
   async function handleLogout() {
+    inactivityTracking.stop();
     let logoutFailed = false;
     try {
       const res = await fetch("/api/admin/logout", { method: "POST" });
@@ -466,6 +499,14 @@
       setNotice("No se pudo cerrar sesión correctamente. Intenta de nuevo.");
       return;
     }
+    window.location.href = "/admin/login";
+  }
+
+  async function handleInactivityLogout() {
+    inactivityTracking.stop();
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch {}
     window.location.href = "/admin/login";
   }
 </script>
@@ -547,6 +588,17 @@
         </button>
       </div>
     </div>
+
+    {#if inactivityWarningToast}
+      <div class="toast toast-top toast-end z-50 mt-24 mr-2 md:mr-4">
+        <div class="alert alert-warning shadow-lg">
+          <span
+            >Tu sesión expirará en {inactivityWarningToast.secondsRemaining} segundos
+            por inactividad.</span
+          >
+        </div>
+      </div>
+    {/if}
 
     {#if notice}
       <div role="alert" class="alert alert-success shadow-sm">

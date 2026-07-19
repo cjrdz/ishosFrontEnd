@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { panelConfigUpdateSchema, parseJsonBody } from "@core/bff/validation";
 import { proxyToBackend } from "@core/bff/proxy";
 
 export const prerender = false;
@@ -8,16 +9,13 @@ export const GET: APIRoute = async (context) => {
 };
 
 export const PATCH: APIRoute = async (context) => {
-  try {
-    const body = await context.request.json();
-    return proxyToBackend(context, "/settings/panel-config", {
-      method: "PATCH",
-      body,
-    });
-  } catch {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+  const parsed = await parseJsonBody(context, panelConfigUpdateSchema);
+  if (!parsed.success) {
+    return parsed.response;
   }
+
+  return proxyToBackend(context, "/settings/panel-config", {
+    method: "PATCH",
+    body: parsed.data,
+  });
 };

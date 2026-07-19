@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PublicProduct } from "./api";
 import {
-  activeAddons,
   addonsForGroup,
   isProductConfigurable,
   paidAddonGroups,
@@ -107,34 +106,5 @@ describe("isProductConfigurable", () => {
     const product = buildProduct([]);
 
     expect(isProductConfigurable(product)).toBe(false);
-  });
-});
-
-describe("activeAddons", () => {
-  it("returns only active addons sorted by group, display_order, and name", () => {
-    const product = buildProduct([
-      buildAddon({
-        id: "b",
-        name: "B",
-        group_name: "extras",
-        display_order: 2,
-      }),
-      buildAddon({
-        id: "a",
-        name: "A",
-        group_name: "extras",
-        display_order: 1,
-      }),
-      buildAddon({
-        id: "i",
-        name: "I",
-        group_name: "extras",
-        is_active: false,
-      }),
-    ]);
-
-    const active = activeAddons(product);
-
-    expect(active.map((addon) => addon.id)).toEqual(["a", "b"]);
   });
 });

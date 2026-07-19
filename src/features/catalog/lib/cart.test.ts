@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  cartItemsMatch,
-  normalizeCartQuantity,
-  type StoreCartItem,
-} from "./cart";
+import { cartItemsMatch, type StoreCartItem } from "./cart";
 
 function makeItem(partial?: Partial<StoreCartItem>): StoreCartItem {
   return {
@@ -14,21 +10,6 @@ function makeItem(partial?: Partial<StoreCartItem>): StoreCartItem {
     ...partial,
   };
 }
-
-describe("normalizeCartQuantity", () => {
-  it("clamps to at least 1 by default", () => {
-    expect(normalizeCartQuantity(0)).toBe(1);
-    expect(normalizeCartQuantity(-2)).toBe(1);
-  });
-
-  it("supports a custom minimum", () => {
-    expect(normalizeCartQuantity(0, 0)).toBe(0);
-  });
-
-  it("floors decimal values", () => {
-    expect(normalizeCartQuantity(3.8)).toBe(3);
-  });
-});
 
 describe("cartItemsMatch", () => {
   it("matches equivalent cart identity regardless of addon order", () => {

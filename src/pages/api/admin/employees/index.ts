@@ -7,6 +7,7 @@
  */
 
 import type { APIRoute } from "astro";
+import { employeeCreateSchema, parseJsonBody } from "@core/bff/validation";
 import { proxyToBackend } from "@core/bff/proxy";
 
 export const prerender = false;
@@ -16,16 +17,13 @@ export const GET: APIRoute = async (context) => {
 };
 
 export const POST: APIRoute = async (context) => {
-  try {
-    const body = await context.request.json();
-    return proxyToBackend(context, "/employees", {
-      method: "POST",
-      body,
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+  const parsed = await parseJsonBody(context, employeeCreateSchema);
+  if (!parsed.success) {
+    return parsed.response;
   }
+
+  return proxyToBackend(context, "/employees", {
+    method: "POST",
+    body: parsed.data,
+  });
 };

@@ -1,10 +1,10 @@
 <script lang="ts">
   import {
-    getCurrentRowsPerTable,
     type Product,
     type StoreOfferItem,
     type Category,
   } from "@features/admin-management";
+  import type { PaginationInfo } from "@api-types/api";
   import { formatCurrency } from "@shared/utils/formatters";
   import Icon from "@shared/components/AppIcon.svelte";
 
@@ -12,28 +12,33 @@
     products: Product[];
     categories: Category[];
     busy: boolean;
+    pagination: PaginationInfo;
     offerByProductId: Map<string, StoreOfferItem>;
     onCreateProduct: () => void;
     onToggleAvailability: (product: Product, checked: boolean) => void;
     onEdit: (product: Product) => void;
     onRequestDelete: (product: Product) => void;
     onOpenOfferPanel: (product: Product) => void;
+    onPageChange: (page: number) => void;
+    onPerPageChange: (perPage: number) => void;
   }
 
   let {
     products,
     categories,
     busy,
+    pagination,
     offerByProductId,
     onCreateProduct,
     onToggleAvailability,
     onEdit,
     onRequestDelete,
     onOpenOfferPanel,
+    onPageChange,
+    onPerPageChange,
   }: Props = $props();
 
-  const rowLimitOptions = [5, 10, 25, 50, 100] as const;
-  let productRowLimit = $state<number>(5);
+  const perPageOptions = [5, 10, 25, 50, 100] as const;
 
   let searchQuery = $state("");
   let debouncedSearchQuery = $state("");
@@ -50,10 +55,6 @@
   let categoryFilter = $state<string>("all");
   let availabilityFilter = $state<"all" | "active" | "inactive">("all");
   let offerFilter = $state<"all" | "with" | "without">("all");
-
-  $effect(() => {
-    productRowLimit = getCurrentRowsPerTable("productos");
-  });
 
   function normalizeText(value: string): string {
     return value
@@ -90,11 +91,7 @@
     }),
   );
 
-  const visibleProducts = $derived(
-    productRowLimit <= 0
-      ? filteredProducts
-      : filteredProducts.slice(0, productRowLimit),
-  );
+  const visibleProducts = $derived(filteredProducts);
 
   const categoryFilterLabel = $derived(
     categoryFilter === "all"
@@ -119,14 +116,6 @@
         : "Sin oferta",
   );
 
-  const rowLimitLabel = $derived(
-    productRowLimit <= 0 ? "Todos" : String(productRowLimit),
-  );
-
-  function setProductRowLimit(limit: number) {
-    productRowLimit = limit;
-  }
-
   function setCategoryFilter(value: string) {
     categoryFilter = value;
   }
@@ -138,6 +127,22 @@
   function setOfferFilter(value: "all" | "with" | "without") {
     offerFilter = value;
   }
+
+  function goToPage(page: number) {
+    if (page < 1 || page > pagination.totalPages) return;
+    onPageChange(page);
+  }
+
+  function changePerPage(perPage: number) {
+    onPerPageChange(perPage);
+  }
+
+  const startItem = $derived(
+    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.perPage + 1,
+  );
+  const endItem = $derived(
+    Math.min(pagination.page * pagination.perPage, pagination.total),
+  );
 </script>
 
 <div class="card bg-base-100 shadow">
@@ -377,36 +382,56 @@
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
       <span class="text-sm text-base-content/60">
-        Mostrando {visibleProducts.length} de {filteredProducts.length}
+        {pagination.total === 0
+          ? "0 resultados"
+          : `${startItem}-${endItem} de ${pagination.total}`}
       </span>
 
       <div class="flex items-center gap-2">
-        <span class="text-sm text-base-content/60">Filas</span>
+        <button
+          class="btn btn-sm btn-outline"
+          type="button"
+          onclick={() => goToPage(pagination.page - 1)}
+          disabled={busy || pagination.page <= 1}
+          aria-label="Página anterior"
+        >
+          <Icon icon="lucide:chevron-left" class="h-4 w-4" />
+        </button>
+
+        <span class="text-sm text-base-content/60">
+          Página {pagination.page} de {pagination.totalPages}
+        </span>
+
+        <button
+          class="btn btn-sm btn-outline"
+          type="button"
+          onclick={() => goToPage(pagination.page + 1)}
+          disabled={busy || pagination.page >= pagination.totalPages}
+          aria-label="Página siguiente"
+        >
+          <Icon icon="lucide:chevron-right" class="h-4 w-4" />
+        </button>
+
         <div class="dropdown w-full sm:w-auto dropdown-top dropdown-end">
           <div
             tabindex="0"
             role="button"
             class="btn btn-sm btn-outline w-full sm:w-24 justify-between"
           >
-            {rowLimitLabel}
+            {pagination.perPage}
             <Icon icon="lucide:chevron-down" class="h-4 w-4 opacity-50" />
           </div>
           <ul
             tabindex="-1"
             class="dropdown-content menu bg-base-100 rounded-box z-100 w-full sm:w-32 p-2 mb-1 shadow-xl border border-base-300"
           >
-            {#each rowLimitOptions as option}
+            {#each perPageOptions as option}
               <li>
-                <button type="button" onclick={() => setProductRowLimit(option)}
+                <button type="button" onclick={() => changePerPage(option)}
                   >{option}</button
                 >
               </li>
             {/each}
-            <li>
-              <button type="button" onclick={() => setProductRowLimit(0)}
-                >Todos</button
-              >
-            </li>
           </ul>
         </div>
       </div>

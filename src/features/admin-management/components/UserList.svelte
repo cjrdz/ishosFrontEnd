@@ -1,7 +1,11 @@
 <script lang="ts">
   import {
     getCurrentRowsPerTable,
+    getCurrentAdminId,
+    getAdminLocalSettings,
+    saveAdminRowsPerTable,
     type User,
+    type RowsPerTableTabKey,
   } from "@features/admin-management";
   import Icon from "@shared/components/AppIcon.svelte";
 
@@ -27,6 +31,7 @@
 
   const rowLimitOptions = [5, 10, 25, 50, 100] as const;
   let userRowLimit = $state<number>(5);
+  let currentPage = $state(1);
 
   let searchQuery = $state("");
   let debouncedSearchQuery = $state("");
@@ -34,6 +39,7 @@
 
   function handleSearchInput(value: string) {
     searchQuery = value;
+    currentPage = 1;
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       debouncedSearchQuery = value;
@@ -68,9 +74,36 @@
     }),
   );
 
-  const visibleUsers = $derived(
-    userRowLimit <= 0 ? filteredUsers : filteredUsers.slice(0, userRowLimit),
+  const totalPages = $derived(
+    userRowLimit <= 0
+      ? 1
+      : Math.max(1, Math.ceil(filteredUsers.length / userRowLimit)),
   );
+
+  const visibleUsers = $derived(
+    userRowLimit <= 0
+      ? filteredUsers
+      : filteredUsers.slice(
+          (currentPage - 1) * userRowLimit,
+          currentPage * userRowLimit,
+        ),
+  );
+
+  const startItem = $derived(
+    filteredUsers.length === 0 ? 0 : (currentPage - 1) * userRowLimit + 1,
+  );
+
+  const endItem = $derived(
+    userRowLimit <= 0
+      ? filteredUsers.length
+      : Math.min(currentPage * userRowLimit, filteredUsers.length),
+  );
+
+  $effect(() => {
+    if (currentPage > totalPages) {
+      currentPage = totalPages || 1;
+    }
+  });
 
   const statusFilterLabel = $derived(
     statusFilter === "all"
@@ -84,12 +117,30 @@
     userRowLimit <= 0 ? "Todos" : String(userRowLimit),
   );
 
+  function persistRowsPerTable(tab: RowsPerTableTabKey, limit: number) {
+    const adminId = getCurrentAdminId();
+    if (!adminId) return;
+    const current = getAdminLocalSettings(adminId);
+    saveAdminRowsPerTable(adminId, {
+      ...current.rows_per_table,
+      [tab]: limit,
+    });
+  }
+
+  function goToPage(page: number) {
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+  }
+
   function setUserRowLimit(limit: number) {
     userRowLimit = limit;
+    currentPage = 1;
+    persistRowsPerTable("usuarios", limit);
   }
 
   function setStatusFilter(value: "all" | "active" | "inactive") {
     statusFilter = value;
+    currentPage = 1;
   }
 </script>
 
@@ -246,11 +297,36 @@
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
       <span class="text-sm text-base-content/60">
-        Mostrando {visibleUsers.length} de {filteredUsers.length}
+        {filteredUsers.length === 0
+          ? "0 resultados"
+          : `${startItem}-${endItem} de ${filteredUsers.length}`}
       </span>
 
       <div class="flex items-center gap-2">
-        <span class="text-sm text-base-content/60">Filas</span>
+        <button
+          class="btn btn-sm btn-outline"
+          type="button"
+          onclick={() => goToPage(currentPage - 1)}
+          disabled={busy || currentPage <= 1}
+          aria-label="Página anterior"
+        >
+          <Icon icon="lucide:chevron-left" class="h-4 w-4" />
+        </button>
+
+        <span class="text-sm text-base-content/60">
+          Página {currentPage} de {totalPages}
+        </span>
+
+        <button
+          class="btn btn-sm btn-outline"
+          type="button"
+          onclick={() => goToPage(currentPage + 1)}
+          disabled={busy || currentPage >= totalPages}
+          aria-label="Página siguiente"
+        >
+          <Icon icon="lucide:chevron-right" class="h-4 w-4" />
+        </button>
+
         <div class="dropdown w-full sm:w-auto dropdown-top dropdown-end">
           <div
             tabindex="0"

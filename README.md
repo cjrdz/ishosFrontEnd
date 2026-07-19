@@ -38,17 +38,16 @@ src/
 │   ├── bff/              # Proxy helpers for Astro API routes
 │   ├── config.ts         # Environment config
 │   ├── errors/           # Shared API/domain errors
-│   ├── guards/           # Route guards
 │   └── stores/           # App-level state
 ├── features/             # Domain modules
-│   ├── admin-management/
-│   ├── analytics/
-│   ├── auth/
-│   ├── catalog/
-│   ├── offers/
-│   ├── orders/
-│   ├── products/
-│   └── settings/
+│   ├── admin-management/ # Dashboard shell, CRUD handlers, BFF wrappers
+│   ├── analytics/        # Analytics display + tracking utilities
+│   ├── auth/             # Session/cache helpers
+│   ├── catalog/          # Storefront menu, cart, public order flow
+│   ├── inventory/        # Stock tracking
+│   ├── orders/           # Admin order management
+│   ├── products/         # Products, categories, flavors, addons, offers
+│   └── settings/         # Admin settings page
 ├── shared/               # Shared UI, utilities, validators, theme
 ├── layouts/              # Astro layouts
 ├── pages/                # Astro routes and BFF routes
@@ -64,7 +63,9 @@ Each feature exposes a root `index.ts` barrel and should be imported through `@f
 - Admin page protection validates the live session, not just cookie presence.
 - Logout revokes the backend token server-side.
 - The BFF parses backend responses by `Content-Type` so non-JSON upstream errors are not masked.
+- BFF routes validate incoming requests with Zod and map validation errors to structured field-level responses.
 - Public order tracking uses `order_number + tracking_token`, and the tracking token is persisted client-side only for the secure tracking flow.
+- **CSRF posture:** The BFF does not use CSRF tokens. State-changing admin routes are protected by the `SameSite=Lax` auth cookie plus same-origin `Origin`/`Referer` checks in `src/middleware.ts`. This decision is documented and should be revisited only if cross-origin admin embedding is ever introduced.
 
 ## Routes
 
@@ -79,7 +80,7 @@ Each feature exposes a root `index.ts` barrel and should be imported through `@f
 | `/admin/login` | Staff login |
 | `/admin` | Admin dashboard shell |
 | `/admin/analytics` | Dedicated analytics page |
-| `/admin/settings` | Admin settings page |
+| `/admin/settings` | Admin settings page (store, archive, rate limits, panel config) |
 
 ### BFF routes
 
@@ -88,7 +89,9 @@ Each feature exposes a root `index.ts` barrel and should be imported through `@f
 | `/api/admin/*` | Authenticated admin/staff proxy routes |
 | `/api/store/*` | Public storefront proxy routes |
 
-Current store BFF routes include `categories`, `featured`, `orders`, `products`, `settings`, and tracking under `/api/store/tracking/[orderNumber]`.
+Store BFF routes include `categories`, `featured`, `offers`, `orders`, `products`, `settings`, and tracking under `/api/store/tracking/[orderNumber]`.
+
+Admin BFF routes cover orders (including approve, reject, status, notes, archive), catalog (products, categories, flavors, addons, container types), employees, customers, analytics, export, upload, archive config, rate limits, and panel config.
 
 ## Quality gates
 
@@ -129,10 +132,13 @@ If you test on LAN, include the backend port explicitly in `PUBLIC_API_BASE_URL`
 
 ```bash
 pnpm install
+pnpm generate:api-types   # creates src/types/api-generated.ts (gitignored)
 pnpm dev
 pnpm test
 pnpm lint
 ```
+
+`src/types/api-generated.ts` is generated from `../ishosBackEnd/api/openapi.yaml` and is gitignored so it never lands in `main`.
 
 Alternate builds:
 
@@ -156,9 +162,9 @@ pnpm deploy
 The frontend consumes the backend only through the Astro BFF. Important upstream route groups are:
 
 - Auth: `/auth/login`, `/auth/logout`, `/auth/session`
-- Catalog: `/products`, `/categories`, `/flavors`, `/addons`
-- Orders: `/orders`, `/orders/{id}`, `/orders/{id}/approve`, `/orders/{id}/reject`, `/orders/{id}/status`, `/orders/{id}/notes`, `/orders/track`
-- Settings: `/settings/store/public`, `/settings/store`, `/settings/tabs`, `/settings/panel-config`
-- Admin-only data: `/employees`, `/users`, `/analytics/*`, `/export/orders`, `/upload/*`
+- Catalog: `/products`, `/categories`, `/flavors`, `/addons`, `/container-types`
+- Orders: `/orders`, `/orders/{id}`, `/orders/{id}/approve`, `/orders/{id}/reject`, `/orders/{id}/status`, `/orders/{id}/notes`, `/orders/{id}/archive`, `/orders/track`, `/admin/orders/archive/run`
+- Settings: `/settings/store/public`, `/settings/store`, `/settings/tabs`, `/settings/archive`, `/settings/rate-limits`, `/settings/panel-config`
+- Admin-only data: `/employees`, `/users`, `/analytics/*`, `/export/orders`, `/upload/*`, `/upload/images`
 
-See the backend docs in [../ishosBackEnd/docs](../ishosBackEnd/docs) for the canonical API contract.
+The canonical contract is the generated [OpenAPI spec](../ishosBackEnd/api/openapi.yaml); see the backend docs in [../ishosBackEnd/docs](../ishosBackEnd/docs) for narrative guidance.

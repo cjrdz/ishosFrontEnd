@@ -73,7 +73,7 @@ export type PublicOrderStatus =
   | "entregada"
   | "cancelada";
 
-export interface PublicOrderCreatePayload {
+interface PublicOrderCreatePayload {
   customer_name: string;
   customer_phone: string;
   customer_email?: string;
@@ -88,7 +88,7 @@ export interface PublicOrderCreatePayload {
   }>;
 }
 
-export interface PublicOrderCreateResponse {
+interface PublicOrderCreateResponse {
   order_number: string;
   status: PublicOrderStatus;
   total: number;
@@ -123,26 +123,121 @@ export interface PublicOrderTrackingResponse {
   }>;
 }
 
-export interface PublicOrderTrackingHistoryResponse {
-  orders: PublicOrderTrackingResponse[];
+export interface PaginationMetadata {
+  page: number;
+  per_page: number;
+  total: number;
+  total_pages: number;
 }
 
-export async function listPublicCategories(): Promise<PublicCategory[]> {
-  const res = await bffRequest<{ data: PublicCategory[] } | PublicCategory[]>(
-    "/api/store/categories",
-  );
-  return Array.isArray(res)
-    ? res
-    : ((res as { data: PublicCategory[] }).data ?? []);
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: PaginationMetadata;
 }
 
-export async function listPublicProducts(): Promise<PublicProduct[]> {
-  const res = await bffRequest<{ data: PublicProduct[] } | PublicProduct[]>(
-    "/api/store/products",
-  );
-  return Array.isArray(res)
-    ? res
-    : ((res as { data: PublicProduct[] }).data ?? []);
+type ListProductsParams = {
+  category?: string;
+  all?: boolean;
+  page?: number;
+  perPage?: number;
+};
+
+type ListCategoriesParams = {
+  all?: boolean;
+  page?: number;
+  perPage?: number;
+};
+
+// ── Client-side cache for public catalog requests ─────────────────────
+
+type CacheEntry<T> = { value: T; expiresAt: number };
+const catalogCache = new Map<string, CacheEntry<unknown>>();
+const DEFAULT_CACHE_TTL_MS = 60_000;
+
+function cacheKey(path: string, params: Record<string, string>): string {
+  const search = new URLSearchParams(params).toString();
+  return search ? `${path}?${search}` : path;
+}
+
+function getCached<T>(key: string): T | undefined {
+  const entry = catalogCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    catalogCache.delete(key);
+    return undefined;
+  }
+  return entry.value as T;
+}
+
+function setCached<T>(
+  key: string,
+  value: T,
+  ttlMs = DEFAULT_CACHE_TTL_MS,
+): void {
+  catalogCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+
+function buildQueryParams(
+  params: ListProductsParams | ListCategoriesParams,
+): Record<string, string> {
+  const query: Record<string, string> = {};
+  if ("category" in params && params.category) {
+    query.category = params.category;
+  }
+  if (params.all) {
+    query.all = "true";
+  } else {
+    if (params.page !== undefined) query.page = String(params.page);
+    if (params.perPage !== undefined) query.per_page = String(params.perPage);
+  }
+  return query;
+}
+
+function extractData<T>(res: { data: T[] } | T[] | PaginatedResponse<T>): T[] {
+  if (Array.isArray(res)) return res;
+  return res.data ?? [];
+}
+
+// ── Public catalog endpoints ──────────────────────────────────────────
+
+export async function listPublicCategories(
+  params: ListCategoriesParams = { all: true },
+): Promise<PublicCategory[]> {
+  const query = buildQueryParams(params);
+  const key = cacheKey("/api/store/categories", query);
+  const cached = getCached<PublicCategory[]>(key);
+  if (cached) return cached;
+
+  const search = new URLSearchParams(query).toString();
+  const path = `/api/store/categories${search ? `?${search}` : ""}`;
+  const res = await bffRequest<
+    | { data: PublicCategory[] }
+    | PublicCategory[]
+    | PaginatedResponse<PublicCategory>
+  >(path);
+  const data = extractData(res);
+  setCached(key, data);
+  return data;
+}
+
+export async function listPublicProducts(
+  params: ListProductsParams = { all: true },
+): Promise<PublicProduct[]> {
+  const query = buildQueryParams(params);
+  const key = cacheKey("/api/store/products", query);
+  const cached = getCached<PublicProduct[]>(key);
+  if (cached) return cached;
+
+  const search = new URLSearchParams(query).toString();
+  const path = `/api/store/products${search ? `?${search}` : ""}`;
+  const res = await bffRequest<
+    | { data: PublicProduct[] }
+    | PublicProduct[]
+    | PaginatedResponse<PublicProduct>
+  >(path);
+  const data = extractData(res);
+  setCached(key, data);
+  return data;
 }
 
 export async function createPublicOrder(
@@ -201,7 +296,7 @@ export interface StoreOfferItem {
   expires_at: string;
 }
 
-export interface StorePublicSettings {
+interface StorePublicSettings {
   orders_enabled: boolean;
   offers: StoreOfferItem[];
 }

@@ -5,9 +5,15 @@ import type {
   Flavor,
   Product,
 } from "@features/admin-management";
+import type {
+  PaginationInfo,
+  ProductCreatePayload,
+  ProductUpdatePayload,
+} from "@api-types/api";
 
 export interface ProductsTabProps {
   categories: Category[];
+  /** Products are typed from the generated OpenAPI contract. */
   products: Product[];
   flavors: Flavor[];
   addons: Addon[];
@@ -15,37 +21,11 @@ export interface ProductsTabProps {
   busy: boolean;
   galleryBusy: boolean;
   moduleError: string;
-  onCreate: (payload: {
-    name: string;
-    description: string;
-    price: number;
-    category_id: string;
-    image_path?: string;
-    is_available: boolean;
-    exclude_global_flavors?: boolean;
-    exclude_global_addons?: boolean;
-    ball_based?: boolean;
-    ball_quantity?: number;
-    allows_mixed_flavors?: boolean;
-    stock_status?: string;
-  }) => void;
-  onUpdate: (
-    id: string,
-    payload: {
-      name: string;
-      description: string;
-      price: number;
-      category_id: string;
-      image_path?: string;
-      is_available: boolean;
-      exclude_global_flavors?: boolean;
-      exclude_global_addons?: boolean;
-      ball_based?: boolean;
-      ball_quantity?: number;
-      allows_mixed_flavors?: boolean;
-      stock_status?: string;
-    },
-  ) => void;
+  pagination: PaginationInfo;
+  /** Create payload derived from the generated OpenAPI Product schema. */
+  onCreate: (payload: ProductCreatePayload) => void;
+  /** Update payload derived from the generated OpenAPI Product schema. */
+  onUpdate: (id: string, payload: ProductUpdatePayload) => void;
   onDelete: (id: string) => void;
   onCreateFlavor: (payload: { name: string; is_seasonal: boolean }) => void;
   onUpdateFlavor: (
@@ -85,4 +65,6 @@ export interface ProductsTabProps {
   onReloadGallery: () => void | Promise<void>;
   onUploadGalleryImage: (file: File) => Promise<string | null>;
   onDeleteGalleryImage: (path: string) => Promise<boolean>;
+  onPageChange: (page: number) => void;
+  onPerPageChange: (perPage: number) => void;
 }

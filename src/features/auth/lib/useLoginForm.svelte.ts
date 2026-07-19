@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { setCachedSession } from "./session";
 
 const schema = z.object({
   email: z.string().email("Correo inválido"),
@@ -60,14 +59,11 @@ export function useLoginForm() {
         return;
       }
 
-      const result = (await res.json()) as Record<string, unknown>;
-
       if (!res.ok) {
         errorMessage = "Credenciales incorrectas";
         return;
       }
 
-      setCachedSession(result.employee);
       window.location.href = "/admin";
     } catch (err) {
       errorMessage =
