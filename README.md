@@ -167,4 +167,4 @@ The frontend consumes the backend only through the Astro BFF. Important upstream
 - Settings: `/settings/store/public`, `/settings/store`, `/settings/tabs`, `/settings/archive`, `/settings/rate-limits`, `/settings/panel-config`
 - Admin-only data: `/employees`, `/users`, `/analytics/*`, `/export/orders`, `/upload/*`, `/upload/images`
 
-The canonical contract is the generated [OpenAPI spec](../ishosBackEnd/api/openapi.yaml); see the backend docs in [../ishosBackEnd/docs](../ishosBackEnd/docs) for narrative guidance.
+The canonical contract is the generated [OpenAPI spec](https://github.com/cjrdz/ishosBackEnd/blob/main/api/openapi.yaml); see the backend docs in [ishosBackEnd/docs](https://github.com/cjrdz/ishosBackEnd/tree/main/docs) for narrative guidance.
