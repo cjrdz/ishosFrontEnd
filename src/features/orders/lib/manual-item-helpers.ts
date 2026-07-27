@@ -102,7 +102,7 @@ export function buildCustomizationsFromDraft(
   // included_addon_ids, treat it as "none" to avoid backend rejection.
   const hasToppingAddonIncluded = (item.included_addon_ids ?? []).some((id) =>
     (product?.addons ?? []).some(
-      (a) =>
+      (a: Addon) =>
         a.id === id &&
         a.is_active &&
         normalizeAddonGroupName(a.group_name) === "toppings",
@@ -110,7 +110,7 @@ export function buildCustomizationsFromDraft(
   );
   const hasJaleaAddonIncluded = (item.included_addon_ids ?? []).some((id) =>
     (product?.addons ?? []).some(
-      (a) =>
+      (a: Addon) =>
         a.id === id &&
         a.is_active &&
         normalizeAddonGroupName(a.group_name) === "jalea",

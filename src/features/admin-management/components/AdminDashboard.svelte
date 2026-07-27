@@ -1133,14 +1133,13 @@
   });
   const productsPanelProps = $derived({
     categories,
-    products,
+    products: allProducts,
     flavors,
     addons,
     galleryImages: productImages,
     busy: busy.productos,
     galleryBusy: productGalleryBusy,
     moduleError: moduleErrors.productos,
-    pagination: productsPagination,
     onCreate: handleCreateProduct,
     onUpdate: handleUpdateProduct,
     onDelete: handleDeleteProduct,
@@ -1161,8 +1160,6 @@
     onReloadGallery: loadProductImages,
     onUploadGalleryImage: handleUploadProductImage,
     onDeleteGalleryImage: handleDeleteProductImage,
-    onPageChange: handleProductsPageChange,
-    onPerPageChange: handleProductsPerPageChange,
   });
   const employeesPanelProps = $derived({
     employees,

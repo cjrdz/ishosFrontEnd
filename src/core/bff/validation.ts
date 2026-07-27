@@ -29,6 +29,7 @@ export const productCreateSchema = z.object({
   ball_based: z.boolean().optional(),
   ball_quantity: z.number().int().nonnegative().optional(),
   allows_mixed_flavors: z.boolean().optional(),
+  free_toppings: z.number().int().nonnegative().optional(),
 });
 
 export const productUpdateSchema = productCreateSchema
@@ -75,6 +76,7 @@ export const orderCreateSchema = z.object({
   customer_phone: z.string().trim().min(7).max(25),
   customer_email: z.string().email().optional(),
   payment_method: z.enum(["efectivo", "tarjeta", "transferencia", "otro"]),
+  amount_received: z.number().nonnegative().optional(),
   order_type: z.enum(["en_local", "para_llevar"]),
   table_number: z.number().int().positive().optional(),
   notes: z.string().trim().max(1000).optional(),

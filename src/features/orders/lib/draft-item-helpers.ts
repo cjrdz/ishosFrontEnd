@@ -13,9 +13,11 @@ export function buildCurrentDraftItem(
   quantity: number,
   selectedFlavorId: string,
   selectedFlavorIds: string[],
-  includedToppingId: string,
-  includedJaleaId: string,
+  includedToppingIds: string[],
+  includedJaleaIds: string[],
   selectedExtraAddonIds: string[],
+  toppingSelection: "none" | "selected" | undefined,
+  jaleaSelection: "none" | "selected" | undefined,
   products: Product[],
 ):
   | { item: ManualOrderItemDraft; error: string }
@@ -54,11 +56,6 @@ export function buildCurrentDraftItem(
     return { item: null, error: "Selecciona un sabor para este producto" };
   }
 
-  const normalizedToppingSelection =
-    includedToppingId === "none" ? "none" : includedToppingId;
-  const normalizedJaleaSelection =
-    includedJaleaId === "none" ? "none" : includedJaleaId;
-
   const hasToppingOptions = (selectedProduct?.addons ?? []).some(
     (addon: Addon) =>
       addon.is_active &&
@@ -69,14 +66,14 @@ export function buildCurrentDraftItem(
       addon.is_active && normalizeAddonGroupName(addon.group_name) === "jalea",
   );
 
-  if (hasToppingOptions && !normalizedToppingSelection) {
+  if (hasToppingOptions && toppingSelection === undefined) {
     return {
       item: null,
       error: "Selecciona un topping o marca 'Sin topping'",
     };
   }
 
-  if (hasJaleaOptions && !normalizedJaleaSelection) {
+  if (hasJaleaOptions && jaleaSelection === undefined) {
     return {
       item: null,
       error: "Selecciona una jalea o marca 'Sin jalea'",
@@ -93,22 +90,13 @@ export function buildCurrentDraftItem(
             .fill("")
             .map((_, index) => selectedFlavorIds[index] || "")
         : undefined,
-      included_addon_ids: normalizeIdList(
-        [normalizedToppingSelection, normalizedJaleaSelection].filter(
-          (value) => value && value !== "none",
-        ),
-      ),
+      included_addon_ids: normalizeIdList([
+        ...includedToppingIds,
+        ...includedJaleaIds,
+      ]),
       extra_addon_ids: normalizeIdList(selectedExtraAddonIds),
-      topping_selection: hasToppingOptions
-        ? normalizedToppingSelection === "none"
-          ? "none"
-          : "selected"
-        : undefined,
-      jalea_selection: hasJaleaOptions
-        ? normalizedJaleaSelection === "none"
-          ? "none"
-          : "selected"
-        : undefined,
+      topping_selection: hasToppingOptions ? toppingSelection : undefined,
+      jalea_selection: hasJaleaOptions ? jaleaSelection : undefined,
     },
     error: "",
   };
@@ -183,15 +171,15 @@ export function draftItemKey(
 export function resetCustomizationSelections(): {
   selectedFlavorId: string;
   selectedFlavorIds: string[];
-  includedToppingId: string;
-  includedJaleaId: string;
+  includedToppingIds: string[];
+  includedJaleaIds: string[];
   selectedExtraAddonIds: string[];
 } {
   return {
     selectedFlavorId: "",
     selectedFlavorIds: [],
-    includedToppingId: "",
-    includedJaleaId: "",
+    includedToppingIds: [],
+    includedJaleaIds: [],
     selectedExtraAddonIds: [],
   };
 }

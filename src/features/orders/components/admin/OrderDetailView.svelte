@@ -146,6 +146,19 @@
     }
     return "";
   }
+
+  function extraAddonCost(
+    customizations: NonNullable<Order["items"]>[number]["customizations"],
+  ): number {
+    if (!customizations) return 0;
+    const prices = customizations.extra_addon_prices;
+    if (!Array.isArray(prices)) return 0;
+    return prices.reduce(
+      (sum, price) =>
+        sum + (Number.isFinite(Number(price)) ? Number(price) : 0),
+      0,
+    );
+  }
 </script>
 
 <div class="flex flex-col gap-4 text-sm">
@@ -195,6 +208,22 @@
       <span class="text-xs text-base-content/60">Metodo de pago</span>
       <p class="font-medium capitalize">{selectedOrder.payment_method}</p>
     </div>
+    {#if selectedOrder.payment_method === "efectivo" && selectedOrder.amount_received != null}
+      <div class="space-y-1">
+        <span class="text-xs text-base-content/60">Recibido</span>
+        <p class="font-medium">
+          {formatCurrency(selectedOrder.amount_received)}
+        </p>
+      </div>
+      <div class="space-y-1">
+        <span class="text-xs text-base-content/60">Cambio</span>
+        <p class="font-medium">
+          {formatCurrency(
+            selectedOrder.amount_received - selectedOrder.total_amount,
+          )}
+        </p>
+      </div>
+    {/if}
     <div class="space-y-1">
       <span class="text-xs text-base-content/60">Tipo</span>
       <p class="font-medium">
@@ -485,8 +514,14 @@
                     </div>
                   {/if}
                   {#if Array.isArray(item.customizations.extra_addon_names) && item.customizations.extra_addon_names.length > 0}
+                    {@const extraCost = extraAddonCost(item.customizations)}
                     <div class="text-xs text-base-content/60">
                       Extras: {item.customizations.extra_addon_names.join(", ")}
+                      {#if extraCost > 0}
+                        <span class="text-success ml-1">
+                          +{formatCurrency(extraCost)}
+                        </span>
+                      {/if}
                     </div>
                   {/if}
                   {#if item.customizations.notes}
@@ -521,6 +556,18 @@
       <p class="text-lg font-bold text-primary">
         {formatCurrency(selectedOrder.total_amount)}
       </p>
+      {#if selectedOrder.payment_method === "efectivo" && selectedOrder.amount_received != null}
+        <p class="text-xs text-base-content/60 mt-1">Recibido</p>
+        <p class="font-semibold">
+          {formatCurrency(selectedOrder.amount_received)}
+        </p>
+        <p class="text-xs text-base-content/60 mt-1">Cambio</p>
+        <p class="font-semibold">
+          {formatCurrency(
+            selectedOrder.amount_received - selectedOrder.total_amount,
+          )}
+        </p>
+      {/if}
     </div>
   </div>
 </div>

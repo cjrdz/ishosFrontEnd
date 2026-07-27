@@ -1,10 +1,10 @@
 <script lang="ts">
   import {
+    getCurrentRowsPerTable,
     type Product,
     type StoreOfferItem,
     type Category,
   } from "@features/admin-management";
-  import type { PaginationInfo } from "@api-types/api";
   import { formatCurrency } from "@shared/utils/formatters";
   import Icon from "@shared/components/AppIcon.svelte";
 
@@ -12,30 +12,24 @@
     products: Product[];
     categories: Category[];
     busy: boolean;
-    pagination: PaginationInfo;
     offerByProductId: Map<string, StoreOfferItem>;
     onCreateProduct: () => void;
     onToggleAvailability: (product: Product, checked: boolean) => void;
     onEdit: (product: Product) => void;
     onRequestDelete: (product: Product) => void;
     onOpenOfferPanel: (product: Product) => void;
-    onPageChange: (page: number) => void;
-    onPerPageChange: (perPage: number) => void;
   }
 
   let {
-    products,
-    categories,
+    products = [],
+    categories = [],
     busy,
-    pagination,
     offerByProductId,
     onCreateProduct,
     onToggleAvailability,
     onEdit,
     onRequestDelete,
     onOpenOfferPanel,
-    onPageChange,
-    onPerPageChange,
   }: Props = $props();
 
   const perPageOptions = [5, 10, 25, 50, 100] as const;
@@ -55,6 +49,8 @@
   let categoryFilter = $state<string>("all");
   let availabilityFilter = $state<"all" | "active" | "inactive">("all");
   let offerFilter = $state<"all" | "with" | "without">("all");
+  let currentPage = $state(1);
+  let currentPerPage = $state<number>(getCurrentRowsPerTable("productos"));
 
   function normalizeText(value: string): string {
     return value
@@ -91,7 +87,16 @@
     }),
   );
 
-  const visibleProducts = $derived(filteredProducts);
+  const filteredTotal = $derived(filteredProducts.length);
+  const totalPages = $derived(
+    Math.max(1, Math.ceil(filteredTotal / currentPerPage)),
+  );
+  const visibleProducts = $derived(
+    filteredProducts.slice(
+      (currentPage - 1) * currentPerPage,
+      currentPage * currentPerPage,
+    ),
+  );
 
   const categoryFilterLabel = $derived(
     categoryFilter === "all"
@@ -118,30 +123,34 @@
 
   function setCategoryFilter(value: string) {
     categoryFilter = value;
+    currentPage = 1;
   }
 
   function setAvailabilityFilter(value: "all" | "active" | "inactive") {
     availabilityFilter = value;
+    currentPage = 1;
   }
 
   function setOfferFilter(value: "all" | "with" | "without") {
     offerFilter = value;
+    currentPage = 1;
   }
 
   function goToPage(page: number) {
-    if (page < 1 || page > pagination.totalPages) return;
-    onPageChange(page);
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
   }
 
   function changePerPage(perPage: number) {
-    onPerPageChange(perPage);
+    currentPage = 1;
+    currentPerPage = perPage;
   }
 
   const startItem = $derived(
-    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.perPage + 1,
+    filteredTotal === 0 ? 0 : (currentPage - 1) * currentPerPage + 1,
   );
   const endItem = $derived(
-    Math.min(pagination.page * pagination.perPage, pagination.total),
+    Math.min(currentPage * currentPerPage, filteredTotal),
   );
 </script>
 
@@ -382,31 +391,31 @@
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
       <span class="text-sm text-base-content/60">
-        {pagination.total === 0
+        {filteredTotal === 0
           ? "0 resultados"
-          : `${startItem}-${endItem} de ${pagination.total}`}
+          : `${startItem}-${endItem} de ${filteredTotal}`}
       </span>
 
       <div class="flex items-center gap-2">
         <button
           class="btn btn-sm btn-outline"
           type="button"
-          onclick={() => goToPage(pagination.page - 1)}
-          disabled={busy || pagination.page <= 1}
+          onclick={() => goToPage(currentPage - 1)}
+          disabled={busy || currentPage <= 1}
           aria-label="Página anterior"
         >
           <Icon icon="lucide:chevron-left" class="h-4 w-4" />
         </button>
 
         <span class="text-sm text-base-content/60">
-          Página {pagination.page} de {pagination.totalPages}
+          Página {currentPage} de {totalPages}
         </span>
 
         <button
           class="btn btn-sm btn-outline"
           type="button"
-          onclick={() => goToPage(pagination.page + 1)}
-          disabled={busy || pagination.page >= pagination.totalPages}
+          onclick={() => goToPage(currentPage + 1)}
+          disabled={busy || currentPage >= totalPages}
           aria-label="Página siguiente"
         >
           <Icon icon="lucide:chevron-right" class="h-4 w-4" />
@@ -418,7 +427,7 @@
             role="button"
             class="btn btn-sm btn-outline w-full sm:w-24 justify-between"
           >
-            {pagination.perPage}
+            {currentPerPage}
             <Icon icon="lucide:chevron-down" class="h-4 w-4 opacity-50" />
           </div>
           <ul

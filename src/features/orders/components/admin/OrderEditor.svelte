@@ -39,8 +39,8 @@
     paidAddonGroups: AddonGroup[];
     selectedFlavorId: string;
     selectedFlavorIds: string[];
-    includedToppingId: string;
-    includedJaleaId: string;
+    includedToppingIds: string[];
+    includedJaleaIds: string[];
     selectedExtraAddonIds: string[];
     hasCustomizationOptions: boolean;
     totalPreview: number;
@@ -56,9 +56,16 @@
     onQuantityChange: (value: number) => void;
     onFlavorChange: (value: string) => void;
     onFlavorIdsChange: (value: string[]) => void;
-    onChangeIncludedTopping: (value: string) => void;
-    onChangeIncludedJalea: (value: string) => void;
+    onToppingSelectionChange: (
+      includedIds: string[],
+      extraIds: string[],
+    ) => void;
+    onJaleaSelectionChange: (includedIds: string[], extraIds: string[]) => void;
     onToggleExtraAddonSelection: (addonId: string, checked: boolean) => void;
+    toppingFreeAllowance: number;
+    jaleaFreeAllowance: number;
+    toppingSelection?: "none" | "selected";
+    jaleaSelection?: "none" | "selected";
     onAddDraftItem: () => void;
     onEditDraftItem: (index: number) => void;
     onCancelDraftItemEdit: () => void;
@@ -91,9 +98,13 @@
     paidAddonGroups,
     selectedFlavorId,
     selectedFlavorIds,
-    includedToppingId,
-    includedJaleaId,
+    includedToppingIds,
+    includedJaleaIds,
     selectedExtraAddonIds,
+    toppingFreeAllowance,
+    jaleaFreeAllowance,
+    toppingSelection,
+    jaleaSelection,
     hasCustomizationOptions,
     totalPreview,
     manualOrderTotal,
@@ -108,8 +119,8 @@
     onQuantityChange,
     onFlavorChange,
     onFlavorIdsChange,
-    onChangeIncludedTopping,
-    onChangeIncludedJalea,
+    onToppingSelectionChange,
+    onJaleaSelectionChange,
     onToggleExtraAddonSelection,
     onAddDraftItem,
     onEditDraftItem,
@@ -183,6 +194,25 @@
     return true;
   }
 
+  const effectiveReceived = $derived(
+    typeof orderForm.amount_received === "number" &&
+      orderForm.amount_received > 0
+      ? orderForm.amount_received
+      : null,
+  );
+  const changeAmount = $derived(
+    effectiveReceived != null ? effectiveReceived - displayTotal : null,
+  );
+  const cashError = $derived(
+    orderForm.payment_method === "efectivo" &&
+      effectiveReceived != null &&
+      effectiveReceived < displayTotal,
+  );
+
+  function setReceivedAmount(value: number) {
+    orderForm.amount_received = value;
+  }
+
   function isStepValid(target: EditorStep): boolean {
     if (target === "products") {
       return manualItems.length > 0 && draftItemEditIndex === null;
@@ -199,7 +229,7 @@
       );
     }
     if (target === "summary") {
-      return isStepValid("products") && isStepValid("customer");
+      return isStepValid("products") && isStepValid("customer") && !cashError;
     }
     return false;
   }
@@ -321,9 +351,13 @@
         {paidAddonGroups}
         {selectedFlavorId}
         {selectedFlavorIds}
-        {includedToppingId}
-        {includedJaleaId}
+        {includedToppingIds}
+        {includedJaleaIds}
         {selectedExtraAddonIds}
+        {toppingFreeAllowance}
+        {jaleaFreeAllowance}
+        {toppingSelection}
+        {jaleaSelection}
         {hasCustomizationOptions}
         {totalPreview}
         {manualOrderTotal}
@@ -333,8 +367,8 @@
         {onQuantityChange}
         {onFlavorChange}
         {onFlavorIdsChange}
-        {onChangeIncludedTopping}
-        {onChangeIncludedJalea}
+        {onToppingSelectionChange}
+        {onJaleaSelectionChange}
         {onToggleExtraAddonSelection}
         {onAddDraftItem}
         {onEditDraftItem}
@@ -578,6 +612,53 @@
               <p class="text-xs text-base-content/60">
                 Total previo: {formatCurrency(selectedOrder.total_amount)}
               </p>
+            {/if}
+
+            {#if orderForm.payment_method === "efectivo"}
+              <div class="border-t border-primary/10 pt-3 space-y-2">
+                <div class="flex flex-wrap gap-1.5">
+                  {#each [displayTotal, 1, 5, 10, 20] as amount (amount)}
+                    <button
+                      type="button"
+                      class="btn btn-xs {effectiveReceived === amount
+                        ? 'btn-primary'
+                        : 'btn-outline'}"
+                      onclick={() => setReceivedAmount(amount)}
+                    >
+                      {amount === displayTotal ? "Exacto" : `$${amount}`}
+                    </button>
+                  {/each}
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input input-xs input-bordered w-full bg-base-100"
+                  placeholder="Monto recibido"
+                  value={orderForm.amount_received}
+                  oninput={(e) => {
+                    const raw = e.currentTarget.value;
+                    orderForm.amount_received = raw === "" ? "" : Number(raw);
+                  }}
+                />
+                {#if changeAmount !== null}
+                  <p class="text-sm">
+                    <span class="text-base-content/60">Cambio:</span>
+                    <span
+                      class="font-semibold {cashError
+                        ? 'text-error'
+                        : 'text-success'}"
+                    >
+                      {formatCurrency(changeAmount)}
+                    </span>
+                  </p>
+                {/if}
+                {#if cashError}
+                  <p class="text-xs text-error">
+                    El monto recibido debe ser igual o mayor al total.
+                  </p>
+                {/if}
+              </div>
             {/if}
           </div>
         </div>

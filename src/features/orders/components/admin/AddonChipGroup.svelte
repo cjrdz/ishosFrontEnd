@@ -15,65 +15,44 @@
 
   interface Props {
     items: AddonItem[];
-    includedId?: string;
+    includedIds?: string[];
     selectedIds: string[];
     noneId?: string;
     noneLabel?: string;
     label?: string;
     variant?: "unified" | "multi";
+    allowance?: number;
     required?: boolean;
     error?: string;
-    onIncludedChange?: (value: string) => void;
+    onUnifiedChange?: (includedIds: string[], extraIds: string[]) => void;
     onToggleExtra: (addonId: string, checked: boolean) => void;
   }
 
   let {
     items,
-    includedId = "",
+    includedIds = [],
     selectedIds,
     noneId = "none",
     noneLabel = "Ninguno",
     label,
     variant = "unified",
+    allowance = 1,
     required = false,
     error = "",
-    onIncludedChange,
+    onUnifiedChange,
     onToggleExtra,
   }: Props = $props();
 
   let groupRef = $state<HTMLDivElement | null>(null);
 
-  function emitUnifiedChanges(next: {
-    includedId: string | null;
-    extraIds: string[];
-  }) {
-    const nextIncludedValue = next.includedId ?? noneId;
-    if (nextIncludedValue !== includedId) {
-      onIncludedChange?.(nextIncludedValue);
-    }
-
-    const currentExtras = new Set(selectedIds);
-    const nextExtras = new Set(next.extraIds);
-
-    for (const id of currentExtras) {
-      if (!nextExtras.has(id)) {
-        onToggleExtra(id, false);
-      }
-    }
-    for (const id of nextExtras) {
-      if (!currentExtras.has(id)) {
-        onToggleExtra(id, true);
-      }
-    }
-  }
-
   function handleUnifiedChipClick(clickedId: string) {
     const next = computeAddonSelection(
-      { includedId: includedId || null, extraIds: selectedIds },
+      { includedIds, extraIds: selectedIds },
       clickedId,
       noneId,
+      allowance,
     );
-    emitUnifiedChanges(next);
+    onUnifiedChange?.(next.includedIds, next.extraIds);
   }
 
   function handleMultiChipClick(clickedId: string) {
@@ -90,7 +69,7 @@
   }
 
   function isIncluded(id: string): boolean {
-    return includedId === id;
+    return variant === "unified" && includedIds.includes(id);
   }
 
   function isExtra(id: string): boolean {
@@ -98,20 +77,29 @@
   }
 
   function isNoneSelected(): boolean {
-    return (!includedId || includedId === noneId) && selectedIds.length === 0;
+    return includedIds.length === 0 && selectedIds.length === 0;
   }
 
   function clearSelection() {
-    onIncludedChange?.(noneId);
-    for (const id of selectedIds) {
-      onToggleExtra(id, false);
+    if (variant === "unified") {
+      onUnifiedChange?.([], []);
+    } else {
+      for (const id of selectedIds) {
+        onToggleExtra(id, false);
+      }
     }
   }
 
   const canClear = $derived(
     variant === "unified"
-      ? (includedId && includedId !== noneId) || selectedIds.length > 0
+      ? includedIds.length > 0 || selectedIds.length > 0
       : selectedIds.length > 0,
+  );
+
+  const remainingFree = $derived(
+    variant === "unified" && allowance > 0
+      ? Math.max(0, allowance - includedIds.length)
+      : 0,
   );
 
   $effect(() => {
@@ -195,6 +183,13 @@
       </button>
     {/each}
   </div>
+
+  {#if remainingFree > 0 && variant === "unified"}
+    <p class="text-xs text-success">
+      {remainingFree}
+      {label?.toLowerCase() ?? "item"}{remainingFree === 1 ? "" : "s"} gratis
+    </p>
+  {/if}
 
   {#if error}
     <p class="label text-error text-xs">{error}</p>

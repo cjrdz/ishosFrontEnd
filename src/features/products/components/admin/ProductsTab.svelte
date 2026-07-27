@@ -54,8 +54,6 @@
     onReloadGallery,
     onUploadGalleryImage,
     onDeleteGalleryImage,
-    onPageChange,
-    onPerPageChange,
   }: Props = $props();
 
   let productEditorOpen = $state(false);
@@ -107,6 +105,8 @@
     ball_quantity: 1 as number | "custom",
     custom_ball_quantity: "",
     allows_mixed_flavors: false,
+    free_toppings: 1 as number | "custom",
+    custom_free_toppings: "",
     stock_status: "auto" as string,
   });
 
@@ -136,6 +136,8 @@
       ball_quantity: 1,
       custom_ball_quantity: "",
       allows_mixed_flavors: false,
+      free_toppings: 1,
+      custom_free_toppings: "",
       stock_status: "auto",
     };
   }
@@ -165,6 +167,9 @@
   function editProduct(product: Product) {
     editingProductId = product.id;
     const isCustom = product.ball_quantity && product.ball_quantity > 3;
+    const isCustomFreeToppings =
+      product.free_toppings !== undefined &&
+      (product.free_toppings > 3 || product.free_toppings < 1);
     form = {
       id: product.id,
       name: product.name,
@@ -179,6 +184,12 @@
       ball_quantity: isCustom ? "custom" : product.ball_quantity || 1,
       custom_ball_quantity: isCustom ? String(product.ball_quantity) : "",
       allows_mixed_flavors: Boolean(product.allows_mixed_flavors),
+      free_toppings: isCustomFreeToppings
+        ? "custom"
+        : (product.free_toppings ?? 1),
+      custom_free_toppings: isCustomFreeToppings
+        ? String(product.free_toppings)
+        : "",
       stock_status: product.stock_status || "auto",
     };
     productEditorOpen = true;
@@ -190,6 +201,10 @@
       form.ball_quantity === "custom"
         ? Number(form.custom_ball_quantity)
         : form.ball_quantity;
+    const freeToppings =
+      form.free_toppings === "custom"
+        ? Number(form.custom_free_toppings)
+        : form.free_toppings;
 
     const payload: any = {
       name: form.name.trim(),
@@ -203,6 +218,7 @@
       ball_based: form.ball_based,
       ball_quantity: ballQty,
       allows_mixed_flavors: form.allows_mixed_flavors,
+      free_toppings: freeToppings,
     };
 
     if (form.id) {
@@ -262,6 +278,7 @@
       ball_based: product.ball_based,
       ball_quantity: product.ball_quantity,
       allows_mixed_flavors: product.allows_mixed_flavors,
+      free_toppings: product.free_toppings,
     });
   }
 
@@ -357,15 +374,12 @@
     {products}
     {categories}
     {busy}
-    {pagination}
     offerByProductId={activeOfferByProductId}
     onCreateProduct={openCreateProductModal}
     onToggleAvailability={requestToggleProductAvailability}
     onEdit={editProduct}
     onRequestDelete={requestDeleteProduct}
     onOpenOfferPanel={openOfferPanel}
-    {onPageChange}
-    {onPerPageChange}
   />
 </section>
 

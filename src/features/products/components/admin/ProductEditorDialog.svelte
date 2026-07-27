@@ -17,6 +17,8 @@
     ball_quantity: number | "custom";
     custom_ball_quantity: string;
     allows_mixed_flavors: boolean;
+    free_toppings: number | "custom";
+    custom_free_toppings: string;
     stock_status: string;
   }
 
@@ -51,6 +53,7 @@
   }: Props = $props();
 
   const ballQuantityOptions = [1, 2, 3];
+  const freeToppingsOptions = [1, 2, 3];
   const stockStatusOptions = [
     { value: "auto", label: "Automatico (desde inventario)" },
     { value: "in_stock", label: "En stock" },
@@ -68,6 +71,15 @@
   );
   const showMixedFlavors = $derived(
     form.ball_based && effectiveBallQuantity > 1,
+  );
+
+  const isCustomFreeToppings = $derived(form.free_toppings === "custom");
+  const effectiveFreeToppings = $derived(
+    isCustomFreeToppings
+      ? Number(form.custom_free_toppings) || 0
+      : typeof form.free_toppings === "number"
+        ? form.free_toppings
+        : 1,
   );
 
   let dialogRef = $state<HTMLDialogElement | null>(null);
@@ -255,6 +267,43 @@
                 <span class="label-text text-sm">Permitir sabores mixtos</span>
               </label>
             {/if}
+
+            <div class="space-y-2">
+              <span class="label-text text-xs"
+                >Toppings gratuitos incluidos</span
+              >
+              <div class="join">
+                {#each freeToppingsOptions as qty (qty)}
+                  <input
+                    class="join-item btn btn-sm"
+                    type="radio"
+                    name="free_toppings"
+                    value={qty}
+                    checked={form.free_toppings === qty}
+                    onchange={() => (form.free_toppings = qty)}
+                    aria-label={String(qty)}
+                  />
+                {/each}
+                <input
+                  class="join-item btn btn-sm"
+                  type="radio"
+                  name="free_toppings"
+                  value="custom"
+                  checked={isCustomFreeToppings}
+                  onchange={() => (form.free_toppings = "custom")}
+                  aria-label="Custom"
+                />
+              </div>
+              {#if isCustomFreeToppings}
+                <input
+                  type="number"
+                  class="input input-bordered input-sm w-full"
+                  placeholder="Ej: 5"
+                  min="0"
+                  bind:value={form.custom_free_toppings}
+                />
+              {/if}
+            </div>
           {/if}
 
           <div class="form-control w-full">

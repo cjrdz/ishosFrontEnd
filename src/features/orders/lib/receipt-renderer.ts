@@ -22,8 +22,20 @@ function renderReceipt(order: Order): string {
           Array.isArray(item.customizations.extra_addon_names) &&
           item.customizations.extra_addon_names.length > 0
         ) {
+          const extraPrices = Array.isArray(
+            item.customizations.extra_addon_prices,
+          )
+            ? (item.customizations.extra_addon_prices as number[])
+            : [];
+          const extraTotal = extraPrices.reduce(
+            (sum, price) =>
+              sum + (Number.isFinite(Number(price)) ? Number(price) : 0),
+            0,
+          );
+          const costLabel =
+            extraTotal > 0 ? ` (+${formatCurrency(extraTotal)})` : "";
           parts.push(
-            `Extras: ${(item.customizations.extra_addon_names as string[]).join(", ")}`,
+            `Extras: ${(item.customizations.extra_addon_names as string[]).join(", ")}${costLabel}`,
           );
         }
         if (
@@ -70,6 +82,12 @@ function renderReceipt(order: Order): string {
       <tbody>${itemsTable}</tbody>
     </table>
     <div class="total">Total: ${formatCurrency(order.total_amount)}</div>
+    ${
+      order.payment_method === "efectivo" && order.amount_received != null
+        ? `<div class="meta">Recibido: ${formatCurrency(order.amount_received)}</div>
+         <div class="meta">Cambio: ${formatCurrency(order.amount_received - order.total_amount)}</div>`
+        : ""
+    }
   </body>
 </html>`;
 }

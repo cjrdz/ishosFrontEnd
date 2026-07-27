@@ -32,6 +32,7 @@ export function buildOrderUpdatePayload(
   customerPhone: string,
   customerEmail: string,
   paymentMethod: "efectivo" | "tarjeta" | "transferencia" | "otro",
+  amountReceived: string | number,
   orderType: "en_local" | "para_llevar",
   tableNumber: string | number,
   notes: string,
@@ -41,12 +42,17 @@ export function buildOrderUpdatePayload(
     orderType === "en_local" && tableNumber !== ""
       ? Number(tableNumber)
       : undefined;
+  const normalizedAmountReceived =
+    paymentMethod === "efectivo" && amountReceived !== ""
+      ? Number(amountReceived)
+      : undefined;
 
   return {
     customer_name: customerName.trim(),
     customer_phone: customerPhone.trim(),
     customer_email: customerEmail.trim() || undefined,
     payment_method: paymentMethod,
+    amount_received: normalizedAmountReceived,
     order_type: orderType,
     table_number: Number.isFinite(normalizedTableNumber)
       ? normalizedTableNumber
@@ -62,16 +68,23 @@ export function buildCreateOrderPayload(
   customerPhone: string,
   customerEmail: string,
   paymentMethod: "efectivo" | "tarjeta" | "transferencia" | "otro",
+  amountReceived: string | number,
   orderType: "en_local" | "para_llevar",
   tableNumber: string | number,
   notes: string,
   items: CreateOrderPayload["items"],
 ): CreateOrderPayload {
+  const normalizedAmountReceived =
+    paymentMethod === "efectivo" && amountReceived !== ""
+      ? Number(amountReceived)
+      : undefined;
+
   return {
     customer_name: customerName.trim(),
     customer_phone: customerPhone.trim(),
     customer_email: customerEmail.trim() || undefined,
     payment_method: paymentMethod,
+    amount_received: normalizedAmountReceived,
     order_type: orderType,
     table_number:
       orderType === "en_local" && tableNumber !== ""

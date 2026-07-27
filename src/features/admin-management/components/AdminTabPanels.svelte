@@ -128,15 +128,12 @@
       busy={products.busy}
       galleryBusy={products.galleryBusy}
       moduleError={products.moduleError}
-      pagination={products.pagination}
       onCreate={products.onCreate}
       onUpdate={products.onUpdate}
       onDelete={products.onDelete}
       onReloadGallery={products.onReloadGallery}
       onUploadGalleryImage={products.onUploadGalleryImage}
       onDeleteGalleryImage={products.onDeleteGalleryImage}
-      onPageChange={products.onPageChange}
-      onPerPageChange={products.onPerPageChange}
       onLinkFlavor={products.onLinkFlavor}
       onUnlinkFlavor={products.onUnlinkFlavor}
       onLinkAddon={products.onLinkAddon}

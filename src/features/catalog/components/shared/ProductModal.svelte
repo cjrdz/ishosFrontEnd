@@ -16,7 +16,7 @@
     paidAddonGroups,
     requiresFlavorSelection,
     requiresGroupSelection,
-    selectedIncludedAddonForGroup,
+    selectedIncludedAddonsForGroup,
     type ProductCustomizationDraft,
   } from "@features/catalog/lib/customization";
 
@@ -55,12 +55,16 @@
   const jaleaOptions = $derived(addonsForGroup(product ?? undefined, "jalea"));
   const extraGroups = $derived(paidAddonGroups(product ?? undefined));
 
-  const selectedToppingId = $derived(
-    selectedIncludedAddonForGroup(product ?? undefined, draft, "toppings"),
+  const selectedToppingIds = $derived(
+    selectedIncludedAddonsForGroup(product ?? undefined, draft, "toppings"),
   );
-  const selectedJaleaId = $derived(
-    selectedIncludedAddonForGroup(product ?? undefined, draft, "jalea"),
+  const selectedJaleaIds = $derived(
+    selectedIncludedAddonsForGroup(product ?? undefined, draft, "jalea"),
   );
+  const toppingFreeAllowance = $derived(
+    Math.max(0, product?.free_toppings ?? 1),
+  );
+  const jaleaFreeAllowance = $derived(1);
 
   const toppingIds = $derived(new Set(toppingOptions.map((addon) => addon.id)));
   const jaleaIds = $derived(new Set(jaleaOptions.map((addon) => addon.id)));
@@ -79,6 +83,16 @@
   );
   const jaleaRequired = $derived(
     requiresGroupSelection(product ?? undefined, draft, "jalea"),
+  );
+  const toppingHelperText = $derived(
+    toppingFreeAllowance === 0
+      ? "Cada topping tiene costo adicional."
+      : `Los primeros ${toppingFreeAllowance} topping${toppingFreeAllowance === 1 ? "" : "s"} son gratis. Los siguientes tienen costo.`,
+  );
+  const jaleaHelperText = $derived(
+    jaleaFreeAllowance === 0
+      ? "Cada jalea tiene costo adicional."
+      : `Las primeras ${jaleaFreeAllowance} jalea${jaleaFreeAllowance === 1 ? "" : "s"} son gratis. Las siguientes tienen costo.`,
   );
 
   // Mixed flavors support
@@ -157,54 +171,50 @@
   }
 
   function updateToppingSelection(
-    nextIncludedId: string | null,
+    nextIncludedIds: string[],
     nextExtraIds: string[],
   ) {
     const currentIncluded = draft.included_addon_ids ?? [];
     const currentExtras = draft.extra_addon_ids ?? [];
 
-    const newIncluded = currentIncluded.filter((id) => !toppingIds.has(id));
-    if (nextIncludedId && nextIncludedId !== "none") {
-      newIncluded.push(nextIncludedId);
-    }
-
-    const newExtras = currentExtras.filter((id) => !toppingIds.has(id));
-    for (const id of nextExtraIds) {
-      if (toppingIds.has(id)) newExtras.push(id);
-    }
+    const newIncluded = [
+      ...currentIncluded.filter((id) => !toppingIds.has(id)),
+      ...nextIncludedIds.filter((id) => toppingIds.has(id)),
+    ];
+    const newExtras = [
+      ...currentExtras.filter((id) => !toppingIds.has(id)),
+      ...nextExtraIds.filter((id) => toppingIds.has(id)),
+    ];
 
     draft = {
       ...draft,
       included_addon_ids: normalizeSelectionIds(newIncluded),
       extra_addon_ids: normalizeSelectionIds(newExtras),
-      topping_selection:
-        nextIncludedId && nextIncludedId !== "none" ? "selected" : "none",
+      topping_selection: nextIncludedIds.length > 0 ? "selected" : "none",
     };
   }
 
   function updateJaleaSelection(
-    nextIncludedId: string | null,
+    nextIncludedIds: string[],
     nextExtraIds: string[],
   ) {
     const currentIncluded = draft.included_addon_ids ?? [];
     const currentExtras = draft.extra_addon_ids ?? [];
 
-    const newIncluded = currentIncluded.filter((id) => !jaleaIds.has(id));
-    if (nextIncludedId && nextIncludedId !== "none") {
-      newIncluded.push(nextIncludedId);
-    }
-
-    const newExtras = currentExtras.filter((id) => !jaleaIds.has(id));
-    for (const id of nextExtraIds) {
-      if (jaleaIds.has(id)) newExtras.push(id);
-    }
+    const newIncluded = [
+      ...currentIncluded.filter((id) => !jaleaIds.has(id)),
+      ...nextIncludedIds.filter((id) => jaleaIds.has(id)),
+    ];
+    const newExtras = [
+      ...currentExtras.filter((id) => !jaleaIds.has(id)),
+      ...nextExtraIds.filter((id) => jaleaIds.has(id)),
+    ];
 
     draft = {
       ...draft,
       included_addon_ids: normalizeSelectionIds(newIncluded),
       extra_addon_ids: normalizeSelectionIds(newExtras),
-      jalea_selection:
-        nextIncludedId && nextIncludedId !== "none" ? "selected" : "none",
+      jalea_selection: nextIncludedIds.length > 0 ? "selected" : "none",
     };
   }
 
@@ -538,7 +548,7 @@
               {#if toppingOptions.length > 0}
                 <details
                   class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                  open={toppingRequired || !selectedToppingId}
+                  open={toppingRequired || selectedToppingIds.length === 0}
                 >
                   <summary
                     class="collapse-title font-bold flex items-center gap-2"
@@ -548,11 +558,12 @@
                   <div class="collapse-content pt-1">
                     <ProductAddonChipGroup
                       items={toppingOptions}
-                      includedId={selectedToppingId}
+                      includedIds={selectedToppingIds}
                       selectedIds={toppingExtraIds}
+                      allowance={toppingFreeAllowance}
                       noneLabel="Sin topping"
                       label="Topping"
-                      helperText="El primer Topping es gratis. Los siguientes tienen costo."
+                      helperText={toppingHelperText}
                       required={true}
                       error={toppingRequired
                         ? "Selecciona un topping o 'Sin topping'"
@@ -567,7 +578,7 @@
               {#if jaleaOptions.length > 0}
                 <details
                   class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                  open={jaleaRequired || !selectedJaleaId}
+                  open={jaleaRequired || selectedJaleaIds.length === 0}
                 >
                   <summary
                     class="collapse-title font-bold flex items-center gap-2"
@@ -577,11 +588,12 @@
                   <div class="collapse-content pt-1">
                     <ProductAddonChipGroup
                       items={jaleaOptions}
-                      includedId={selectedJaleaId}
+                      includedIds={selectedJaleaIds}
                       selectedIds={jaleaExtraIds}
+                      allowance={jaleaFreeAllowance}
                       noneLabel="Sin jalea"
                       label="Jalea"
-                      helperText="La primera Jalea es gratis. Las siguientes tienen costo."
+                      helperText={jaleaHelperText}
                       required={true}
                       error={jaleaRequired
                         ? "Selecciona una jalea o 'Sin jalea'"

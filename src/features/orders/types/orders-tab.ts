@@ -11,6 +11,7 @@ export interface CreateOrderPayload {
   customer_phone: string;
   customer_email?: string;
   payment_method: "efectivo" | "tarjeta" | "transferencia" | "otro";
+  amount_received?: number;
   order_type: "en_local" | "para_llevar";
   table_number?: number;
   notes?: string;
@@ -32,6 +33,7 @@ export interface OrderUpdatePayload {
   customer_phone: string;
   customer_email?: string;
   payment_method: "efectivo" | "tarjeta" | "transferencia" | "otro";
+  amount_received?: number;
   order_type: "en_local" | "para_llevar";
   table_number?: number;
   notes: string;
@@ -54,6 +56,7 @@ export interface OrderFormState {
   customer_phone: string;
   customer_email: string;
   payment_method: "efectivo" | "tarjeta" | "transferencia" | "otro";
+  amount_received: "" | number;
   order_type: "en_local" | "para_llevar";
   table_number: "" | number;
   notes: string;
