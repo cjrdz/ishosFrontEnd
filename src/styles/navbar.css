@@ -1,0 +1,147 @@
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  Navbar — Ishos Factory brand styles                               */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Top accent bar ───────────────────────────────────────────────── */
+.navbar-brand::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--ishos-teal),
+    var(--ishos-pink),
+    var(--ishos-yellow)
+  );
+  border-radius: 0;
+  z-index: 60;
+}
+
+/* ── Active link ──────────────────────────────────────────────────── */
+.nav-link-active {
+  color: var(--ishos-teal);
+}
+
+/* ── Active dot indicator (overrides component.css) ───────────────── */
+.navbar .nav-link-dot.active::after {
+  background: var(--ishos-teal);
+}
+
+/* ── Hover underline ──────────────────────────────────────────────── */
+.navbar .menu a:hover::after {
+  background: linear-gradient(
+    90deg,
+    var(--ishos-teal),
+    color-mix(in srgb, var(--ishos-teal) 60%, var(--ishos-pink))
+  );
+}
+
+/* ── Theme-aware navbar shadow ────────────────────────────────────── */
+:root {
+  --navbar-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="night"] {
+  --navbar-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.navbar-brand {
+  box-shadow: var(--navbar-shadow);
+}
+
+/* ── Responsive sizing ────────────────────────────────────────────── */
+.navbar-brand {
+  min-height: 3.25rem;
+  padding-inline: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .navbar-brand {
+    min-height: 3.75rem;
+    padding-inline: 0.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .navbar-brand {
+    min-height: 4.25rem;
+    padding-inline: 1rem;
+  }
+}
+
+/* Compact link spacing on mobile */
+.navbar-brand .menu li a {
+  padding-inline: 0.4rem;
+  font-size: 0.8rem;
+}
+
+@media (min-width: 640px) {
+  .navbar-brand .menu li a {
+    padding-inline: 0.65rem;
+    font-size: 0.875rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .navbar-brand .menu li a {
+    padding-inline: 0.85rem;
+    font-size: 1rem;
+  }
+}
+
+/* Responsive logo */
+.navbar-brand .logo-img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+
+@media (min-width: 640px) {
+  .navbar-brand .logo-img {
+    width: 72px;
+    height: 72px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .navbar-brand .logo-img {
+    width: 86px;
+    height: 86px;
+  }
+}
+
+/* Compact end section on mobile */
+.navbar-brand .navbar-end {
+  gap: 0.25rem;
+}
+
+@media (min-width: 640px) {
+  .navbar-brand .navbar-end {
+    gap: 0.5rem;
+  }
+}
+
+/* ── Navbar entrance animation ────────────────────────────────────── */
+@keyframes navSlideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.navbar-brand {
+  animation: navSlideDown 0.4s cubic-bezier(0, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar-brand {
+    animation: none;
+  }
+}

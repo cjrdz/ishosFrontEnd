@@ -1,0 +1,66 @@
+{
+  "name": "ishosfactory",
+  "type": "module",
+  "version": "0.0.1",
+  "packageManager": "pnpm@11.13.0",
+  "scripts": {
+    "dev": "DEPLOY_TARGET=vercel astro dev --host 0.0.0.0 --port 4321",
+    "dev:cloudflare": "astro dev",
+    "dev:lan": "DEPLOY_TARGET=vercel astro dev --host 0.0.0.0 --port 4321",
+    "build": "astro build",
+    "build:cloudflare": "DEPLOY_TARGET=cloudflare astro build",
+    "build:vercel": "DEPLOY_TARGET=vercel astro build",
+    "deploy": "pnpm run build:cloudflare && wrangler deploy",
+    "preview": "astro preview",
+    "astro": "astro",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "check:store-boundary": "node scripts/check-store-boundaries.mjs",
+    "audit": "pnpm audit --audit-level moderate",
+    "audit:fix": "pnpm audit --fix",
+    "lint": "astro check && tsc --noEmit",
+    "lint:types": "tsc --noEmit",
+    "generate:api-types": "openapi-typescript ../ishosBackEnd/api/openapi.yaml -o src/types/api-generated.ts",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.1.4",
+    "@astrojs/svelte": "^9.0.1",
+    "@iconify-json/lucide": "^1.2.102",
+    "@iconify-json/proicons": "^1.2.19",
+    "@iconify/svelte": "^5.2.1",
+    "@tailwindcss/vite": "^4.2.0",
+    "astro": "^7.1.3",
+    "daisyui": "^5.5.19",
+    "echarts": "^6.1.0",
+    "motion": "^12.38.0",
+    "svelte": "^5.56.4",
+    "svelte-echarts": "^1.0.0",
+    "tailwindcss": "^4.2.0",
+    "typescript": "^5.9.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@astrojs/vercel": "^11.0.3",
+    "@testing-library/svelte": "^5.3.1",
+    "@types/node": "^25.6.0",
+    "@vitest/coverage-v8": "^4.1.4",
+    "husky": "^9.1.7",
+    "jsdom": "^29.0.2",
+    "lint-staged": "^16.4.0",
+    "openapi-typescript": "^7.13.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-astro": "^0.14.1",
+    "prettier-plugin-svelte": "^3.5.1",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.4",
+    "wrangler": "^4.101.0"
+  },
+  "lint-staged": {
+    "*.{ts,js,svelte,astro,json}": [
+      "prettier --write"
+    ]
+  }
+}

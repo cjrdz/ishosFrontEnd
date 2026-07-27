@@ -1,0 +1,97 @@
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  Home page — Ishos Factory brand styles & animations               */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Theme-aware design tokens ────────────────────────────────────── */
+:root {
+  --home-pill-bg: color-mix(in srgb, var(--ishos-teal) 12%, transparent);
+  --home-wave-fill: color-mix(in srgb, var(--ishos-teal) 8%, transparent);
+  --home-hero-teal-opacity: 0.2;
+  --home-hero-pink-opacity: 0.15;
+  --home-hero-blue-opacity: 0.12;
+}
+
+[data-theme="night"] {
+  --home-pill-bg: color-mix(in srgb, var(--ishos-teal) 20%, transparent);
+  --home-wave-fill: color-mix(in srgb, var(--ishos-teal) 16%, transparent);
+  --home-hero-teal-opacity: 0.35;
+  --home-hero-pink-opacity: 0.28;
+  --home-hero-blue-opacity: 0.2;
+}
+
+/* ── Stagger fade-in ──────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up   { animation: fadeUp 0.6s ease forwards; opacity: 0; }
+.fade-up-1 { animation-delay: 0.1s; }
+.fade-up-2 { animation-delay: 0.25s; }
+.fade-up-3 { animation-delay: 0.4s; }
+.fade-up-4 { animation-delay: 0.55s; }
+
+/* ── Hero background blobs ────────────────────────────────────────── */
+.hero-blob-teal {
+  opacity: var(--home-hero-teal-opacity);
+}
+.hero-blob-pink {
+  opacity: var(--home-hero-pink-opacity);
+}
+.hero-blob-blue {
+  opacity: var(--home-hero-blue-opacity);
+}
+
+/* ── Decorative diagonal stripe pattern ───────────────────────────── */
+.stripe-bg {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    color-mix(in srgb, var(--ishos-teal) 6%, transparent) 6px,
+    color-mix(in srgb, var(--ishos-teal) 6%, transparent) 12px
+  );
+}
+
+/* ── Section divider wave ─────────────────────────────────────────── */
+.wave-divider {
+  overflow: hidden;
+  line-height: 0;
+}
+.wave-divider svg {
+  display: block;
+}
+
+/* ── Brand section pill ───────────────────────────────────────────── */
+.section-pill {
+  display: inline-block;
+  border-radius: 0.75rem;
+  padding: 0.2rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--home-pill-bg);
+  color: var(--ishos-teal);
+}
+
+/* ── Animated gradient border ─────────────────────────────────────── */
+@keyframes borderSpin {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.home-hero-card-border {
+  background: linear-gradient(
+    135deg,
+    var(--ishos-teal),
+    var(--ishos-pink),
+    var(--ishos-yellow),
+    var(--ishos-teal)
+  );
+  background-size: 300% 300%;
+  animation: borderSpin 6s ease infinite;
+  padding: 2px;
+  border-radius: 1.5rem;
+}

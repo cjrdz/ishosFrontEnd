@@ -1,0 +1,57 @@
+/**
+ * PATCH /api/admin/employees/{id} - Update employee
+ * DELETE /api/admin/employees/{id} - Delete employee
+ * POST /api/admin/employees/{id}?action=deactivate - Deactivate employee
+ *
+ * Backend forwarding endpoints for specific employee operations
+ * Requires: auth_token HttpOnly cookie
+ */
+
+import type { APIRoute } from "astro";
+import { employeeUpdateSchema, parseJsonBody } from "@core/bff/validation";
+import { requireAction, requireSafePathParam } from "@core/bff/params";
+import { proxyToBackend } from "@core/bff/proxy";
+
+export const prerender = false;
+
+export const PATCH: APIRoute = async (context) => {
+  const id = requireSafePathParam(context, "id");
+  if (id instanceof Response) return id;
+
+  const parsed = await parseJsonBody(context, employeeUpdateSchema);
+  if (!parsed.success) {
+    return parsed.response;
+  }
+
+  return proxyToBackend(context, `/employees/${id}`, {
+    method: "PATCH",
+    body: parsed.data,
+  });
+};
+
+export const DELETE: APIRoute = async (context) => {
+  const id = requireSafePathParam(context, "id");
+  if (id instanceof Response) return id;
+  const action = context.url.searchParams.get("action");
+
+  if (action === "deactivate") {
+    return proxyToBackend(context, `/employees/${id}/deactivate`, {
+      method: "POST",
+    });
+  }
+
+  return proxyToBackend(context, `/employees/${id}`, { method: "DELETE" });
+};
+
+export const POST: APIRoute = async (context) => {
+  const id = requireSafePathParam(context, "id");
+  if (id instanceof Response) return id;
+  const action = requireAction(context.url.searchParams.get("action"), [
+    "deactivate",
+  ]);
+  if (action instanceof Response) return action;
+
+  return proxyToBackend(context, `/employees/${id}/${action}`, {
+    method: "POST",
+  });
+};

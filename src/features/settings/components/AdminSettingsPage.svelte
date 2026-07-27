@@ -1,0 +1,766 @@
+<script lang="ts">
+  import { onDestroy, onMount } from "svelte";
+  import Icon from "@shared/components/AppIcon.svelte";
+  import ThemeToggle from "@shared/components/ThemeToggle.svelte";
+  import {
+    createInactivityTracking,
+    getAdminLocalSettings,
+    saveAdminRowsPerTable,
+    saveAdminStoreSettings,
+    saveAdminTabOrder,
+    setCurrentAdminContext,
+    getAdminStoreSettings,
+    updateAdminStoreSettings,
+    getOrderArchiveConfig,
+    updateOrderArchiveConfig,
+    runArchive,
+    getAdminPanelConfig,
+    updateAdminPanelConfig,
+    type RowsPerTableConfig,
+    type PanelConfigValues,
+    type StoreOfferItem,
+    type OrderArchiveConfig,
+    DEFAULT_PANEL_CONFIG,
+    DEFAULT_ROWS_PER_TABLE_CONFIG,
+    DEFAULT_TAB_ORDER,
+    normalizeTabOrder,
+    type TabKey,
+  } from "@features/admin-management";
+  import SettingsTab from "../../admin-management/components/SettingsTab.svelte";
+  import { trackAction, trackError } from "@shared/utils/analytics";
+
+  type Session = {
+    id: string;
+    email: string;
+    name: string;
+    phone: string;
+    role: "admin" | "employee";
+    active?: boolean;
+  };
+
+  const SEARCH_ITEMS = [
+    {
+      id: "navegacion-panel",
+      title: "Navegacion del panel",
+      description: "Orden global de pestanas del equipo",
+      icon: "lucide:panel-top",
+      keywords: ["pestanas", "tabs", "orden", "navegacion", "global"],
+    },
+    {
+      id: "seguridad-panel",
+      title: "Seguridad y sesiones",
+      description: "Cookies, tokens y timeout de inactividad",
+      icon: "lucide:shield-check",
+      keywords: [
+        "sesion",
+        "cookie",
+        "token",
+        "inactividad",
+        "seguridad",
+        "logout",
+        "expiracion",
+      ],
+    },
+    {
+      id: "proximas-personalizaciones",
+      title: "Proximas personalizaciones",
+      description: "Branding, widgets y atajos futuros",
+      icon: "lucide:sparkles",
+      keywords: ["branding", "widgets", "atajos", "personalizar", "proximo"],
+    },
+    {
+      id: "filas-tablas",
+      title: "Filas por tabla",
+      description: "Cantidad default de filas por tabla en el panel",
+      icon: "lucide:table-properties",
+      keywords: ["filas", "tabla", "row", "rows", "paginacion", "limite"],
+    },
+    {
+      id: "operacion-tienda",
+      title: "Operacion de tienda",
+      description: "Pausar o reactivar pedidos publicos",
+      icon: "lucide:store",
+      keywords: [
+        "ofertas",
+        "tienda",
+        "pedidos",
+        "pausar",
+        "activar",
+        "kill switch",
+      ],
+    },
+    {
+      id: "archivo-ordenes",
+      title: "Archivo de ordenes",
+      description: "Archivar automaticamente ordenes antiguas",
+      icon: "lucide:archive",
+      keywords: ["archivo", "archivar", "ordenes", "auto archive", "historial"],
+    },
+  ] as const;
+
+  let loading = $state(true);
+  let busy = $state(false);
+  let sessionError = $state("");
+  let moduleError = $state("");
+  let notice = $state("");
+  let session = $state<Session | null>(null);
+  let tabOrder = $state<TabKey[]>([...DEFAULT_TAB_ORDER]);
+  let panelConfig = $state<PanelConfigValues>({ ...DEFAULT_PANEL_CONFIG });
+  let rowsPerTable = $state<RowsPerTableConfig>({
+    ...DEFAULT_ROWS_PER_TABLE_CONFIG,
+  });
+  let storeOrdersEnabled = $state(true);
+  let storeOffers = $state<StoreOfferItem[]>([]);
+  const DEFAULT_ARCHIVE_CONFIG: OrderArchiveConfig = {
+    enabled: true,
+    age_days: 7,
+    interval_minutes: 60,
+  };
+  let archiveConfig = $state<OrderArchiveConfig>({ ...DEFAULT_ARCHIVE_CONFIG });
+
+  // Search palette
+  let searchQuery = $state("");
+  let selectedIndex = $state(0);
+  let searchDialog = $state<HTMLDialogElement | null>(null);
+  let searchInput = $state<HTMLInputElement | null>(null);
+
+  let inactivityWarningToast = $state<{ secondsRemaining: number } | null>(
+    null,
+  );
+
+  /**
+   * Keep the backend inactivity tracker fresh while the user is actively
+   * working on this page. Any protected endpoint records activity; the panel
+   * config read is the cheapest admin-only one available here.
+   */
+  async function keepSessionAlive() {
+    try {
+      await fetch("/api/admin/settings/panel-config", {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      });
+    } catch {
+      // Best-effort keepalive; ignore network errors.
+    }
+  }
+
+  const inactivityTracking = createInactivityTracking({
+    getTimeoutSeconds: () => {
+      if (!session) return null;
+      return (
+        panelConfig.inactivity_logout_seconds ||
+        DEFAULT_PANEL_CONFIG.inactivity_logout_seconds
+      );
+    },
+    onWarningChange: (secondsRemaining) => {
+      inactivityWarningToast =
+        secondsRemaining === null ? null : { secondsRemaining };
+    },
+    onTimeout: () => {
+      void handleInactivityLogout();
+    },
+    onActivity: () => {
+      void keepSessionAlive();
+    },
+  });
+
+  const filteredItems = $derived.by(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [...SEARCH_ITEMS];
+    return SEARCH_ITEMS.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.keywords.some((k) => k.includes(q)),
+    );
+  });
+
+  $effect(() => {
+    if (searchQuery) selectedIndex = 0;
+  });
+
+  onMount(() => {
+    void loadPage();
+
+    function handleGlobalKeydown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        openSearch();
+      }
+    }
+
+    document.addEventListener("keydown", handleGlobalKeydown);
+    return () => document.removeEventListener("keydown", handleGlobalKeydown);
+  });
+
+  onDestroy(() => {
+    inactivityTracking.stop();
+  });
+
+  function openSearch() {
+    searchQuery = "";
+    selectedIndex = 0;
+    searchDialog?.showModal();
+    requestAnimationFrame(() => searchInput?.focus());
+  }
+
+  function closeSearch() {
+    searchDialog?.close();
+  }
+
+  function navigateTo(id: string) {
+    closeSearch();
+    requestAnimationFrame(() => {
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function handleSearchKeydown(e: KeyboardEvent) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      selectedIndex = Math.min(selectedIndex + 1, filteredItems.length - 1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      selectedIndex = Math.max(selectedIndex - 1, 0);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = filteredItems[selectedIndex];
+      if (item) navigateTo(item.id);
+    }
+  }
+
+  function setNotice(message: string) {
+    notice = message;
+    setTimeout(() => {
+      if (notice === message) {
+        notice = "";
+      }
+    }, 3000);
+  }
+
+  // Note: This client-side session validation is for UX only.
+  // Real security is enforced by server-side middleware.
+  async function loadPage() {
+    loading = true;
+    sessionError = "";
+    moduleError = "";
+
+    try {
+      const response = await fetch("/api/admin/session", {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Sesion invalida");
+      }
+
+      const currentSession = payload as Session;
+      if (currentSession.role !== "admin") {
+        throw new Error(
+          "Solo administradores pueden acceder a esta configuracion",
+        );
+      }
+
+      session = currentSession;
+      trackAction("admin_settings_session_loaded", {
+        role: currentSession.role,
+      });
+      await loadSettings();
+      inactivityTracking.start();
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.loadPage");
+      sessionError =
+        requestError instanceof Error
+          ? requestError.message
+          : "Sesion invalida";
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function loadSettings() {
+    busy = true;
+    moduleError = "";
+
+    if (!session?.id) {
+      tabOrder = [...DEFAULT_TAB_ORDER];
+      panelConfig = { ...DEFAULT_PANEL_CONFIG };
+      rowsPerTable = { ...DEFAULT_ROWS_PER_TABLE_CONFIG };
+      storeOrdersEnabled = true;
+      storeOffers = [];
+      busy = false;
+      return;
+    }
+
+    const settings = getAdminLocalSettings(session.id);
+    tabOrder = normalizeTabOrder(settings.tab_order);
+    rowsPerTable = settings.rows_per_table;
+    setCurrentAdminContext(session.id, rowsPerTable.default);
+
+    try {
+      panelConfig = await getAdminPanelConfig();
+    } catch {
+      panelConfig = { ...DEFAULT_PANEL_CONFIG };
+    }
+
+    try {
+      const storeSettings = await getAdminStoreSettings();
+      storeOrdersEnabled = storeSettings.orders_enabled;
+      storeOffers = storeSettings.offers ?? [];
+      saveAdminStoreSettings(session.id, storeSettings);
+    } catch {
+      storeOrdersEnabled = settings.store_settings.orders_enabled;
+      storeOffers = settings.store_settings.offers ?? [];
+    }
+
+    try {
+      archiveConfig = await getOrderArchiveConfig();
+    } catch {
+      archiveConfig = { ...DEFAULT_ARCHIVE_CONFIG };
+    }
+
+    busy = false;
+  }
+
+  async function handleSaveTabOrder(nextTabOrder: string[]) {
+    busy = true;
+    moduleError = "";
+    try {
+      if (!session?.id) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      tabOrder = saveAdminTabOrder(session.id, nextTabOrder as TabKey[]);
+      setNotice("Orden del panel actualizada");
+      trackAction("admin_settings_tab_order_saved", {
+        tabCount: nextTabOrder.length,
+      });
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.handleSaveTabOrder", {
+        tabCount: nextTabOrder.length,
+      });
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo guardar el orden global";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleSavePanelConfig(nextPanelConfig: PanelConfigValues) {
+    busy = true;
+    moduleError = "";
+    try {
+      if (!session?.id) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      panelConfig = await updateAdminPanelConfig(nextPanelConfig);
+      setNotice("Configuracion de seguridad actualizada");
+      trackAction(
+        "admin_settings_panel_config_saved",
+        panelConfig as unknown as Record<string, unknown>,
+      );
+    } catch (requestError) {
+      trackError(
+        requestError,
+        "AdminSettingsPage.handleSavePanelConfig",
+        nextPanelConfig as unknown as Record<string, unknown>,
+      );
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo guardar la configuracion de seguridad";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleToggleStoreOrders(enabled: boolean) {
+    busy = true;
+    moduleError = "";
+
+    try {
+      if (!session?.id) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      const response = await updateAdminStoreSettings({
+        orders_enabled: enabled,
+        offers: storeOffers,
+      });
+      storeOrdersEnabled = response.orders_enabled;
+      storeOffers = response.offers ?? [];
+      saveAdminStoreSettings(session.id, response);
+      setNotice(
+        enabled ? "Pedidos publicos activados" : "Pedidos publicos pausados",
+      );
+      trackAction("admin_settings_store_orders_toggled", { enabled });
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.handleToggleStoreOrders", {
+        enabled,
+      });
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo actualizar la operacion de tienda";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleSaveRowsPerTable(nextRowsPerTable: RowsPerTableConfig) {
+    busy = true;
+    moduleError = "";
+    try {
+      if (!session?.id) {
+        throw new Error("No se pudo identificar la sesion de administrador");
+      }
+      rowsPerTable = saveAdminRowsPerTable(session.id, nextRowsPerTable);
+      setCurrentAdminContext(session.id, rowsPerTable.default);
+      setNotice("Filas por tabla actualizadas");
+      trackAction("admin_settings_rows_per_table_saved", {
+        ...rowsPerTable,
+      });
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.handleSaveRowsPerTable", {
+        ...nextRowsPerTable,
+      });
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo guardar filas por tabla";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleSaveArchiveConfig(nextConfig: OrderArchiveConfig) {
+    busy = true;
+    moduleError = "";
+    try {
+      archiveConfig = await updateOrderArchiveConfig(nextConfig);
+      setNotice("Configuracion de archivo actualizada");
+      trackAction("admin_settings_archive_config_saved", {
+        ...archiveConfig,
+      });
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.handleSaveArchiveConfig", {
+        ...nextConfig,
+      });
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo guardar la configuracion de archivo";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleRunArchive() {
+    busy = true;
+    moduleError = "";
+    try {
+      const result = await runArchive();
+      setNotice(
+        `Archivo ejecutado: ${result.archived ?? 0} ordenes archivadas`,
+      );
+      trackAction("admin_settings_archive_run", {
+        archived: result.archived ?? 0,
+      });
+    } catch (requestError) {
+      trackError(requestError, "AdminSettingsPage.handleRunArchive");
+      moduleError =
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo ejecutar el archivo";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function handleLogout() {
+    inactivityTracking.stop();
+    let logoutFailed = false;
+    try {
+      const res = await fetch("/api/admin/logout", { method: "POST" });
+      if (!res.ok) logoutFailed = true;
+    } catch {
+      logoutFailed = true;
+    }
+    if (logoutFailed) {
+      setNotice("No se pudo cerrar sesión correctamente. Intenta de nuevo.");
+      return;
+    }
+    window.location.href = "/admin/login";
+  }
+
+  async function handleInactivityLogout() {
+    inactivityTracking.stop();
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch {}
+    window.location.href = "/admin/login";
+  }
+</script>
+
+{#if loading}
+  <div class="flex min-h-[45vh] w-full items-center justify-center">
+    <div
+      class="flex items-center gap-3 rounded-2xl border border-base-300 bg-base-100 px-6 py-5 shadow-sm"
+    >
+      <span class="loading loading-spinner loading-md"></span>
+      <span>Cargando configuraciones...</span>
+    </div>
+  </div>
+{:else if sessionError}
+  <div class="space-y-4">
+    <div class="alert alert-warning shadow-sm">
+      <Icon icon="lucide:shield-alert" class="h-5 w-5" />
+      <div>
+        <p class="font-semibold">No fue posible abrir configuraciones</p>
+        <p class="text-sm">{sessionError}</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <a href="/admin" class="btn btn-primary">Volver al panel</a>
+      <a href="/admin/login" class="btn btn-outline">Ir al login</a>
+    </div>
+  </div>
+{:else if session}
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="space-y-4">
+      <!-- Top row: back link + actions -->
+      <div class="flex items-center justify-between gap-3">
+        <a
+          href="/admin"
+          class="btn btn-ghost btn-sm gap-2"
+          title="Volver al panel administrativo"
+        >
+          <Icon icon="lucide:arrow-left" class="h-4 w-4" />
+          <span>Panel administrativo</span>
+        </a>
+        <div class="flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            class="btn btn-outline btn-sm"
+            type="button"
+            onclick={handleLogout}
+          >
+            <Icon icon="lucide:log-out" class="h-4 w-4" />
+            <span class="hidden sm:inline">Cerrar sesion</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Title + search -->
+      <div
+        class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"
+      >
+        <div>
+          <h1
+            class="text-2xl font-bold tracking-tight text-base-content/90 sm:text-3xl"
+          >
+            Configuraciones
+          </h1>
+          <p class="mt-1 text-sm text-base-content/70">
+            Administrador, <strong>{session.name}</strong>
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-ghost h-10 w-full justify-start gap-2 rounded-lg border border-base-300 px-3 hover:bg-base-200 lg:w-80"
+          onclick={openSearch}
+          title="Buscar ajuste (Ctrl+K)"
+        >
+          <Icon icon="lucide:search" class="h-4 w-4 text-base-content/50" />
+          <span class="text-sm text-base-content/50">Buscar ajuste...</span>
+          <kbd class="kbd kbd-sm ml-auto hidden sm:inline">Ctrl K</kbd>
+        </button>
+      </div>
+    </div>
+
+    {#if inactivityWarningToast}
+      <div class="toast toast-top toast-end z-50 mt-24 mr-2 md:mr-4">
+        <div class="alert alert-warning shadow-lg">
+          <span
+            >Tu sesión expirará en {inactivityWarningToast.secondsRemaining} segundos
+            por inactividad.</span
+          >
+        </div>
+      </div>
+    {/if}
+
+    {#if notice}
+      <div role="alert" class="alert alert-success shadow-sm">
+        <span>{notice}</span>
+      </div>
+    {/if}
+
+    <!-- Settings forms -->
+    <div class="space-y-6">
+      <SettingsTab
+        {tabOrder}
+        {panelConfig}
+        rowsPerTable={rowsPerTable as unknown as any}
+        {storeOrdersEnabled}
+        {archiveConfig}
+        {busy}
+        {moduleError}
+        onSave={handleSaveTabOrder}
+        onSavePanelConfig={handleSavePanelConfig}
+        onToggleStoreOrders={handleToggleStoreOrders}
+        onSaveRowsPerTable={(rows) =>
+          void handleSaveRowsPerTable(rows as unknown as RowsPerTableConfig)}
+        onSaveArchiveConfig={handleSaveArchiveConfig}
+        onRunArchive={handleRunArchive}
+      />
+
+      <section id="proximas-personalizaciones" class="card bg-base-100 shadow">
+        <div class="card-body space-y-4">
+          <div>
+            <h2 class="card-title">Proximas personalizaciones</h2>
+            <p class="text-sm text-base-content/70">
+              Esta pagina queda preparada para crecer nuevas opciones sin tocar
+              la operacion diaria.
+            </p>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
+              <div class="flex items-center gap-3">
+                <span class="rounded-xl bg-info/10 p-2 text-info">
+                  <Icon icon="lucide:palette" class="h-5 w-5" />
+                </span>
+                <h3 class="font-semibold">Branding del panel</h3>
+              </div>
+              <p class="mt-3 text-sm text-base-content/70">
+                Logo, colores y nombre visible para el equipo.
+              </p>
+            </article>
+            <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
+              <div class="flex items-center gap-3">
+                <span class="rounded-xl bg-success/10 p-2 text-success">
+                  <Icon icon="lucide:layout-dashboard" class="h-5 w-5" />
+                </span>
+                <h3 class="font-semibold">Widgets de inicio</h3>
+              </div>
+              <p class="mt-3 text-sm text-base-content/70">
+                Define que resumenes aparecen primero al entrar al panel.
+              </p>
+            </article>
+            <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
+              <div class="flex items-center gap-3">
+                <span class="rounded-xl bg-warning/10 p-2 text-warning">
+                  <Icon icon="lucide:rocket" class="h-5 w-5" />
+                </span>
+                <h3 class="font-semibold">Atajos de operacion</h3>
+              </div>
+              <p class="mt-3 text-sm text-base-content/70">
+                Accesos rapidos para procesos frecuentes del equipo.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Ctrl+K search palette -->
+  <dialog
+    bind:this={searchDialog}
+    class="modal"
+    onclose={() => {
+      searchQuery = "";
+    }}
+  >
+    <div class="modal-box max-w-lg overflow-hidden rounded-2xl p-0">
+      <!-- Input row -->
+      <div class="flex items-center gap-3 border-b border-base-300 px-4 py-3">
+        <Icon
+          icon="lucide:search"
+          class="h-5 w-5 shrink-0 text-base-content/40"
+        />
+        <input
+          bind:this={searchInput}
+          bind:value={searchQuery}
+          onkeydown={handleSearchKeydown}
+          type="text"
+          placeholder="Buscar ajuste..."
+          class="min-w-0 flex-1 bg-transparent text-base focus:outline-none"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          onclick={closeSearch}
+        >
+          <kbd class="kbd kbd-sm">Esc</kbd>
+        </button>
+      </div>
+
+      <!-- Results -->
+      <div class="max-h-64 overflow-y-auto">
+        {#if filteredItems.length === 0}
+          <p class="px-4 py-8 text-center text-sm text-base-content/50">
+            Sin resultados para "{searchQuery}"
+          </p>
+        {:else}
+          {#each filteredItems as item, i}
+            <button
+              type="button"
+              class="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-base-200 {i ===
+              selectedIndex
+                ? 'bg-base-200'
+                : ''}"
+              onclick={() => navigateTo(item.id)}
+              onmouseenter={() => {
+                selectedIndex = i;
+              }}
+            >
+              <span class="rounded-xl bg-base-200 p-2">
+                <Icon icon={item.icon} class="h-4 w-4 text-base-content/70" />
+              </span>
+              <span>
+                <span class="block font-medium">{item.title}</span>
+                <span class="block text-sm text-base-content/60"
+                  >{item.description}</span
+                >
+              </span>
+            </button>
+          {/each}
+        {/if}
+      </div>
+
+      <!-- Keyboard hints -->
+      <div
+        class="flex items-center gap-4 border-t border-base-300 px-4 py-2.5 text-xs text-base-content/40"
+      >
+        <span class="flex items-center gap-1">
+          <kbd class="kbd kbd-xs">↑</kbd><kbd class="kbd kbd-xs">↓</kbd>
+          <span class="ml-1">navegar</span>
+        </span>
+        <span class="flex items-center gap-1">
+          <kbd class="kbd kbd-xs">↵</kbd>
+          <span class="ml-1">ir a seccion</span>
+        </span>
+        <span class="flex items-center gap-1">
+          <kbd class="kbd kbd-xs">Esc</kbd>
+          <span class="ml-1">cerrar</span>
+        </span>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button>close</button>
+    </form>
+  </dialog>
+{/if}

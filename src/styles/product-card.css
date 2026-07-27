@@ -1,0 +1,76 @@
+/* ═══════════════════════════════════════════════════════════════════ */
+/*  ProductCard — theme-aware design tokens                          */
+/* ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --pc-gradient-overlay: linear-gradient(
+    to top,
+    oklch(0% 0 0 / 0.78) 0%,
+    oklch(0% 0 0 / 0.35) 40%,
+    oklch(0% 0 0 / 0.05) 70%,
+    transparent 100%
+  );
+  --pc-text-over-image: white;
+  --pc-price-strikethrough-over: oklch(1 0 0 / 0.65);
+  --pc-note-over: oklch(1 0 0 / 0.8);
+  --pc-countdown-bg: oklch(0 0 0 / 0.42);
+  --pc-countdown-border: oklch(1 0 0 / 0.12);
+  --pc-pill-border: oklch(1 0 0 / 0.12);
+  --pc-pill-bg: oklch(var(--b1) / 0.32);
+  --pc-price-strikethrough-plain: oklch(var(--bc) / 0.5);
+  --pc-note-plain: oklch(var(--bc) / 0.65);
+  --pc-card-shadow: 0 1px 3px oklch(0% 0 0 / 0.07), 0 1px 2px oklch(0% 0 0 / 0.06);
+  --pc-card-shadow-hover: 0 4px 16px oklch(0% 0 0 / 0.12), 0 2px 6px oklch(0% 0 0 / 0.08);
+}
+
+[data-theme="night"] {
+  --pc-gradient-overlay: linear-gradient(
+    to top,
+    oklch(0% 0 0 / 0.82) 0%,
+    oklch(0% 0 0 / 0.38) 40%,
+    oklch(0% 0 0 / 0.06) 70%,
+    transparent 100%
+  );
+  --pc-pill-bg: oklch(var(--b1) / 0.45);
+  --pc-pill-border: oklch(1 0 0 / 0.08);
+  --pc-card-shadow: 0 1px 3px oklch(0% 0 0 / 0.12), 0 1px 2px oklch(0% 0 0 / 0.1);
+  --pc-card-shadow-hover: 0 4px 16px oklch(0% 0 0 / 0.18), 0 2px 6px oklch(0% 0 0 / 0.14);
+}
+
+/* ── Staggered card entrance ──────────────────────────────────────── */
+@keyframes pcFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pc-root {
+  animation: pcFadeIn 0.45s ease-out both;
+}
+
+.pc-root:nth-child(1)  { animation-delay: 0.05s; }
+.pc-root:nth-child(2)  { animation-delay: 0.1s; }
+.pc-root:nth-child(3)  { animation-delay: 0.15s; }
+.pc-root:nth-child(4)  { animation-delay: 0.2s; }
+.pc-root:nth-child(5)  { animation-delay: 0.25s; }
+.pc-root:nth-child(6)  { animation-delay: 0.3s; }
+.pc-root:nth-child(7)  { animation-delay: 0.35s; }
+.pc-root:nth-child(8)  { animation-delay: 0.4s; }
+.pc-root:nth-child(n+9) { animation-delay: 0.45s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-root {
+    animation: none;
+  }
+}
+
+/* ── Brand hover glow ─────────────────────────────────────────────── */
+.pc-root:hover .pc-card {
+  box-shadow: var(--pc-card-shadow-hover),
+    0 0 0 1px color-mix(in srgb, var(--ishos-teal) 15%, transparent);
+}

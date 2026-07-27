@@ -1,0 +1,10 @@
+---
+import StoreLayout from "../../layouts/StoreLayout.astro";
+import CartCheckout from "../../features/catalog/components/CartCheckout.svelte";
+---
+
+<StoreLayout title="IshosFactory - Carrito">
+  <main>
+    <CartCheckout client:load />
+  </main>
+</StoreLayout>

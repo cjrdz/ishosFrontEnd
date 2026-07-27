@@ -1,0 +1,747 @@
+---
+import StoreLayout from "../layouts/StoreLayout.astro";
+import Icon from "@shared/components/AppIcon.svelte";
+import "../styles/about.css";
+---
+
+<StoreLayout title="IshosFactory - Nosotros">
+  <div class="space-y-0 about-page">
+    {/* ══════════════════════════════════════════ */}
+    {/* ── HERO SECTION ── */}
+    {/* ══════════════════════════════════════════ */}
+    <section
+      class="about-hero relative overflow-hidden px-4 pt-8 pb-12 md:pt-12 md:pb-16"
+    >
+      {/* Background blobs */}
+      <div class="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          class="hero-blob-teal absolute -top-24 -left-24 w-80 h-80 md:w-96 md:h-96 rounded-full blur-3xl"
+          style="background: var(--ishos-teal);"
+        >
+        </div>
+        <div
+          class="hero-blob-pink absolute -bottom-16 -right-16 w-64 h-64 md:w-80 md:h-80 rounded-full blur-3xl"
+          style="background: var(--ishos-pink);"
+        >
+        </div>
+        <div class="stripe-bg absolute inset-0 opacity-30"></div>
+      </div>
+
+      <div class="relative max-w-3xl mx-auto text-center" data-anime-reveal>
+        {/* Pre-title pill */}
+        <div class="section-pill mb-4">
+          <span
+            class="w-1.5 h-1.5 rounded-full inline-block mr-2 align-middle"
+            style="background: var(--ishos-teal);"></span>
+          Desde 2021
+        </div>
+
+        <h1
+          class="text-4xl md:text-5xl font-extrabold tracking-tight mb-2 leading-tight"
+        >
+          <span style="color: var(--ishos-teal);">Isho's</span>
+          <span class="text-base-content"> Factory</span>
+        </h1>
+        <p
+          class="text-base-content/60 text-xs md:text-sm font-bold uppercase tracking-[0.2em] mb-8"
+        >
+          Gelatos &amp; Sorbetes Artesanales
+        </p>
+
+        {/* Hero card */}
+        <div class="hero-card-border shadow-xl" data-anime-reveal>
+          <div
+            class="bg-base-100 rounded-2xl md:rounded-3xl p-6 md:p-10 relative overflow-hidden text-left md:text-center"
+          >
+            {/* Inner accent bar */}
+            <div
+              class="absolute top-0 left-0 right-0 h-1 rounded-t-2xl md:rounded-t-3xl"
+              style="background: linear-gradient(90deg, var(--ishos-teal), var(--ishos-pink), var(--ishos-yellow));"
+            >
+            </div>
+
+            <p
+              class="text-base md:text-lg text-base-content/80 leading-relaxed font-medium mb-6 md:mb-8"
+            >
+              Isho's Factory ha sido sinónimo de
+              <strong style="color: var(--ishos-teal);">tradición</strong> y
+              <strong style="color: var(--ishos-maroon);">calidad</strong>
+              en El Salvador. Nuestros helados artesanales son preparados con los
+              mejores ingredientes y mucho amor. Cada bola de helado cuenta una historia
+              de sabor auténtico y dedicación.
+            </p>
+
+            <div
+              class="flex flex-wrap gap-2 md:gap-3 justify-start md:justify-center"
+            >
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs md:text-sm font-semibold border"
+                style="border-color: color-mix(in srgb, var(--ishos-teal) 40%, transparent); color: var(--ishos-teal);"
+              >
+                <Icon icon="lucide:sparkles" class="w-3.5 h-3.5" />
+                Artesanal
+              </span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs md:text-sm font-semibold border"
+                style="border-color: color-mix(in srgb, var(--ishos-maroon) 40%, transparent); color: var(--ishos-maroon);"
+              >
+                <Icon icon="lucide:leaf" class="w-3.5 h-3.5" />
+                Ingredientes Naturales
+              </span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs md:text-sm font-semibold border text-base-content/70"
+                style="border-color: color-mix(in srgb, var(--ishos-yellow) 60%, #aaa);"
+              >
+                <Icon icon="lucide:map-pin" class="w-3.5 h-3.5" />
+                Hecho en El Salvador
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* Wave divider */}
+    <div class="wave-divider -mt-2" style="color: var(--ishos-teal);">
+      <svg
+        viewBox="0 0 1440 60"
+        xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="none"
+        style="height:24px; width:100%;"
+      >
+        <path
+          d="M0,30 C240,60 480,0 720,30 C960,60 1200,0 1440,30 L1440,60 L0,60 Z"
+          fill="var(--about-wave-fill)"></path>
+      </svg>
+    </div>
+
+    {/* ══════════════════════════════════════════ */}
+    {/* ── VALUES SECTION ── */}
+    {/* ══════════════════════════════════════════ */}
+    <section id="valores" class="px-4 py-10 md:py-16">
+      <div class="max-w-4xl mx-auto">
+        <div class="text-center mb-8 md:mb-10" data-anime-reveal>
+          <div class="section-pill section-pill--maroon mb-3">
+            Nuestra Esencia
+          </div>
+          <h2 class="text-2xl md:text-4xl font-extrabold text-base-content">
+            Lo que nos <span style="color: var(--ishos-teal);">define</span>
+          </h2>
+          <p class="text-base-content/60 mt-2 text-sm md:text-base font-medium">
+            Los pilares de nuestra marca
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
+          {/* Calidad */}
+          <div
+            class="value-card bg-base-100 border border-base-200 rounded-2xl text-center transition-all duration-300 overflow-hidden group"
+            data-anime-reveal
+          >
+            <div class="h-1 w-full" style="background: var(--ishos-teal);">
+            </div>
+            <div class="p-6 md:p-8">
+              <div
+                class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                style="background: var(--about-icon-teal-bg);"
+              >
+                <Icon
+                  icon="lucide:shield-check"
+                  class="w-6 h-6 md:w-7 md:h-7"
+                  style="color: var(--ishos-teal);"
+                />
+              </div>
+              <h3
+                class="text-lg md:text-xl font-extrabold mb-2 text-base-content"
+              >
+                Calidad
+              </h3>
+              <p class="text-base-content/70 text-sm leading-relaxed">
+                Solo los mejores ingredientes llegan a nuestras recetas.
+              </p>
+            </div>
+          </div>
+
+          {/* Tradición */}
+          <div
+            class="value-card bg-base-100 border border-base-200 rounded-2xl text-center transition-all duration-300 overflow-hidden group"
+            data-anime-reveal
+          >
+            <div class="h-1 w-full" style="background: var(--ishos-pink);">
+            </div>
+            <div class="p-6 md:p-8">
+              <div
+                class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                style="background: var(--about-icon-pink-bg);"
+              >
+                <Icon
+                  icon="lucide:clock"
+                  class="w-6 h-6 md:w-7 md:h-7"
+                  style="color: var(--ishos-maroon);"
+                />
+              </div>
+              <h3
+                class="text-lg md:text-xl font-extrabold mb-2 text-base-content"
+              >
+                Tradición
+              </h3>
+              <p class="text-base-content/70 text-sm leading-relaxed">
+                Más de 4 años llevando sabores auténticos a cada familia.
+              </p>
+            </div>
+          </div>
+
+          {/* Pasión */}
+          <div
+            class="value-card bg-base-100 border border-base-200 rounded-2xl text-center transition-all duration-300 overflow-hidden group"
+            data-anime-reveal
+          >
+            <div class="h-1 w-full" style="background: var(--ishos-maroon);">
+            </div>
+            <div class="p-6 md:p-8">
+              <div
+                class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                style="background: var(--about-icon-pink-bg);"
+              >
+                <Icon
+                  icon="lucide:heart"
+                  class="w-6 h-6 md:w-7 md:h-7"
+                  style="color: var(--ishos-maroon);"
+                />
+              </div>
+              <h3
+                class="text-lg md:text-xl font-extrabold mb-2 text-base-content"
+              >
+                Pasión
+              </h3>
+              <p class="text-base-content/70 text-sm leading-relaxed">
+                Cada helado es hecho con dedicación y amor por lo que hacemos.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* ══════════════════════════════════════════ */}
+    {/* ── CONTACT SECTION ── */}
+    {/* ══════════════════════════════════════════ */}
+    <section id="contacto" class="px-4 py-10 md:py-16 relative overflow-hidden">
+      {/* Subtle teal wash background */}
+      <div
+        class="absolute inset-0 pointer-events-none"
+        style="background: var(--about-contact-wash);"
+      >
+      </div>
+
+      <div class="max-w-5xl mx-auto relative">
+        <div class="text-center mb-8 md:mb-10" data-anime-reveal>
+          <div class="section-pill mb-3">Contáctanos</div>
+          <h2 class="text-2xl md:text-4xl font-extrabold text-base-content">
+            Estamos <span style="color: var(--ishos-teal);">aquí</span> para ti
+          </h2>
+          <p class="text-base-content/60 mt-2 text-sm md:text-base font-medium">
+            Encuéntranos o comunícate con nosotros.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+          {/* Location */}
+          <div
+            class="bg-base-100 border border-base-200 rounded-2xl p-6 md:p-7 text-center hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+            data-anime-reveal
+          >
+            <div
+              class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              style="background: var(--about-icon-teal-bg);"
+            >
+              <Icon
+                icon="lucide:map-pin"
+                class="w-6 h-6 md:w-7 md:h-7"
+                style="color: var(--ishos-teal);"
+              />
+            </div>
+            <h3
+              class="text-base md:text-lg font-extrabold mb-2 text-base-content"
+            >
+              Visítanos
+            </h3>
+            <p class="text-base-content/60 text-sm leading-relaxed">
+              Ahuachapán<br />El Salvador
+            </p>
+          </div>
+
+          {/* Phone / WhatsApp */}
+          <div
+            class="bg-base-100 border border-base-200 rounded-2xl p-6 md:p-7 text-center hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+            data-anime-reveal
+          >
+            <div
+              class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              style="background: var(--about-icon-teal-bg);"
+            >
+              <Icon
+                icon="lucide:phone"
+                class="w-6 h-6 md:w-7 md:h-7"
+                style="color: var(--ishos-teal);"
+              />
+            </div>
+            <h3
+              class="text-base md:text-lg font-extrabold mb-4 text-base-content"
+            >
+              Llámanos
+            </h3>
+            <div class="flex flex-col gap-2.5">
+              <a
+                href="tel:+50376454347"
+                class="flex items-center justify-center gap-2 rounded-full py-2 px-4 text-sm font-bold transition-colors"
+                style="background: color-mix(in srgb, var(--ishos-teal) 10%, transparent); color: var(--ishos-teal);"
+              >
+                <Icon icon="lucide:phone-call" class="w-4 h-4" /> Llamar
+              </a>
+              <a
+                href="https://wa.me/50376454347"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center justify-center gap-2 rounded-full py-2 px-4 text-sm font-bold transition-opacity hover:opacity-90"
+                style="background: var(--ishos-maroon); color: white;"
+              >
+                <Icon icon="mdi:whatsapp" class="w-4 h-4" /> WhatsApp
+              </a>
+            </div>
+          </div>
+
+          {/* Schedule */}
+          <div
+            class="bg-base-100 border border-base-200 rounded-2xl p-6 md:p-7 text-center hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+            data-anime-reveal
+          >
+            <div
+              class="w-12 h-12 md:w-14 md:h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+              style="background: var(--about-icon-pink-bg);"
+            >
+              <Icon
+                icon="lucide:clock"
+                class="w-6 h-6 md:w-7 md:h-7"
+                style="color: var(--ishos-maroon);"
+              />
+            </div>
+            <h3
+              class="text-base md:text-lg font-extrabold mb-4 text-base-content"
+            >
+              Horario
+            </h3>
+            <div class="space-y-2">
+              <div
+                class="flex justify-between items-center text-sm rounded-xl px-4 py-2"
+                style="background: var(--about-schedule-bg);"
+              >
+                <span class="font-bold text-base-content/80">Lun – Vie</span>
+                <span class="text-base-content/65">10:30 AM – 6:30 PM</span>
+              </div>
+              <div
+                class="flex justify-between items-center text-sm rounded-xl px-4 py-2"
+                style="background: var(--about-schedule-bg);"
+              >
+                <span class="font-bold text-base-content/80">Domingo</span>
+                <span class="text-base-content/65">10:30 AM – 6:30 PM</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Social Media ── */}
+        <div class="mt-8 md:mt-10" data-anime-reveal>
+          <p
+            class="text-center text-xs font-bold uppercase tracking-[0.2em] text-base-content/60 mb-4"
+          >
+            Síguenos en Redes Sociales
+          </p>
+          <div class="flex flex-wrap justify-center gap-3">
+            {/* Instagram */}
+            <a
+              href="https://www.instagram.com/ishos_factory/?hl=en"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="social-pill flex items-center gap-2 bg-base-100 border border-base-200 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300"
+              aria-label="Instagram"
+              data-anime-reveal
+            >
+              <svg
+                class="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <defs>
+                  <linearGradient
+                    id="ig-grad2"
+                    x1="0%"
+                    y1="100%"
+                    x2="100%"
+                    y2="0%"
+                  >
+                    <stop offset="0%" style="stop-color:#f09433"></stop>
+                    <stop offset="50%" style="stop-color:#dc2743"></stop>
+                    <stop offset="100%" style="stop-color:#bc1888"></stop>
+                  </linearGradient>
+                </defs>
+                <rect
+                  x="2"
+                  y="2"
+                  width="20"
+                  height="20"
+                  rx="5"
+                  ry="5"
+                  stroke="url(#ig-grad2)"
+                  stroke-width="2"
+                  fill="none"></rect>
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="4"
+                  stroke="url(#ig-grad2)"
+                  stroke-width="2"
+                  fill="none"></circle>
+                <circle cx="17.5" cy="6.5" r="1" fill="url(#ig-grad2)"></circle>
+              </svg>
+              <span style="color:#E4405F;">Instagram</span>
+            </a>
+
+            {/* Facebook */}
+            <a
+              href="https://www.facebook.com/ishosfactory/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="social-pill flex items-center gap-2 bg-base-100 border border-base-200 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300"
+              aria-label="Facebook"
+              data-anime-reveal
+            >
+              <svg
+                class="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="#1877F2"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.874v2.25h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"
+                ></path>
+              </svg>
+              <span style="color:#1877F2;">Facebook</span>
+            </a>
+
+            {/* TikTok */}
+            <a
+              href="https://www.tiktok.com/@ishosfactory"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="social-pill flex items-center gap-2 bg-base-100 border border-base-200 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300"
+              aria-label="TikTok"
+              data-anime-reveal
+            >
+              <svg
+                class="w-5 h-5"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.27 8.27 0 004.84 1.55V6.79a4.85 4.85 0 01-1.07-.1z"
+                  fill="currentColor"></path>
+              </svg>
+              <span class="text-base-content">TikTok</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* ══════════════════════════════════════════ */}
+    {/* ── LOCATIONS / MAPS ── */}
+    {/* ══════════════════════════════════════════ */}
+    <section id="sucursales" class="px-4 py-10 md:py-16 pb-8 md:pb-12">
+      <div class="max-w-5xl mx-auto">
+        <div class="text-center mb-8 md:mb-10" data-anime-reveal>
+          <div class="section-pill section-pill--maroon mb-3">Sucursales</div>
+          <h2 class="text-2xl md:text-4xl font-extrabold text-base-content">
+            Nuestras <span style="color: var(--ishos-teal);">Sucursales</span>
+          </h2>
+          <p class="text-base-content/60 mt-2 text-sm md:text-base font-medium">
+            Encuéntranos en Ahuachapán, El Salvador.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {/* Sucursal 1 */}
+          <div
+            class="bg-base-100 border border-base-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 group"
+            data-anime-reveal
+          >
+            {/* Card header accent */}
+            <div
+              class="px-4 pt-4 pb-3 flex items-start md:items-center justify-between gap-3"
+            >
+              <div>
+                <h3
+                  class="text-sm md:text-base font-extrabold flex items-center gap-2 text-base-content"
+                >
+                  <span style="color: var(--ishos-teal);">
+                    <Icon icon="lucide:map-pin" class="w-4 h-4 inline" />
+                  </span>
+                  Isho's Sucursal 1
+                </h3>
+                <p class="text-base-content/60 text-xs mt-0.5">
+                  Ahuachapán, El Salvador
+                </p>
+              </div>
+              <a
+                href="https://maps.google.com/?q=Isho%27s+Sucursal+1,+Ahuachap%C3%A1n,+El+Salvador"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-full border transition-colors shrink-0"
+                style="border-color: var(--ishos-teal); color: var(--ishos-teal);"
+              >
+                <Icon icon="lucide:external-link" class="w-3 h-3" /> Maps
+              </a>
+            </div>
+            <div class="mx-4 rounded-xl overflow-hidden" style="height: 200px;">
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d6847.623198808501!2d-89.8518696249066!3d13.92355228648646!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8f6297001f790639%3A0xa292396c664dfae0!2sIsho%E2%80%99s%20Sucursal%201!5e1!3m2!1ses!2ssv!4v1777132497595!5m2!1ses!2ssv"
+                width="100%"
+                height="100%"
+                style="border:0;"
+                allowfullscreen=""
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+                title="Mapa de Isho's Sucursal 1"></iframe>
+            </div>
+            <div class="p-4 pt-3">
+              <a
+                href="https://maps.google.com/?q=Isho%27s+Sucursal+1,+Ahuachap%C3%A1n,+El+Salvador"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center justify-center gap-2 w-full rounded-xl py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                style="background: var(--ishos-teal);"
+              >
+                <Icon icon="lucide:navigation" class="w-4 h-4" /> Direcciones
+              </a>
+            </div>
+          </div>
+
+          {/* Sucursal 2 */}
+          <div
+            class="bg-base-100 border border-base-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 group"
+            data-anime-reveal
+          >
+            <div
+              class="px-4 pt-4 pb-3 flex items-start md:items-center justify-between gap-3"
+            >
+              <div>
+                <h3
+                  class="text-sm md:text-base font-extrabold flex items-center gap-2 text-base-content"
+                >
+                  <span style="color: var(--ishos-teal);">
+                    <Icon icon="lucide:map-pin" class="w-4 h-4 inline" />
+                  </span>
+                  Isho's Sucursal 2
+                </h3>
+                <p class="text-base-content/60 text-xs mt-0.5">
+                  Ahuachapán, El Salvador
+                </p>
+              </div>
+              <a
+                href="https://maps.app.goo.gl/bSYLeqagKbSW3wUh8"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-xs font-bold flex items-center gap-1 px-3 py-1.5 rounded-full border transition-colors shrink-0"
+                style="border-color: var(--ishos-teal); color: var(--ishos-teal);"
+              >
+                <Icon icon="lucide:external-link" class="w-3 h-3" /> Maps
+              </a>
+            </div>
+            <div class="mx-4 rounded-xl overflow-hidden" style="height: 200px;">
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d6847.705736039818!2d-89.8483311!3d13.920766299999997!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8f6297004861f67d%3A0xfed9bfb450de212f!2sIsho%E2%80%99s%20sucursal%202!5e1!3m2!1ses!2ssv!4v1777132555390!5m2!1ses!2ssv"
+                width="100%"
+                height="100%"
+                style="border:0;"
+                allowfullscreen=""
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+                title="Mapa de Isho's Sucursal 2"></iframe>
+            </div>
+            <div class="p-4 pt-3">
+              <a
+                href="https://maps.app.goo.gl/bSYLeqagKbSW3wUh8"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center justify-center gap-2 w-full rounded-xl py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                style="background: var(--ishos-teal);"
+              >
+                <Icon icon="lucide:navigation" class="w-4 h-4" /> Direcciones
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</StoreLayout>
+
+<script>
+  import { animate, stagger, inView } from "motion";
+
+  // Keep a single bound flag so view-transition re-entry does not duplicate listeners
+  interface AboutWindow extends Window {
+    __ishosAboutMotionBound?: boolean;
+  }
+
+  const aboutWindow = window as AboutWindow;
+
+  if (!aboutWindow.__ishosAboutMotionBound) {
+    aboutWindow.__ishosAboutMotionBound = true;
+
+    const setupAboutAnimations = () => {
+      const page = document.querySelector<HTMLElement>(".about-page");
+      if (!page) return;
+
+      const reduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      if (reduced) return;
+
+      // ── Hero entrance ─────────────────────────────────────────────
+      // Blobs grow then settle; the hero card fades up. The ambient loop
+      // starts only after the entrance so the two never fight.
+      const blobTeal = page.querySelector<HTMLElement>(".hero-blob-teal");
+      const blobPink = page.querySelector<HTMLElement>(".hero-blob-pink");
+      const heroCard = page.querySelector<HTMLElement>(".hero-card-border");
+      const heroText = page.querySelector<HTMLElement>(
+        ".about-hero [data-anime-reveal]",
+      );
+
+      // After a one-shot entrance animation finishes, drop the inline
+      // styles + [data-anime-reveal] so CSS :hover transforms work again.
+      const cleanup = (el: HTMLElement) => {
+        el.removeAttribute("data-anime-reveal");
+        el.style.opacity = "";
+        el.style.transform = "";
+      };
+
+      const startAmbient = () => {
+        if (blobTeal) {
+          // @ts-ignore — motion shorthand x/y/scale accepted at runtime
+          animate(
+            blobTeal,
+            { x: [-14, 14], y: [-18, 18], scale: [1, 1.06] },
+            {
+              duration: 8.5,
+              ease: [0.37, 0, 0.63, 1],
+              repeat: Infinity,
+              repeatType: "reverse",
+            },
+          );
+        }
+        if (blobPink) {
+          // @ts-ignore
+          animate(
+            blobPink,
+            { x: [14, -14], y: [18, -18], scale: [1, 1.08] },
+            {
+              duration: 10.5,
+              ease: [0.37, 0, 0.63, 1],
+              repeat: Infinity,
+              repeatType: "reverse",
+            },
+          );
+        }
+      };
+
+      const startAmbientAfterEntrance = () => {
+        const tealEntrance = blobTeal
+          ? animate(
+              blobTeal,
+              {
+                scale: [0, 1],
+                opacity: [
+                  0,
+                  parseFloat(getComputedStyle(blobTeal).opacity) || 0.2,
+                ],
+              },
+              { duration: 1.1, ease: [0.34, 1.56, 0.64, 1] },
+            )
+          : Promise.resolve();
+        const pinkEntrance = blobPink
+          ? animate(
+              blobPink,
+              {
+                scale: [0, 1],
+                opacity: [
+                  0,
+                  parseFloat(getComputedStyle(blobPink).opacity) || 0.15,
+                ],
+              },
+              { duration: 1.1, ease: [0.34, 1.56, 0.64, 1], delay: 0.12 },
+            )
+          : Promise.resolve();
+        void Promise.all([tealEntrance, pinkEntrance]).then(startAmbient);
+      };
+
+      if (blobTeal && blobPink) {
+        startAmbientAfterEntrance();
+      } else {
+        startAmbient();
+      }
+
+      if (heroText) {
+        // @ts-ignore
+        animate(
+          heroText,
+          { opacity: [0, 1], y: [24, 0] },
+          { duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 },
+        ).then(() => cleanup(heroText));
+      }
+
+      if (heroCard) {
+        // @ts-ignore
+        animate(
+          heroCard,
+          { opacity: [0, 1], scale: [0.93, 1], y: [40, 0] },
+          { duration: 1.0, ease: [0.22, 1, 0.36, 1], delay: 0.35 },
+        ).then(() => cleanup(heroCard));
+      }
+
+      // ── Scroll-triggered section reveals ──────────────────────────
+      // Trigger a one-shot reveal as soon as the section enters the
+      // viewport. A short spring ease with a quick stagger makes the
+      // cascade feel smooth and responsive instead of late/forced.
+      const revealSections = page.querySelectorAll<HTMLElement>(
+        "#valores, #contacto, #sucursales",
+      );
+
+      revealSections.forEach((section) => {
+        const items = section.querySelectorAll<HTMLElement>(
+          "[data-anime-reveal]",
+        );
+        if (!items.length) return;
+
+        let revealed = false;
+        inView(section, () => {
+          if (revealed) return;
+          revealed = true;
+          // @ts-ignore — NodeList accepted at runtime
+          animate(
+            items,
+            { opacity: [0, 1], y: [24, 0], scale: [0.96, 1] },
+            {
+              duration: 0.85,
+              ease: [0.34, 1.36, 0.64, 1],
+              delay: stagger(0.05),
+            },
+          ).then(() => items.forEach(cleanup));
+        });
+      });
+    };
+
+    document.addEventListener("astro:page-load", setupAboutAnimations);
+  }
+</script>
