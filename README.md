@@ -2,6 +2,8 @@
 
 Astro 6 + Svelte 5 storefront and admin panel for IshosFactory. The frontend is an SSR app with an Astro BFF layer in front of the Go backend, so browser clients never talk to the backend directly.
 
+**Current version:** `0.0.1` (see [`package.json`](package.json) and [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for release flow).
+
 The app has two surfaces:
 - Storefront: home, menu, cart checkout, secure order tracking.
 - Admin: authentication, orders, catalog, employees, customer directory, analytics, offers, and settings.
