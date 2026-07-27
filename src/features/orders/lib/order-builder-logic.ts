@@ -1,5 +1,5 @@
 interface AddonSelection {
-  includedId: string | null;
+  includedIds: string[];
   extraIds: string[];
 }
 
@@ -8,50 +8,61 @@ interface AddonSelection {
  * included/extra selector.
  *
  * Rules:
- * - First selection becomes the included (free) item.
- * - Tapping the included item again adds it as an extra (double portion).
+ * - The first `allowance` distinct selections become included (free).
+ * - Tapping an included item again adds it as an extra (double portion).
  * - Tapping an item that is both included and extra removes the extra portion.
- * - Tapping a different unselected item adds it as an extra.
- * - Tapping an extra item removes it.
+ * - Tapping an extra-only item removes it.
+ * - Tapping an unselected item when free slots remain adds it as included.
+ * - Tapping an unselected item when free slots are full adds it as an extra.
  * - Tapping the "none" item clears everything.
  */
 export function computeAddonSelection(
   current: AddonSelection,
   clickedId: string,
   noneId: string,
+  allowance: number = 1,
 ): AddonSelection {
-  const { includedId, extraIds } = current;
-  const effectiveIncludedId =
-    includedId === noneId || !includedId ? null : includedId;
+  const { includedIds, extraIds } = current;
 
   if (clickedId === noneId) {
-    return { includedId: null, extraIds: [] };
+    return { includedIds: [], extraIds: [] };
   }
 
-  if (clickedId === effectiveIncludedId) {
-    if (extraIds.includes(clickedId)) {
-      return {
-        includedId: clickedId,
-        extraIds: extraIds.filter((id) => id !== clickedId),
-      };
+  const includedSet = new Set(includedIds.filter((id) => id !== noneId));
+  const extraSet = new Set(extraIds.filter((id) => id !== noneId));
+
+  if (includedSet.has(clickedId)) {
+    if (extraSet.has(clickedId)) {
+      // Remove the extra portion, keep the included/free portion.
+      extraSet.delete(clickedId);
+    } else {
+      // Add an extra portion (double).
+      extraSet.add(clickedId);
     }
-    return { includedId: clickedId, extraIds: [...extraIds, clickedId] };
-  }
-
-  if (extraIds.includes(clickedId)) {
     return {
-      includedId: effectiveIncludedId,
-      extraIds: extraIds.filter((id) => id !== clickedId),
+      includedIds: Array.from(includedSet),
+      extraIds: Array.from(extraSet),
     };
   }
 
-  if (!effectiveIncludedId) {
-    return { includedId: clickedId, extraIds };
+  if (extraSet.has(clickedId)) {
+    extraSet.delete(clickedId);
+    return {
+      includedIds: Array.from(includedSet),
+      extraIds: Array.from(extraSet),
+    };
+  }
+
+  // New selection.
+  if (includedSet.size < Math.max(0, allowance)) {
+    includedSet.add(clickedId);
+  } else {
+    extraSet.add(clickedId);
   }
 
   return {
-    includedId: effectiveIncludedId,
-    extraIds: [...extraIds, clickedId],
+    includedIds: Array.from(includedSet),
+    extraIds: Array.from(extraSet),
   };
 }
 

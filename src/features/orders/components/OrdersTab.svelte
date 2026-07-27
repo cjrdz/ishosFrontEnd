@@ -59,9 +59,11 @@
     manualItems: ManualOrderItemDraft[];
     selectedFlavorId: string;
     selectedFlavorIds: string[];
-    includedToppingId: string;
-    includedJaleaId: string;
+    includedToppingIds: string[];
+    includedJaleaIds: string[];
     selectedExtraAddonIds: string[];
+    toppingSelection?: "none" | "selected";
+    jaleaSelection?: "none" | "selected";
   }
 
   let {
@@ -146,9 +148,11 @@
   let orderSearch = $state("");
   let selectedFlavorId = $state("");
   let selectedFlavorIds = $state<string[]>([]);
-  let includedToppingId = $state("");
-  let includedJaleaId = $state("");
+  let includedToppingIds = $state<string[]>([]);
+  let includedJaleaIds = $state<string[]>([]);
   let selectedExtraAddonIds = $state<string[]>([]);
+  let toppingSelection = $state<"none" | "selected" | undefined>(undefined);
+  let jaleaSelection = $state<"none" | "selected" | undefined>(undefined);
   let lastSelectedProductId = $state("");
   let editingDraftIndex = $state<number | null>(null);
   let createOrderIdempotencyKey = $state<string | null>(null);
@@ -164,6 +168,7 @@
       | "tarjeta"
       | "transferencia"
       | "otro",
+    amount_received: "" as "" | number,
     order_type: "para_llevar" as "en_local" | "para_llevar",
     table_number: "" as "" | number,
     notes: "",
@@ -183,9 +188,13 @@
       snapshot.orderForm.quantity !== 1 ||
       snapshot.selectedFlavorId.length > 0 ||
       snapshot.selectedFlavorIds.length > 0 ||
-      snapshot.includedToppingId.length > 0 ||
-      snapshot.includedJaleaId.length > 0 ||
-      snapshot.selectedExtraAddonIds.length > 0
+      snapshot.includedToppingIds.length > 0 ||
+      snapshot.includedJaleaIds.length > 0 ||
+      snapshot.selectedExtraAddonIds.length > 0 ||
+      snapshot.toppingSelection === "none" ||
+      snapshot.toppingSelection === "selected" ||
+      snapshot.jaleaSelection === "none" ||
+      snapshot.jaleaSelection === "selected"
     );
   }
 
@@ -201,9 +210,11 @@
       })),
       selectedFlavorId,
       selectedFlavorIds: [...selectedFlavorIds],
-      includedToppingId,
-      includedJaleaId,
+      includedToppingIds: [...includedToppingIds],
+      includedJaleaIds: [...includedJaleaIds],
       selectedExtraAddonIds: [...selectedExtraAddonIds],
+      toppingSelection,
+      jaleaSelection,
     };
   }
 
@@ -242,6 +253,7 @@
         customer_phone: snapshot.orderForm.customer_phone ?? "",
         customer_email: snapshot.orderForm.customer_email ?? "",
         payment_method: snapshot.orderForm.payment_method ?? "efectivo",
+        amount_received: snapshot.orderForm.amount_received ?? "",
         order_type: snapshot.orderForm.order_type ?? "para_llevar",
         table_number: snapshot.orderForm.table_number ?? "",
         notes: snapshot.orderForm.notes ?? "",
@@ -309,11 +321,13 @@
       selectedFlavorIds = (snapshot.selectedFlavorIds ?? []).filter(
         (id): id is string => !!id,
       );
-      includedToppingId = snapshot.includedToppingId ?? "";
-      includedJaleaId = snapshot.includedJaleaId ?? "";
+      includedToppingIds = normalizeIdList(snapshot.includedToppingIds ?? []);
+      includedJaleaIds = normalizeIdList(snapshot.includedJaleaIds ?? []);
       selectedExtraAddonIds = normalizeIdList(
         snapshot.selectedExtraAddonIds ?? [],
       );
+      toppingSelection = snapshot.toppingSelection ?? undefined;
+      jaleaSelection = snapshot.jaleaSelection ?? undefined;
       return true;
     } catch {
       clearManualDraftStorage();
@@ -576,9 +590,11 @@
       orderForm.quantity,
       selectedFlavorId,
       selectedFlavorIds,
-      includedToppingId,
-      includedJaleaId,
+      includedToppingIds,
+      includedJaleaIds,
       selectedExtraAddonIds,
+      toppingSelection,
+      jaleaSelection,
       orderEditorProducts,
     );
     if (result.item) return result.item;
@@ -610,9 +626,11 @@
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
     selectedFlavorIds = reset.selectedFlavorIds;
-    includedToppingId = reset.includedToppingId;
-    includedJaleaId = reset.includedJaleaId;
+    includedToppingIds = reset.includedToppingIds;
+    includedJaleaIds = reset.includedJaleaIds;
     selectedExtraAddonIds = reset.selectedExtraAddonIds;
+    toppingSelection = undefined;
+    jaleaSelection = undefined;
   }
 
   function removeDraftItem(indexToRemove: number) {
@@ -651,19 +669,21 @@
     );
     const includedIds = new Set(targetItem.included_addon_ids ?? []);
 
-    const toppingId =
-      product?.addons?.find(
+    const toppingIds = (product?.addons ?? [])
+      .filter(
         (addon) =>
           includedIds.has(addon.id) &&
           normalizeAddonGroupName(addon.group_name) === "toppings",
-      )?.id ?? "";
+      )
+      .map((addon) => addon.id);
 
-    const jaleaId =
-      product?.addons?.find(
+    const jaleaIds = (product?.addons ?? [])
+      .filter(
         (addon) =>
           includedIds.has(addon.id) &&
           normalizeAddonGroupName(addon.group_name) === "jalea",
-      )?.id ?? "";
+      )
+      .map((addon) => addon.id);
 
     editingDraftIndex = index;
     orderForm.product_id = targetItem.product_id;
@@ -672,17 +692,31 @@
     selectedFlavorIds = (targetItem.flavor_ids ?? []).filter(
       (id): id is string => !!id,
     );
-    includedToppingId = toppingId
-      ? toppingId
-      : targetItem.topping_selection === "none"
-        ? "none"
-        : "";
-    includedJaleaId = jaleaId
-      ? jaleaId
-      : targetItem.jalea_selection === "none"
-        ? "none"
-        : "";
+    includedToppingIds =
+      toppingIds.length > 0
+        ? toppingIds
+        : targetItem.topping_selection === "none"
+          ? []
+          : [];
+    includedJaleaIds =
+      jaleaIds.length > 0
+        ? jaleaIds
+        : targetItem.jalea_selection === "none"
+          ? []
+          : [];
     selectedExtraAddonIds = normalizeIdList(targetItem.extra_addon_ids ?? []);
+    toppingSelection =
+      targetItem.topping_selection === "selected"
+        ? "selected"
+        : targetItem.topping_selection === "none"
+          ? "none"
+          : undefined;
+    jaleaSelection =
+      targetItem.jalea_selection === "selected"
+        ? "selected"
+        : targetItem.jalea_selection === "none"
+          ? "none"
+          : undefined;
     addItemError = "";
     editError = "";
   }
@@ -693,9 +727,11 @@
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
     selectedFlavorIds = reset.selectedFlavorIds;
-    includedToppingId = reset.includedToppingId;
-    includedJaleaId = reset.includedJaleaId;
+    includedToppingIds = reset.includedToppingIds;
+    includedJaleaIds = reset.includedJaleaIds;
     selectedExtraAddonIds = reset.selectedExtraAddonIds;
+    toppingSelection = undefined;
+    jaleaSelection = undefined;
   }
 
   $effect(() => {
@@ -709,9 +745,11 @@
       lastSelectedProductId = currentProductId;
       selectedFlavorId = "";
       selectedFlavorIds = Array(currentBallQuantity).fill("");
-      includedToppingId = "";
-      includedJaleaId = "";
+      includedToppingIds = [];
+      includedJaleaIds = [];
       selectedExtraAddonIds = [];
+      toppingSelection = undefined;
+      jaleaSelection = undefined;
       return;
     }
 
@@ -742,19 +780,18 @@
       selectedExtraAddonIds = normalizedAddonIds;
     }
 
-    if (
-      includedToppingId &&
-      includedToppingId !== "none" &&
-      !toppingAddons.some((addon) => addon.id === includedToppingId)
-    ) {
-      includedToppingId = "";
+    const validToppingIds = includedToppingIds.filter((id) =>
+      toppingAddons.some((addon) => addon.id === id),
+    );
+    if (validToppingIds.length !== includedToppingIds.length) {
+      includedToppingIds = validToppingIds;
     }
-    if (
-      includedJaleaId &&
-      includedJaleaId !== "none" &&
-      !jaleaAddons.some((addon) => addon.id === includedJaleaId)
-    ) {
-      includedJaleaId = "";
+
+    const validJaleaIds = includedJaleaIds.filter((id) =>
+      jaleaAddons.some((addon) => addon.id === id),
+    );
+    if (validJaleaIds.length !== includedJaleaIds.length) {
+      includedJaleaIds = validJaleaIds;
     }
   });
 
@@ -834,15 +871,18 @@
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
     selectedFlavorIds = reset.selectedFlavorIds;
-    includedToppingId = reset.includedToppingId;
-    includedJaleaId = reset.includedJaleaId;
+    includedToppingIds = reset.includedToppingIds;
+    includedJaleaIds = reset.includedJaleaIds;
     selectedExtraAddonIds = reset.selectedExtraAddonIds;
+    toppingSelection = undefined;
+    jaleaSelection = undefined;
     manualItems = [];
     orderForm = {
       customer_name: "",
       customer_phone: "",
       customer_email: "",
       payment_method: "efectivo",
+      amount_received: "",
       order_type: "para_llevar",
       table_number: "",
       notes: "",
@@ -864,12 +904,26 @@
     );
   }
 
-  function changeIncludedTopping(addonId: string) {
-    includedToppingId = addonId;
+  function onToppingSelectionChange(includedIds: string[], extraIds: string[]) {
+    includedToppingIds = includedIds;
+    const groupIds = new Set(toppingAddons.map((a) => a.id));
+    selectedExtraAddonIds = normalizeIdList([
+      ...selectedExtraAddonIds.filter((id) => !groupIds.has(id)),
+      ...extraIds,
+    ]);
+    toppingSelection =
+      includedIds.length > 0 || extraIds.length > 0 ? "selected" : "none";
   }
 
-  function changeIncludedJalea(addonId: string) {
-    includedJaleaId = addonId;
+  function onJaleaSelectionChange(includedIds: string[], extraIds: string[]) {
+    includedJaleaIds = includedIds;
+    const groupIds = new Set(jaleaAddons.map((a) => a.id));
+    selectedExtraAddonIds = normalizeIdList([
+      ...selectedExtraAddonIds.filter((id) => !groupIds.has(id)),
+      ...extraIds,
+    ]);
+    jaleaSelection =
+      includedIds.length > 0 || extraIds.length > 0 ? "selected" : "none";
   }
 
   function openCreateOrderModal() {
@@ -976,6 +1030,7 @@
         orderForm.customer_phone,
         orderForm.customer_email,
         orderForm.payment_method,
+        orderForm.amount_received,
         orderForm.order_type,
         orderForm.table_number,
         orderForm.notes,
@@ -1009,6 +1064,7 @@
       orderForm.customer_phone,
       orderForm.customer_email,
       orderForm.payment_method,
+      orderForm.amount_received,
       orderForm.order_type,
       orderForm.table_number,
       orderForm.notes,
@@ -1121,9 +1177,11 @@
     const reset = DraftHelpers.resetCustomizationSelections();
     selectedFlavorId = reset.selectedFlavorId;
     selectedFlavorIds = reset.selectedFlavorIds;
-    includedToppingId = reset.includedToppingId;
-    includedJaleaId = reset.includedJaleaId;
+    includedToppingIds = reset.includedToppingIds;
+    includedJaleaIds = reset.includedJaleaIds;
     selectedExtraAddonIds = reset.selectedExtraAddonIds;
+    toppingSelection = undefined;
+    jaleaSelection = undefined;
 
     manualItems = draftItems;
     editOrderId = order.id;
@@ -1132,6 +1190,7 @@
       customer_phone: order.customer_phone,
       customer_email: order.customer_email ?? "",
       payment_method: order.payment_method,
+      amount_received: order.amount_received ?? "",
       order_type: order.order_type,
       table_number: order.table_number ?? "",
       notes: order.notes ?? "",
@@ -1325,9 +1384,13 @@
   {paidAddonGroups}
   {selectedFlavorId}
   {selectedFlavorIds}
-  {includedToppingId}
-  {includedJaleaId}
+  {includedToppingIds}
+  {includedJaleaIds}
   {selectedExtraAddonIds}
+  toppingFreeAllowance={Math.max(0, selectedProduct?.free_toppings ?? 1)}
+  jaleaFreeAllowance={1}
+  {toppingSelection}
+  {jaleaSelection}
   {hasCustomizationOptions}
   {totalPreview}
   {manualOrderTotal}
@@ -1352,8 +1415,8 @@
   onFlavorIdsChange={(value) => {
     selectedFlavorIds = value;
   }}
-  onChangeIncludedTopping={changeIncludedTopping}
-  onChangeIncludedJalea={changeIncludedJalea}
+  {onToppingSelectionChange}
+  {onJaleaSelectionChange}
   onToggleExtraAddonSelection={toggleExtraAddonSelection}
   onAddDraftItem={addDraftItem}
   onEditDraftItem={startEditingDraftItem}

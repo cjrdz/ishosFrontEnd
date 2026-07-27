@@ -6,21 +6,23 @@
 
   interface Props {
     items: PublicAddon[];
-    includedId: string;
+    includedIds: string[];
     selectedIds: string[];
+    allowance: number;
     noneLabel: string;
     label: string;
     helperText?: string;
     required?: boolean;
     error?: string;
     chipClass: (selected: boolean, variant?: "base" | "required") => string;
-    onChange: (includedId: string | null, selectedIds: string[]) => void;
+    onChange: (includedIds: string[], extraIds: string[]) => void;
   }
 
   let {
     items,
-    includedId,
+    includedIds,
     selectedIds,
+    allowance,
     noneLabel,
     label,
     helperText = "",
@@ -34,19 +36,20 @@
 
   function handleChipClick(clickedId: string) {
     const next = computeAddonSelection(
-      { includedId: includedId || null, extraIds: selectedIds },
+      { includedIds, extraIds: selectedIds },
       clickedId,
       NONE_ID,
+      allowance,
     );
-    onChange(next.includedId, next.extraIds);
+    onChange(next.includedIds, next.extraIds);
   }
 
   function clearSelection() {
-    onChange(null, []);
+    onChange([], []);
   }
 
   function isIncluded(id: string): boolean {
-    return includedId === id;
+    return includedIds.includes(id);
   }
 
   function isExtra(id: string): boolean {
@@ -54,11 +57,12 @@
   }
 
   function isNoneSelected(): boolean {
-    return (!includedId || includedId === NONE_ID) && selectedIds.length === 0;
+    return includedIds.length === 0 && selectedIds.length === 0;
   }
 
-  const canClear = $derived(
-    (includedId && includedId !== NONE_ID) || selectedIds.length > 0,
+  const canClear = $derived(includedIds.length > 0 || selectedIds.length > 0);
+  const remainingFree = $derived(
+    Math.max(0, Math.max(0, allowance) - includedIds.length),
   );
 </script>
 
@@ -125,6 +129,15 @@
 
   {#if helperText}
     <p class="text-xs text-base-content/60">{helperText}</p>
+  {/if}
+
+  {#if remainingFree > 0 && items.length > 0}
+    <p class="text-xs text-success">
+      {remainingFree} topping{remainingFree === 1 ? "" : "s"} gratis restante{remainingFree ===
+      1
+        ? ""
+        : "s"}
+    </p>
   {/if}
 
   {#if error}

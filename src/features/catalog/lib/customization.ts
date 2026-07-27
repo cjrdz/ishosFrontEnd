@@ -114,11 +114,19 @@ export function selectedIncludedAddonForGroup(
   draft: ProductCustomizationDraft,
   groupName: "toppings" | "jalea",
 ): string {
+  const ids = selectedIncludedAddonsForGroup(product, draft, groupName);
+  return ids[0] ?? "";
+}
+
+export function selectedIncludedAddonsForGroup(
+  product: PublicProduct | undefined,
+  draft: ProductCustomizationDraft,
+  groupName: "toppings" | "jalea",
+): string[] {
   const options = addonsForGroup(product, groupName);
-  return (
-    options.find((addon) => (draft.included_addon_ids ?? []).includes(addon.id))
-      ?.id ?? ""
-  );
+  return options
+    .filter((addon) => (draft.included_addon_ids ?? []).includes(addon.id))
+    .map((addon) => addon.id);
 }
 
 export function requiresFlavorSelection(

@@ -6,14 +6,13 @@ import type {
   Product,
 } from "@features/admin-management";
 import type {
-  PaginationInfo,
   ProductCreatePayload,
   ProductUpdatePayload,
 } from "@api-types/api";
 
 export interface ProductsTabProps {
   categories: Category[];
-  /** Products are typed from the generated OpenAPI contract. */
+  /** All products for client-side filtering and pagination. */
   products: Product[];
   flavors: Flavor[];
   addons: Addon[];
@@ -21,7 +20,6 @@ export interface ProductsTabProps {
   busy: boolean;
   galleryBusy: boolean;
   moduleError: string;
-  pagination: PaginationInfo;
   /** Create payload derived from the generated OpenAPI Product schema. */
   onCreate: (payload: ProductCreatePayload) => void;
   /** Update payload derived from the generated OpenAPI Product schema. */

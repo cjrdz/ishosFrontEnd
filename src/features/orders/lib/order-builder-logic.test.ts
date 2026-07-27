@@ -6,74 +6,94 @@ const NONE = "none";
 describe("computeAddonSelection", () => {
   it("selects the first item as included when nothing is selected", () => {
     const result = computeAddonSelection(
-      { includedId: null, extraIds: [] },
+      { includedIds: [], extraIds: [] },
       "a",
       NONE,
     );
-    expect(result).toEqual({ includedId: "a", extraIds: [] });
+    expect(result).toEqual({ includedIds: ["a"], extraIds: [] });
   });
 
-  it("replaces 'none' with a real item as included", () => {
+  it("selects the first item as included from a cleared state", () => {
     const result = computeAddonSelection(
-      { includedId: NONE, extraIds: [] },
+      { includedIds: [], extraIds: [] },
       "a",
       NONE,
     );
-    expect(result).toEqual({ includedId: "a", extraIds: [] });
+    expect(result).toEqual({ includedIds: ["a"], extraIds: [] });
   });
 
-  it("adds a second selection as an extra", () => {
+  it("adds a second selection as an extra when allowance is one", () => {
     const result = computeAddonSelection(
-      { includedId: "a", extraIds: [] },
+      { includedIds: ["a"], extraIds: [] },
       "b",
       NONE,
     );
-    expect(result).toEqual({ includedId: "a", extraIds: ["b"] });
+    expect(result).toEqual({ includedIds: ["a"], extraIds: ["b"] });
+  });
+
+  it("adds a second selection as included when allowance allows", () => {
+    const result = computeAddonSelection(
+      { includedIds: ["a"], extraIds: [] },
+      "b",
+      NONE,
+      2,
+    );
+    expect(result).toEqual({ includedIds: ["a", "b"], extraIds: [] });
+  });
+
+  it("adds a third selection as an extra after free slots are full", () => {
+    const result = computeAddonSelection(
+      { includedIds: ["a", "b"], extraIds: [] },
+      "c",
+      NONE,
+      2,
+    );
+    expect(result).toEqual({ includedIds: ["a", "b"], extraIds: ["c"] });
   });
 
   it("adds the included item as an extra when tapped again (double portion)", () => {
     const result = computeAddonSelection(
-      { includedId: "a", extraIds: [] },
+      { includedIds: ["a"], extraIds: [] },
       "a",
       NONE,
     );
-    expect(result).toEqual({ includedId: "a", extraIds: ["a"] });
+    expect(result).toEqual({ includedIds: ["a"], extraIds: ["a"] });
   });
 
   it("removes the extra portion from an included+extra item", () => {
     const result = computeAddonSelection(
-      { includedId: "a", extraIds: ["a", "b"] },
+      { includedIds: ["a"], extraIds: ["a", "b"] },
       "a",
       NONE,
     );
-    expect(result).toEqual({ includedId: "a", extraIds: ["b"] });
+    expect(result).toEqual({ includedIds: ["a"], extraIds: ["b"] });
   });
 
   it("removes an extra when tapped", () => {
     const result = computeAddonSelection(
-      { includedId: "a", extraIds: ["b", "c"] },
+      { includedIds: ["a"], extraIds: ["b", "c"] },
       "b",
       NONE,
     );
-    expect(result).toEqual({ includedId: "a", extraIds: ["c"] });
+    expect(result).toEqual({ includedIds: ["a"], extraIds: ["c"] });
   });
 
   it("clears everything when the none item is tapped", () => {
     const result = computeAddonSelection(
-      { includedId: "a", extraIds: ["b"] },
+      { includedIds: ["a"], extraIds: ["b"] },
       NONE,
       NONE,
     );
-    expect(result).toEqual({ includedId: null, extraIds: [] });
+    expect(result).toEqual({ includedIds: [], extraIds: [] });
   });
 
   it("does not add duplicate extras", () => {
     const result = computeAddonSelection(
-      { includedId: "a", extraIds: ["b"] },
+      { includedIds: ["a"], extraIds: ["b"] },
       "b",
       NONE,
     );
-    expect(result).toEqual({ includedId: "a", extraIds: [] });
+    expect(result).toEqual({ includedIds: ["a"], extraIds: [] });
   });
 });
 

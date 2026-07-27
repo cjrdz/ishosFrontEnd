@@ -43,12 +43,18 @@ import type {
 } from "@api-types/api";
 import type { PanelConfigValues } from "../types/settings";
 
+export interface AnalyticsPaymentMethodSummary {
+  revenue: number;
+  count: number;
+}
+
 export interface AnalyticsOverview {
   period: "week" | "month" | "year" | "custom";
   total_orders: number;
   total_revenue: number;
   avg_order_value: number;
   status_breakdown: Record<string, number>;
+  payment_method_breakdown?: Record<string, AnalyticsPaymentMethodSummary>;
 }
 
 export interface AnalyticsTimelinePoint {

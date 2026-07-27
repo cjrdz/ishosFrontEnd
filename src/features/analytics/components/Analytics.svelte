@@ -19,6 +19,7 @@
   import {
     getAnalyticsDashboard,
     type AnalyticsOverview,
+    type AnalyticsPaymentMethodSummary,
     type AnalyticsTimelinePoint,
     type AnalyticsTopProduct,
   } from "@features/admin-management";
@@ -163,6 +164,7 @@
   function donutSeries(
     data: { name: string; value: number }[],
     colors: string[],
+    labelFormatter?: (name: string, value: number) => string,
   ): EChartsOption["series"] {
     return [
       {
@@ -181,7 +183,10 @@
           textBorderWidth: 0,
           fontSize: 12,
           fontWeight: 600,
-          formatter: "{b}: {c}",
+          formatter: labelFormatter
+            ? (params: any) =>
+                labelFormatter(params?.name ?? "", Number(params?.value ?? 0))
+            : "{b}: {c}",
         },
         labelLine: { lineStyle: { color: chartMutedTextColor, width: 1.2 } },
         emphasis: {
@@ -212,6 +217,36 @@
         value: Number(value ?? 0),
       })),
       ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"],
+    ),
+  });
+
+  const paymentMethodPieOptions = $derived<EChartsOption>({
+    tooltip: {
+      trigger: "item",
+      backgroundColor: chartTooltipBackground,
+      borderColor: chartTooltipBorder,
+      borderWidth: 1,
+      textStyle: { color: chartTooltipTextColor, fontWeight: 600 },
+      formatter: (params: any) => {
+        const revenue = formatCurrency(params?.value ?? 0);
+        const count = params?.data?.count ?? 0;
+        return `${params?.name ?? ""}<br/><strong>${revenue}</strong> (${count} órdenes)`;
+      },
+    },
+    legend: { bottom: 0, textStyle: { color: chartMutedTextColor } },
+    series: donutSeries(
+      Object.entries(overview?.payment_method_breakdown || {}).map(
+        ([name, summary]: [
+          string,
+          AnalyticsPaymentMethodSummary | undefined,
+        ]) => ({
+          name,
+          value: Math.round(Number(summary?.revenue ?? 0) * 100) / 100,
+          count: summary?.count ?? 0,
+        }),
+      ),
+      CHART_COLORS,
+      (name, value) => `${name}: ${formatCurrency(value)}`,
     ),
   });
 
@@ -376,6 +411,24 @@
     series: donutSeries(
       topProducts.map((p) => ({ name: p.name, value: p.total_sold })),
       CHART_COLORS,
+    ),
+  });
+
+  const topProductsByRevenueOptions = $derived<EChartsOption>({
+    tooltip: {
+      trigger: "item",
+      backgroundColor: chartTooltipBackground,
+      borderColor: chartTooltipBorder,
+      borderWidth: 1,
+      textStyle: { color: chartTooltipTextColor, fontWeight: 600 },
+      formatter: (params: any) =>
+        `${params?.name ?? ""}<br/><strong>${formatCurrency(Number(params?.value ?? 0))}</strong> (${params?.percent ?? 0}%)`,
+    },
+    legend: { bottom: 0, textStyle: { color: chartMutedTextColor } },
+    series: donutSeries(
+      topProducts.map((p) => ({ name: p.name, value: p.total_value })),
+      CHART_COLORS,
+      (name, value) => `${name}: ${formatCurrency(value)}`,
     ),
   });
 
@@ -574,7 +627,7 @@
       <!-- Charts -->
       {#if loading}
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {#each Array(4) as _}
+          {#each Array(5) as _}
             <div class="card bg-base-100 shadow">
               <div class="card-body">
                 <div class="h-4 bg-base-200 rounded w-36 mb-4"></div>
@@ -680,6 +733,53 @@
               {:else}
                 <div class="h-72 w-full md:h-80">
                   <Chart {init} options={statusPieOptions} />
+                </div>
+              {/if}
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow">
+            <div class="card-body">
+              <h4 class="text-sm font-semibold flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-secondary inline-block"
+                ></span>
+                Ingresos por método de pago
+              </h4>
+              {#if !overview?.payment_method_breakdown || Object.keys(overview.payment_method_breakdown).length === 0}
+                <div
+                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                >
+                  Sin datos de métodos de pago
+                </div>
+              {:else}
+                <div class="h-72 w-full md:h-80">
+                  <Chart {init} options={paymentMethodPieOptions} />
+                </div>
+              {/if}
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow">
+            <div class="card-body">
+              <h4 class="text-sm font-semibold flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-accent inline-block"
+                ></span>
+                Productos por ingresos
+                {#if topProducts.length > 0}
+                  <span class="badge badge-ghost badge-xs ml-auto"
+                    >Top {topProducts.length}</span
+                  >
+                {/if}
+              </h4>
+              {#if topProducts.length === 0}
+                <div
+                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                >
+                  Sin datos de productos
+                </div>
+              {:else}
+                <div class="h-72 w-full md:h-80">
+                  <Chart {init} options={topProductsByRevenueOptions} />
                 </div>
               {/if}
             </div>

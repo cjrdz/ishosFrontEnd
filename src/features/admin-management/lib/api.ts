@@ -31,6 +31,7 @@ export interface Order {
   payment_method: "efectivo" | "tarjeta" | "transferencia" | "otro";
   payment_status: "pendiente" | "confirmado";
   total_amount: number;
+  amount_received?: number | null;
   notes?: string | null;
   rejection_reason?: string | null;
   created_by_user_id?: string | null;

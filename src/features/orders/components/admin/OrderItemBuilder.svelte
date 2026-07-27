@@ -35,9 +35,13 @@
     paidAddonGroups: AddonGroup[];
     selectedFlavorId: string;
     selectedFlavorIds: string[];
-    includedToppingId: string;
-    includedJaleaId: string;
+    includedToppingIds: string[];
+    includedJaleaIds: string[];
     selectedExtraAddonIds: string[];
+    toppingFreeAllowance: number;
+    jaleaFreeAllowance: number;
+    toppingSelection?: "none" | "selected";
+    jaleaSelection?: "none" | "selected";
     hasCustomizationOptions: boolean;
     totalPreview: number;
     manualOrderTotal: number;
@@ -47,8 +51,11 @@
     onQuantityChange: (value: number) => void;
     onFlavorChange: (value: string) => void;
     onFlavorIdsChange: (value: string[]) => void;
-    onChangeIncludedTopping: (value: string) => void;
-    onChangeIncludedJalea: (value: string) => void;
+    onToppingSelectionChange: (
+      includedIds: string[],
+      extraIds: string[],
+    ) => void;
+    onJaleaSelectionChange: (includedIds: string[], extraIds: string[]) => void;
     onToggleExtraAddonSelection: (addonId: string, checked: boolean) => void;
     onAddDraftItem: () => void;
     onEditDraftItem: (index: number) => void;
@@ -82,9 +89,13 @@
     paidAddonGroups,
     selectedFlavorId,
     selectedFlavorIds,
-    includedToppingId,
-    includedJaleaId,
+    includedToppingIds,
+    includedJaleaIds,
     selectedExtraAddonIds,
+    toppingFreeAllowance,
+    jaleaFreeAllowance,
+    toppingSelection,
+    jaleaSelection,
     hasCustomizationOptions,
     totalPreview,
     manualOrderTotal,
@@ -93,8 +104,8 @@
     onQuantityChange,
     onFlavorChange,
     onFlavorIdsChange,
-    onChangeIncludedTopping,
-    onChangeIncludedJalea,
+    onToppingSelectionChange,
+    onJaleaSelectionChange,
     onToggleExtraAddonSelection,
     onAddDraftItem,
     onEditDraftItem,
@@ -137,10 +148,10 @@
         : !selectedFlavorId),
   );
   const requiresToppingSelection = $derived(
-    toppingAddons.length > 0 && !includedToppingId,
+    toppingAddons.length > 0 && toppingSelection === undefined,
   );
   const requiresJaleaSelection = $derived(
-    jaleaAddons.length > 0 && !includedJaleaId,
+    jaleaAddons.length > 0 && jaleaSelection === undefined,
   );
   const canAddCurrentItem = $derived(
     products.length > 0 &&
@@ -154,11 +165,7 @@
       ?.name ?? null,
   );
   const currentIncludedAddonNames = $derived(
-    [includedToppingId, includedJaleaId]
-      .filter(
-        (addonId): addonId is string =>
-          Boolean(addonId) && addonId !== NONE_CUSTOMIZATION,
-      )
+    [...includedToppingIds, ...includedJaleaIds]
       .map(
         (addonId) =>
           selectedProductAddons.find((addon) => addon.id === addonId)?.name ??
@@ -327,16 +334,17 @@
             {#if toppingAddons.length > 0}
               <AddonChipGroup
                 items={toppingAddons}
-                includedId={includedToppingId}
+                includedIds={includedToppingIds}
                 selectedIds={isExtraInAddons(toppingAddons)}
                 noneId={NONE_CUSTOMIZATION}
                 noneLabel="Sin topping"
                 label="Topping"
+                allowance={toppingFreeAllowance}
                 required={true}
                 error={requiresToppingSelection
                   ? "Selecciona un topping o 'Sin topping'"
                   : ""}
-                onIncludedChange={onChangeIncludedTopping}
+                onUnifiedChange={onToppingSelectionChange}
                 onToggleExtra={onToggleExtraAddonSelection}
               />
             {/if}
@@ -344,16 +352,17 @@
             {#if jaleaAddons.length > 0}
               <AddonChipGroup
                 items={jaleaAddons}
-                includedId={includedJaleaId}
+                includedIds={includedJaleaIds}
                 selectedIds={isExtraInAddons(jaleaAddons)}
                 noneId={NONE_CUSTOMIZATION}
                 noneLabel="Sin jalea"
                 label="Jalea"
+                allowance={jaleaFreeAllowance}
                 required={true}
                 error={requiresJaleaSelection
                   ? "Selecciona una jalea o 'Sin jalea'"
                   : ""}
-                onIncludedChange={onChangeIncludedJalea}
+                onUnifiedChange={onJaleaSelectionChange}
                 onToggleExtra={onToggleExtraAddonSelection}
               />
             {/if}
