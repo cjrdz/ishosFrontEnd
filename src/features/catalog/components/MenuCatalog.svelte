@@ -6,7 +6,7 @@
   import ProductCard from "./shared/ProductCard.svelte";
   import ProductModal from "./shared/ProductModal.svelte";
   import { toSafeImageUrl } from "@shared/utils/formatters";
-  import { isOfferActive } from "@features/catalog/lib/offers";
+  import { isOfferActive, offerBasePrice } from "@features/catalog/lib/offers";
   import {
     computeUnitPrice,
     isProductConfigurable,
@@ -50,7 +50,7 @@
   ]);
   const activeCategoryLabel = $derived(
     categoryTabs.find((tab) => tab.id === activeCategory)?.label ??
-      "Categorias",
+      "Categorías",
   );
 
   const SIDEBAR_VISIBILITY_KEY = "ishos:menu-sidebar-visible";
@@ -150,10 +150,11 @@
       ordersEnabled = storeSettings.orders_enabled;
       offers = storeSettings.offers ?? [];
     } catch (error) {
+      // Raw fetch/HTTP messages are English and technical; customers get a
+      // plain Spanish message with a retry button instead.
+      console.error("[menu] load failed", error);
       loadingError =
-        error instanceof Error
-          ? error.message
-          : "No se pudo cargar el menú en este momento.";
+        "No pudimos cargar el menú. Revisa tu conexión e intenta de nuevo.";
     } finally {
       loading = false;
     }
@@ -278,7 +279,11 @@
       product_id: product.id,
       name: product.name,
       image_url: toSafeImageUrl(product.image_url),
-      unit_price: computeUnitPrice(product, draft),
+      unit_price: computeUnitPrice(
+        product,
+        draft,
+        offerBasePrice(product.id, offers),
+      ),
       quantity: draft.quantity,
       flavor_id: draft.flavor_id || undefined,
       flavor_ids: draft.flavor_ids || undefined,
@@ -330,7 +335,7 @@
   {#snippet categoryList(onselect: (categoryId: string) => void)}
     <div
       role="tablist"
-      aria-label="Categorias del menu"
+      aria-label="Categorías del menu"
       aria-orientation="vertical"
       class="flex flex-col gap-1"
       tabindex="0"
@@ -389,8 +394,14 @@
       {:else if loadingError}
         <div
           class="alert alert-error max-w-xl mx-auto rounded-xl shadow-sm mt-8"
+          role="alert"
         >
-          {loadingError}
+          <span>{loadingError}</span>
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={() => void loadStoreData()}>Reintentar</button
+          >
         </div>
       {:else if visibleProducts.length === 0}
         <div
@@ -427,7 +438,8 @@
                   product_id: product.id,
                   name: product.name,
                   image_url: toSafeImageUrl(product.image_url),
-                  unit_price: product.price,
+                  unit_price:
+                    offerBasePrice(product.id, offers) ?? product.price,
                   quantity: 1,
                 });
               }}
@@ -564,6 +576,9 @@
 <ProductModal
   product={selectedProduct}
   {ordersEnabled}
+  basePrice={selectedProduct
+    ? offerBasePrice(selectedProduct.id, offers)
+    : undefined}
   initialDraft={selectedDraft}
   imageUrl={selectedProduct
     ? toSafeImageUrl(selectedProduct.image_url)

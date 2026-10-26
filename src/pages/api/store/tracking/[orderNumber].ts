@@ -7,6 +7,7 @@
 
 import type { APIRoute } from "astro";
 import { forwardUpstreamJson, getServerApiBaseUrl } from "@core/bff/proxy";
+import { clientIdentityHeaders } from "@core/bff/upstream-headers";
 
 const ORDER_NUMBER_RE = /^ORD-\d{8}-\d{4}$/;
 
@@ -39,6 +40,7 @@ export const GET: APIRoute = async (context) => {
 
     const response = await fetch(
       `${getServerApiBaseUrl(context)}/orders/track?${query.toString()}`,
+      { headers: clientIdentityHeaders(context) },
     );
     return forwardUpstreamJson(response);
   } catch (error) {

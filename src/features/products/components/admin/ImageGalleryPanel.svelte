@@ -109,7 +109,7 @@
 >
   <div class="rounded-lg border border-base-300/70 p-3 space-y-3">
     <div class="flex items-center justify-between gap-2">
-      <span class="text-sm font-medium">Galeria de imagenes (menu)</span>
+      <span class="text-sm font-medium">Galería de imágenes (menú)</span>
       <button
         class="btn btn-xs btn-outline"
         type="button"
@@ -143,7 +143,7 @@
   <div>
     {#if galleryImages.length === 0}
       <div class="text-sm text-base-content/70">
-        No hay imagenes en el bucket.
+        No hay imágenes en el bucket.
       </div>
     {:else}
       <ul

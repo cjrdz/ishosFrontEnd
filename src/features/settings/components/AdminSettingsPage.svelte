@@ -260,13 +260,13 @@
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Sesion invalida");
+        throw new Error(payload?.error || "Sesión inválida");
       }
 
       const currentSession = payload as Session;
       if (currentSession.role !== "admin") {
         throw new Error(
-          "Solo administradores pueden acceder a esta configuracion",
+          "Solo administradores pueden acceder a esta configuración",
         );
       }
 
@@ -281,7 +281,7 @@
       sessionError =
         requestError instanceof Error
           ? requestError.message
-          : "Sesion invalida";
+          : "Sesión inválida";
     } finally {
       loading = false;
     }
@@ -336,7 +336,7 @@
     moduleError = "";
     try {
       if (!session?.id) {
-        throw new Error("No se pudo identificar la sesion de administrador");
+        throw new Error("No se pudo identificar la sesión de administrador");
       }
       tabOrder = saveAdminTabOrder(session.id, nextTabOrder as TabKey[]);
       setNotice("Orden del panel actualizada");
@@ -361,10 +361,10 @@
     moduleError = "";
     try {
       if (!session?.id) {
-        throw new Error("No se pudo identificar la sesion de administrador");
+        throw new Error("No se pudo identificar la sesión de administrador");
       }
       panelConfig = await updateAdminPanelConfig(nextPanelConfig);
-      setNotice("Configuracion de seguridad actualizada");
+      setNotice("Configuración de seguridad actualizada");
       trackAction(
         "admin_settings_panel_config_saved",
         panelConfig as unknown as Record<string, unknown>,
@@ -378,7 +378,7 @@
       moduleError =
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo guardar la configuracion de seguridad";
+          : "No se pudo guardar la configuración de seguridad";
     } finally {
       busy = false;
     }
@@ -390,7 +390,7 @@
 
     try {
       if (!session?.id) {
-        throw new Error("No se pudo identificar la sesion de administrador");
+        throw new Error("No se pudo identificar la sesión de administrador");
       }
       const response = await updateAdminStoreSettings({
         orders_enabled: enabled,
@@ -421,7 +421,7 @@
     moduleError = "";
     try {
       if (!session?.id) {
-        throw new Error("No se pudo identificar la sesion de administrador");
+        throw new Error("No se pudo identificar la sesión de administrador");
       }
       rowsPerTable = saveAdminRowsPerTable(session.id, nextRowsPerTable);
       setCurrentAdminContext(session.id, rowsPerTable.default);
@@ -447,7 +447,7 @@
     moduleError = "";
     try {
       archiveConfig = await updateOrderArchiveConfig(nextConfig);
-      setNotice("Configuracion de archivo actualizada");
+      setNotice("Configuración de archivo actualizada");
       trackAction("admin_settings_archive_config_saved", {
         ...archiveConfig,
       });
@@ -458,7 +458,7 @@
       moduleError =
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo guardar la configuracion de archivo";
+          : "No se pudo guardar la configuración de archivo";
     } finally {
       busy = false;
     }
@@ -470,7 +470,7 @@
     try {
       const result = await runArchive();
       setNotice(
-        `Archivo ejecutado: ${result.archived ?? 0} ordenes archivadas`,
+        `Archivo ejecutado: ${result.archived ?? 0} órdenes archivadas`,
       );
       trackAction("admin_settings_archive_run", {
         archived: result.archived ?? 0,
@@ -556,7 +556,7 @@
             onclick={handleLogout}
           >
             <Icon icon="lucide:log-out" class="h-4 w-4" />
-            <span class="hidden sm:inline">Cerrar sesion</span>
+            <span class="hidden sm:inline">Cerrar sesión</span>
           </button>
         </div>
       </div>
@@ -630,7 +630,7 @@
           <div>
             <h2 class="card-title">Proximas personalizaciones</h2>
             <p class="text-sm text-base-content/70">
-              Esta pagina queda preparada para crecer nuevas opciones sin tocar
+              Esta página queda preparada para crecer nuevas opciones sin tocar
               la operacion diaria.
             </p>
           </div>

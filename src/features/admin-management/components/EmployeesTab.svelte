@@ -176,7 +176,7 @@
   function requestDelete(employee: Employee) {
     openConfirm(
       "Eliminar empleado",
-      `Eliminar permanentemente ${employee.email}? Esta accion no se puede deshacer.`,
+      `Eliminar permanentemente ${employee.email}? Esta acción no se puede deshacer.`,
       () => onDelete(employee.id),
     );
   }
@@ -253,7 +253,7 @@
 
     <div class="form-control">
       <span id="employee-password-label" class="label-text text-xs mb-1"
-        >Contrasena {isEditing ? "(opcional)" : ""}</span
+        >Contraseña {isEditing ? "(opcional)" : ""}</span
       >
       <input
         id="employee-password"
@@ -280,7 +280,7 @@
 
     <div class="form-control">
       <span id="employee-phone-label" class="label-text text-xs mb-1"
-        >Telefono</span
+        >Teléfono</span
       >
       <input
         id="employee-phone"

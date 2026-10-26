@@ -12,6 +12,7 @@
 import type { APIRoute } from "astro";
 import { LoginSchema } from "@features/admin-management";
 import { getApiBaseUrl } from "@core/config";
+import { clientIdentityHeaders } from "@core/bff/upstream-headers";
 
 export const prerender = false;
 
@@ -148,12 +149,29 @@ export const POST: APIRoute = async (context) => {
     }
 
     // Parse and validate request body
-    const body = await context.request.json();
-    const validated = LoginSchema.parse(body);
+    const body = await context.request.json().catch(() => null);
+    const parsedBody = LoginSchema.safeParse(body);
+    if (!parsedBody.success) {
+      return new Response(
+        JSON.stringify({
+          error: "Correo o contraseña con formato inválido",
+          code: "VALIDATION_ERROR",
+        }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+    const validated = parsedBody.data;
 
     const upstreamResponse = await fetch(`${getApiBaseUrl()}/auth/login`, {
       method: "POST",
       headers: {
+        ...clientIdentityHeaders(context),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

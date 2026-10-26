@@ -6,14 +6,14 @@
  */
 
 import type { APIContext } from "astro";
-import { z } from "zod";
+import { z } from "@core/zod";
 
-const uuidSchema = z.string().uuid("Invalid UUID");
+const uuidSchema = z.guid("Invalid UUID");
 
 const orderItemSchema = z.object({
   product_id: uuidSchema,
   quantity: z.number().int().positive("Quantity must be at least 1"),
-  customizations: z.record(z.unknown()).optional(),
+  customizations: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const productCreateSchema = z.object({
@@ -74,7 +74,7 @@ export const addonUpdateSchema = addonCreateSchema.partial();
 export const orderCreateSchema = z.object({
   customer_name: z.string().trim().min(1).max(120),
   customer_phone: z.string().trim().min(7).max(25),
-  customer_email: z.string().email().optional(),
+  customer_email: z.email().optional(),
   payment_method: z.enum(["efectivo", "tarjeta", "transferencia", "otro"]),
   amount_received: z.number().nonnegative().optional(),
   order_type: z.enum(["en_local", "para_llevar"]),
@@ -114,7 +114,7 @@ export const orderArchiveSchema = z.object({
 
 // Employees
 export const employeeCreateSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().trim().pipe(z.email()),
   password: z.string().trim().min(6).max(100),
   name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(7).max(25).optional(),
@@ -134,7 +134,7 @@ export const userCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   user_type: z.enum(["user", "company"]).optional(),
   phone: z.string().trim().min(7).max(25),
-  email: z.string().trim().email().optional(),
+  email: z.string().trim().pipe(z.email()).optional(),
   status: z.enum(["active", "inactive"]).optional(),
 });
 
@@ -204,7 +204,7 @@ export const inventoryAdjustmentSchema = z.object({
 
 // Auth
 export const authLockoutResetSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().trim().pipe(z.email()),
 });
 
 // Upload
@@ -233,8 +233,7 @@ function validationErrorResponse(
 }
 
 type ValidationResult =
-  | { success: true; data: unknown }
-  | { success: false; response: Response };
+  { success: true; data: unknown } | { success: false; response: Response };
 
 export async function parseJsonBody(
   context: APIContext,

@@ -1,0 +1,26 @@
+---
+// Static logo: both variants are rendered and CSS shows the one matching
+// <html data-theme> (see .logo-variant in navbar.css), so theme switches need
+// no hydrated component.
+---
+
+<a
+  href="/"
+  class="btn btn-ghost normal-case text-xl font-bold group"
+  aria-label="Inicio"
+>
+  <img
+    src="/images/blackicon.webp"
+    alt="Isho's"
+    width="86"
+    height="86"
+    class="logo-img logo-variant logo-variant--light group-hover:scale-110 transition-transform duration-200"
+  />
+  <img
+    src="/images/whiteicon.webp"
+    alt=""
+    width="86"
+    height="86"
+    class="logo-img logo-variant logo-variant--dark group-hover:scale-110 transition-transform duration-200"
+  />
+</a>

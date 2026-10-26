@@ -100,9 +100,9 @@
 
   const categoryFilterLabel = $derived(
     categoryFilter === "all"
-      ? "Categorias"
+      ? "Categorías"
       : (categories.find((category) => category.id === categoryFilter)?.name ??
-          "Categoria"),
+          "Categoría"),
   );
 
   const availabilityFilterLabel = $derived(
@@ -288,7 +288,7 @@
         <thead class="bg-base-200/60 text-base-content">
           <tr>
             <th class="font-bold">Nombre</th>
-            <th class="text-center font-bold">Categoria</th>
+            <th class="text-center font-bold">Categoría</th>
             <th class="text-center font-bold">Precio</th>
             <th class="text-center font-bold">Oferta</th>
             <th class="text-center font-bold">Estado</th>

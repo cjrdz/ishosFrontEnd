@@ -7,12 +7,12 @@ export type TabKey =
   | "analitica";
 
 export const TAB_LABELS: Record<TabKey, string> = {
-  ordenes: "Ordenes",
-  categorias: "Categorias",
+  ordenes: "Órdenes",
+  categorias: "Categorías",
   productos: "Productos",
   inventario: "Inventario",
   personas: "Personas",
-  analitica: "Analitica",
+  analitica: "Analítica",
 };
 
 export const ADMIN_ONLY_TABS = new Set<TabKey>([

@@ -16,6 +16,9 @@
     onLogout: () => void;
     onTabChange: (tab: TabKey) => void;
     onOpenSettings: () => void;
+    counterMode: boolean;
+    /** Absent for admins: counter mode is a staff-only setting. */
+    onToggleCounterMode?: () => void;
   }
 
   let {
@@ -26,6 +29,8 @@
     onLogout,
     onTabChange,
     onOpenSettings,
+    counterMode,
+    onToggleCounterMode,
   }: Props = $props();
   let currentHour = $state(new Date().getHours());
 
@@ -86,18 +91,36 @@
           <span class="status status-success animate-ping"></span>
           <span class="status status-success"></span>
         </span>
-        <span>Sesion activa</span>
+        <span
+          >Sesión activa{counterMode
+            ? " · modo mostrador (sin cierre por inactividad)"
+            : ""}</span
+        >
       </p>
     </div>
   </div>
   <div class="flex items-center gap-2 self-end sm:self-auto">
     <ThemeToggle />
+    {#if onToggleCounterMode}
+      <button
+        class={`btn btn-circle ${counterMode ? "btn-primary" : "btn-ghost"}`}
+        type="button"
+        aria-pressed={counterMode}
+        aria-label="Modo mostrador: no cerrar sesión por inactividad en este dispositivo"
+        title={counterMode
+          ? "Modo mostrador activo en este dispositivo"
+          : "Activar modo mostrador (tablet de órdenes)"}
+        onclick={onToggleCounterMode}
+      >
+        <Icon icon="lucide:monitor-check" class="h-6 w-6" />
+      </button>
+    {/if}
     {#if isAdmin}
       <button
         class="btn btn-ghost btn-circle"
         type="button"
-        aria-label="Abrir configuracion"
-        title="Configuracion del panel"
+        aria-label="Abrir configuración"
+        title="Configuración del panel"
         onclick={onOpenSettings}
       >
         <Icon icon="lucide:settings-2" class="h-6 w-6" />
@@ -105,12 +128,12 @@
     {/if}
     <button
       class="btn btn-outline max-sm:btn-circle"
-      title="Cerrar sesion"
-      aria-label="Cerrar sesion"
+      title="Cerrar sesión"
+      aria-label="Cerrar sesión"
       onclick={onLogout}
     >
       <Icon icon="lucide:log-out" class="h-5 w-5" />
-      <span class="hidden sm:inline">Cerrar sesion</span>
+      <span class="hidden sm:inline">Cerrar sesión</span>
     </button>
   </div>
 </div>

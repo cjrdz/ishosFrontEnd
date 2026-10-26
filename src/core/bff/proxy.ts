@@ -10,6 +10,8 @@
 
 import type { APIContext } from "astro";
 import { getApiBaseUrl } from "../config";
+import { clientIdentityHeaders } from "./upstream-headers";
+import { resolveClientIp } from "./client-identity";
 
 const DEFAULT_BODY_LIMIT_BYTES = 64 * 1024; // 64 KiB
 const MAX_BODY_LIMIT_BYTES = 10 * 1024 * 1024; // 10 MiB
@@ -44,10 +46,8 @@ function logSecurityEvent(
   details: Record<string, unknown>,
 ): void {
   const requestId = crypto.randomUUID();
-  const clientIp =
-    context.request.headers.get("x-forwarded-for") ??
-    context.request.headers.get("cf-connecting-ip") ??
-    "unknown";
+  // Same trusted source as the rate-limit header (never client-set XFF).
+  const clientIp = resolveClientIp(context.request) ?? "unknown";
 
   const safeDetails: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(details)) {
@@ -204,6 +204,7 @@ export async function proxyToBackend(
   }
 
   const headers: Record<string, string> = {
+    ...clientIdentityHeaders(context),
     Authorization: `Bearer ${token}`,
     ...options.headers,
   };
@@ -346,6 +347,7 @@ export async function proxyToBackendStream(
   }
 
   const headers: Record<string, string> = {
+    ...clientIdentityHeaders(context),
     Authorization: `Bearer ${token}`,
     ...options.headers,
   };

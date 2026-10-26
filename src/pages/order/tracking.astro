@@ -1,10 +1,12 @@
 ---
 import StoreLayout from "../../layouts/StoreLayout.astro";
-import { OrderTracking } from "@features/orders";
+// Island entries import the component file directly, not a feature barrel:
+// Astro bundles the imported module, so a barrel would ship every export.
+import OrderTracking from "@features/orders/components/public/OrderTracking.svelte";
 ---
 
 <StoreLayout title="IshosFactory - Seguimiento">
-  <main class="container mx-auto px-4 py-8">
+  <section class="container mx-auto px-4 py-8">
     <OrderTracking client:load />
-  </main>
+  </section>
 </StoreLayout>

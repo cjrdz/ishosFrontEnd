@@ -1,12 +1,16 @@
 ---
 import "../styles/global.css";
-import StoreFooter from "@shared/components/StoreFooter.astro";
+import { inlineScript } from "@shared/csp/inline-script";
+import adminThemeSource from "./inline/admin-theme.js?raw";
 
 interface Props {
   title: string;
 }
 
 const { title } = Astro.props as Props;
+
+// Inline so the theme applies before first paint; hash registered with the CSP.
+const adminThemeScript = await inlineScript(Astro, adminThemeSource);
 ---
 
 <!doctype html>
@@ -17,29 +21,11 @@ const { title } = Astro.props as Props;
     <meta name="description" content="IshosFactory Admin" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
-    <script is:inline>
-      (() => {
-        const savedTheme =
-          localStorage.getItem("ishos_theme_admin") ??
-          localStorage.getItem("theme");
-        const prefersDark = window.matchMedia(
-          "(prefers-color-scheme: dark)",
-        ).matches;
-        const resolvedTheme =
-          savedTheme === "fantasy" || savedTheme === "night"
-            ? savedTheme
-            : prefersDark
-              ? "night"
-              : "fantasy";
-
-        document.documentElement.setAttribute("data-theme", resolvedTheme);
-      })();
-    </script>
+    <script is:inline set:html={adminThemeScript} />
   </head>
   <body class="bg-base-200 text-base-content min-h-screen flex flex-col">
     <main class="container mx-auto px-4 py-8 flex-1 w-full">
       <slot />
     </main>
-    <StoreFooter />
   </body>
 </html>

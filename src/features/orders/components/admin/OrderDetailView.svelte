@@ -170,9 +170,9 @@
       <button
         class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-info shrink-0"
         type="button"
-        title="Copiar numero de orden"
+        title="Copiar número de orden"
         onclick={() => onCopyToken(selectedOrder.order_number, "both")}
-        aria-label="Copiar numero de orden"
+        aria-label="Copiar número de orden"
       >
         <Icon
           icon={tokenCopied === "both" ? "lucide:check" : "lucide:copy"}
@@ -201,11 +201,11 @@
       <p class="font-medium">{selectedOrder.customer_name}</p>
     </div>
     <div class="space-y-1">
-      <span class="text-xs text-base-content/60">Telefono</span>
+      <span class="text-xs text-base-content/60">Teléfono</span>
       <p class="font-medium">{selectedOrder.customer_phone}</p>
     </div>
     <div class="space-y-1">
-      <span class="text-xs text-base-content/60">Metodo de pago</span>
+      <span class="text-xs text-base-content/60">Método de pago</span>
       <p class="font-medium capitalize">{selectedOrder.payment_method}</p>
     </div>
     {#if selectedOrder.payment_method === "efectivo" && selectedOrder.amount_received != null}

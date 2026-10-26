@@ -5,6 +5,7 @@
  * All requests automatically use HttpOnly cookies for auth.
  */
 
+import { prepareImageForUpload } from "./image-prep";
 import { ApiError } from "@core/errors";
 import { getAdminImageUploadMaxMB } from "@core/config";
 import type {
@@ -587,12 +588,14 @@ export async function listAdminImages() {
 }
 
 export async function uploadAdminImage(
-  file: File,
+  originalFile: File,
   folder = "",
 ): Promise<{ path: string; message: string }> {
+  // Resize/re-encode first so large phone photos fit the limit and load fast.
+  const file = await prepareImageForUpload(originalFile);
   if (file.size > ADMIN_IMAGE_UPLOAD_MAX_BYTES) {
     throw new ApiError(
-      `La imagen es demasiado grande. Tamano maximo: ${ADMIN_IMAGE_UPLOAD_MAX_MB} MB.`,
+      `La imagen es demasiado grande. Tamaño máximo: ${ADMIN_IMAGE_UPLOAD_MAX_MB} MB.`,
       413,
       "UPLOAD_TOO_LARGE",
     );

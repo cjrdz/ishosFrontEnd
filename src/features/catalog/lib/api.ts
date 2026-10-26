@@ -220,13 +220,20 @@ export async function listPublicCategories(
   return data;
 }
 
+/**
+ * Lists public products. `fresh` bypasses the in-memory and HTTP caches; the
+ * cart uses it to re-check prices and availability right before checkout.
+ */
 export async function listPublicProducts(
   params: ListProductsParams = { all: true },
+  options: { fresh?: boolean } = {},
 ): Promise<PublicProduct[]> {
   const query = buildQueryParams(params);
   const key = cacheKey("/api/store/products", query);
-  const cached = getCached<PublicProduct[]>(key);
-  if (cached) return cached;
+  if (!options.fresh) {
+    const cached = getCached<PublicProduct[]>(key);
+    if (cached) return cached;
+  }
 
   const search = new URLSearchParams(query).toString();
   const path = `/api/store/products${search ? `?${search}` : ""}`;
@@ -234,7 +241,7 @@ export async function listPublicProducts(
     | { data: PublicProduct[] }
     | PublicProduct[]
     | PaginatedResponse<PublicProduct>
-  >(path);
+  >(path, options.fresh ? { cache: "no-cache" } : undefined);
   const data = extractData(res);
   setCached(key, data);
   return data;

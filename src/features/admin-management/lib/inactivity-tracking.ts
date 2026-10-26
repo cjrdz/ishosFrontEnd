@@ -85,7 +85,12 @@ export function createInactivityTracking(
   function schedule() {
     if (typeof window === "undefined") return;
     const timeoutValue = options.getTimeoutSeconds();
-    if (timeoutValue === null) return;
+    if (timeoutValue === null) {
+      // Idle: cancel any pending warning/logout scheduled earlier.
+      clearTimers();
+      notifyWarning(null);
+      return;
+    }
 
     const timeoutSeconds = Math.max(1, timeoutValue);
     const timeoutMs = timeoutSeconds * 1000;
