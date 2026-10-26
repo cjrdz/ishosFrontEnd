@@ -23,11 +23,11 @@
   }
 
   const TAB_LABELS: Record<string, string> = {
-    ordenes: "Ordenes",
-    categorias: "Categorias",
+    ordenes: "Órdenes",
+    categorias: "Categorías",
     productos: "Productos",
     personas: "Personas",
-    analitica: "Analitica",
+    analitica: "Analítica",
   };
 
   let {
@@ -341,7 +341,7 @@
       <div class="grid gap-4 md:grid-cols-2">
         <label class="form-control">
           <span class="label-text text-sm font-medium"
-            >Cookie de sesion (horas)</span
+            >Cookie de sesión (horas)</span
           >
           <input
             class="input input-bordered input-sm w-full mt-1"
@@ -369,7 +369,7 @@
             disabled={busy}
           />
           <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >JWT de empleados para iniciar sesion.</span
+            >JWT de empleados para iniciar sesión.</span
           >
         </label>
 
@@ -386,7 +386,7 @@
             disabled={busy}
           />
           <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Token publico para rastreo de ordenes.</span
+            >Token público para rastreo de órdenes.</span
           >
         </label>
 
@@ -403,7 +403,7 @@
             disabled={busy}
           />
           <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Cierra sesion automaticamente sin actividad.</span
+            >Cierra sesión automáticamente sin actividad.</span
           >
         </label>
       </div>
@@ -425,7 +425,7 @@
       <div>
         <h2 class="card-title">Filas por tabla</h2>
         <p class="text-sm text-base-content/70">
-          Define el numero de filas visible por defecto en cada tabla.
+          Define el número de filas visible por defecto en cada tabla.
         </p>
       </div>
 
@@ -444,7 +444,7 @@
         </label>
 
         <label class="form-control">
-          <span class="label-text text-sm font-medium">Ordenes</span>
+          <span class="label-text text-sm font-medium">Órdenes</span>
           <select
             class="select select-bordered select-sm w-full mt-1"
             bind:value={localRowsPerTable.ordenes}
@@ -457,7 +457,7 @@
         </label>
 
         <label class="form-control">
-          <span class="label-text text-sm font-medium">Categorias</span>
+          <span class="label-text text-sm font-medium">Categorías</span>
           <select
             class="select select-bordered select-sm w-full mt-1"
             bind:value={localRowsPerTable.categorias}
@@ -537,9 +537,9 @@
   <div id="archivo-ordenes" class="card bg-base-100 shadow">
     <div class="card-body gap-4">
       <div>
-        <h2 class="card-title">Archivo de ordenes</h2>
+        <h2 class="card-title">Archivo de órdenes</h2>
         <p class="text-sm text-base-content/70">
-          Oculta automaticamente ordenes terminadas o canceladas despues de un
+          Oculta automáticamente órdenes terminadas o canceladas después de un
           tiempo, y permite archivar manualmente desde el panel.
         </p>
       </div>
@@ -555,8 +555,8 @@
           </p>
           <p class="text-sm text-base-content/60">
             {localArchiveConfig.enabled
-              ? `Las ordenes entregadas o canceladas se archivan despues de ${localArchiveConfig.age_days} dias.`
-              : "Las ordenes no se archivan automaticamente."}
+              ? `Las órdenes entregadas o canceladas se archivan después de ${localArchiveConfig.age_days} días.`
+              : "Las órdenes no se archivan automáticamente."}
           </p>
         </div>
         <input
@@ -579,7 +579,7 @@
       <div class="grid gap-4 md:grid-cols-2">
         <label class="form-control">
           <span class="label-text text-sm font-medium">
-            Antiguedad para archivo (dias)
+            Antigüedad para archivo (días)
           </span>
           <input
             class="input input-bordered input-sm w-full mt-1"
@@ -590,7 +590,7 @@
             disabled={busy}
           />
           <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Dias desde que la orden quedo en estado terminal.</span
+            >Días desde que la orden quedó en estado terminal.</span
           >
         </label>
 
@@ -607,7 +607,7 @@
             disabled={busy}
           />
           <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Cada cuanto el servidor busca ordenes candidatas.</span
+            >Cada cuánto el servidor busca órdenes candidatas.</span
           >
         </label>
       </div>
@@ -659,7 +659,7 @@
   onClose={() => {}}
 >
   <p>
-    Las ordenes entregadas y canceladas dejaran de archivarse automaticamente.
+    Las órdenes entregadas y canceladas dejarán de archivarse automáticamente.
     Puedes seguir archivando manualmente desde el panel.
   </p>
   <AdminFormActions

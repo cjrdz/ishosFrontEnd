@@ -5,12 +5,20 @@ import { ClientRouter } from "astro:transitions";
 import StoreNavbar from "@shared/components/StoreNavbar.astro";
 import StoreFooter from "@shared/components/StoreFooter.astro";
 import Icon from "@shared/components/AppIcon.svelte";
+import { inlineScript } from "@shared/csp/inline-script";
+import storeThemeSource from "./inline/store-theme.js?raw";
+import storeCartToastSource from "./inline/store-cart-toast.js?raw";
 
 interface Props {
   title: string;
 }
 
 const { title } = Astro.props as Props;
+
+// Inline (not bundled) so the theme applies before first paint; their hashes
+// are registered with the page CSP.
+const storeThemeScript = await inlineScript(Astro, storeThemeSource);
+const storeCartToastScript = await inlineScript(Astro, storeCartToastSource);
 ---
 
 <!doctype html>
@@ -31,53 +39,7 @@ const { title } = Astro.props as Props;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
     <ClientRouter />
-    <script is:inline>
-      (() => {
-        const themeWindow = window;
-        if (themeWindow.__ishosThemeSyncBound) return;
-        themeWindow.__ishosThemeSyncBound = true;
-
-        const resolveTheme = () => {
-          const savedTheme =
-            localStorage.getItem("ishos_theme_store") ??
-            localStorage.getItem("theme");
-          const prefersDark = window.matchMedia(
-            "(prefers-color-scheme: dark)",
-          ).matches;
-
-          return savedTheme === "fantasy" || savedTheme === "night"
-            ? savedTheme
-            : prefersDark
-              ? "night"
-              : "fantasy";
-        };
-
-        const applyTheme = (targetDocument) => {
-          if (!targetDocument?.documentElement) return;
-          targetDocument.documentElement.setAttribute(
-            "data-theme",
-            resolveTheme(),
-          );
-        };
-
-        // Initial page load
-        applyTheme(document);
-
-        // Apply theme to incoming document before it swaps in to avoid flash.
-        document.addEventListener("astro:before-swap", (event) => {
-          applyTheme(event.newDocument);
-        });
-
-        // Re-assert after swap/page load as safety for script/theme toggles.
-        document.addEventListener("astro:after-swap", () => {
-          applyTheme(document);
-        });
-
-        document.addEventListener("astro:page-load", () => {
-          applyTheme(document);
-        });
-      })();
-    </script>
+    <script is:inline set:html={storeThemeScript} />
   </head>
   <body class="bg-base-200 text-base-content min-h-screen flex flex-col">
     <StoreNavbar transition:animate="none" />
@@ -99,47 +61,7 @@ const { title } = Astro.props as Props;
       </div>
     </div>
 
-    <script is:inline>
-      (() => {
-        const toastEl = document.getElementById("store-cart-toast");
-        const textEl = document.getElementById("store-cart-toast-text");
-        if (!toastEl || !textEl) return;
-
-        let hideTimeout;
-
-        const onCartAdded = (event) => {
-          const customEvent = event;
-          const detail = customEvent?.detail || {};
-          const name =
-            typeof detail.name === "string" ? detail.name : "Producto";
-          const quantity = Number(detail.quantity || 1);
-          const qtyLabel = quantity > 1 ? `${quantity}x ` : "";
-
-          textEl.textContent = `${qtyLabel}${name} agregado al carrito`;
-
-          toastEl.classList.remove("hidden");
-          toastEl.classList.remove("store-cart-toast-visible");
-          void toastEl.offsetWidth;
-          toastEl.classList.add("store-cart-toast-visible");
-
-          clearTimeout(hideTimeout);
-          hideTimeout = setTimeout(() => {
-            toastEl.classList.remove("store-cart-toast-visible");
-            setTimeout(() => {
-              toastEl.classList.add("hidden");
-            }, 220);
-          }, 2100);
-        };
-
-        document.addEventListener("astro:page-load", () => {
-          window.removeEventListener("storefront-cart-added", onCartAdded);
-          window.addEventListener("storefront-cart-added", onCartAdded);
-        });
-
-        window.removeEventListener("storefront-cart-added", onCartAdded);
-        window.addEventListener("storefront-cart-added", onCartAdded);
-      })();
-    </script>
+    <script is:inline set:html={storeCartToastScript} />
 
     <script>
       import { animate } from "motion";

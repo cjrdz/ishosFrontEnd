@@ -141,7 +141,7 @@
 
             <div class="form-control">
               <span id="product-category-label" class="label-text text-xs mb-1"
-                >Categoria</span
+                >Categoría</span
               >
               <select
                 id="product-category"
@@ -151,7 +151,7 @@
                 aria-labelledby="product-category-label"
               >
                 {#if categories.length === 0}
-                  <option value="" disabled>Sin categorias</option>
+                  <option value="" disabled>Sin categorías</option>
                 {:else}
                   {#each categories as category}
                     <option value={category.id}>{category.name}</option>
@@ -329,12 +329,12 @@
           <textarea
             id="product-description"
             class="textarea textarea-bordered w-full flex-1 min-h-[180px] resize-none"
-            placeholder="Descripcion del producto"
+            placeholder="Descripción del producto"
             bind:value={form.description}
             required
             aria-labelledby="product-description-label"
           ></textarea>
-          <span id="product-description-label" class="sr-only">Descripcion</span
+          <span id="product-description-label" class="sr-only">Descripción</span
           >
         </div>
       </fieldset>

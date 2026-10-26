@@ -116,7 +116,7 @@
   function requestDeleteCategory(category: Category) {
     openConfirmDialog(
       confirmDialog,
-      "Eliminar categoria",
+      "Eliminar categoría",
       `Seguro que deseas eliminar ${category.name}?`,
       () => onDelete(category.id),
     );
@@ -131,7 +131,7 @@
     pendingToggleValue = checked;
     openConfirmDialog(
       confirmDialog,
-      checked ? "Activar categoria" : "Desactivar categoria",
+      checked ? "Activar categoría" : "Desactivar categoría",
       checked
         ? `Seguro que deseas activar ${category.name}?`
         : `Seguro que deseas desactivar ${category.name}?`,
@@ -196,7 +196,7 @@
 
 <AdminModalShell
   bind:dialogRef={categoryEditorDialog}
-  title={isEditing ? "Editar categoria" : "Crear categoria"}
+  title={isEditing ? "Editar categoría" : "Crear categoría"}
   icon="lucide:folder"
   widthClass="max-w-3xl"
   onClose={closeCategoryEditor}
@@ -259,17 +259,17 @@
 
     <div class="form-control md:col-span-2">
       <span id="category-description-label" class="label-text text-xs mb-1"
-        >Descripcion</span
+        >Descripción</span
       >
       <textarea
         id="category-description"
         class="textarea textarea-bordered textarea-sm w-full h-32 resize-none"
-        placeholder="Descripcion"
+        placeholder="Descripción"
         bind:value={form.description}
         aria-labelledby="category-description-label"
       ></textarea>
       <p class="mt-1 text-xs text-base-content/60">
-        El slug identifica la categoria en URLs y rutas internas.
+        El slug identifica la categoría en URLs y rutas internas.
       </p>
     </div>
 

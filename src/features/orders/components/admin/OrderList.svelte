@@ -91,7 +91,7 @@
   <div class="card-body gap-4">
     <!-- Toolbar -->
     <div class="flex flex-wrap items-center gap-2">
-      <h2 class="card-title shrink-0 mr-1">Ordenes</h2>
+      <h2 class="card-title shrink-0 mr-1">Órdenes</h2>
 
       <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
 
@@ -197,7 +197,7 @@
       <table class="table w-full">
         <thead class="bg-base-200/60 text-base-content">
           <tr>
-            <th class="font-bold">Numero</th>
+            <th class="font-bold">Número</th>
             <th class="font-bold">Cliente</th>
             <th class="text-center font-bold">Estado</th>
             <th class="text-right font-bold">Total</th>
@@ -208,7 +208,7 @@
           {#if filteredOrders.length === 0}
             <tr
               ><td colspan="5" class="text-center py-6 text-base-content/50"
-                >No hay ordenes</td
+                >No hay órdenes</td
               ></tr
             >
           {:else}

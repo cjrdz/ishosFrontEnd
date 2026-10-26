@@ -1,6 +1,6 @@
 # IshosFactory Frontend
 
-Astro 6 + Svelte 5 storefront and admin panel for IshosFactory. The frontend is an SSR app with an Astro BFF layer in front of the Go backend, so browser clients never talk to the backend directly.
+Astro 7 + Svelte 5 storefront and admin panel for IshosFactory. The frontend is an SSR app with an Astro BFF layer in front of the Go backend, so browser clients never talk to the backend directly.
 
 **Current version:** `0.0.1` (see [`package.json`](package.json) and [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for release flow).
 
@@ -12,7 +12,7 @@ The app has two surfaces:
 
 | Layer | Technology |
 | --- | --- |
-| SSR framework | Astro 6 |
+| SSR framework | Astro 7 |
 | Interactive UI | Svelte 5 |
 | Styling | Tailwind CSS 4 + DaisyUI |
 | Runtime adapters | Cloudflare Workers primary, Vercel adapter kept for alternate builds |
@@ -57,7 +57,9 @@ src/
 └── types/                # Cross-domain shared types only
 ```
 
-Each feature exposes a root `index.ts` barrel and should be imported through `@features/<feature>` from outside that feature. Alias mappings are defined in [tsconfig.json](/home/jrdz/Dev/fullStack/ishosFrontEnd/tsconfig.json), [astro.config.mjs](/home/jrdz/Dev/fullStack/ishosFrontEnd/astro.config.mjs), and [vitest.config.ts](/home/jrdz/Dev/fullStack/ishosFrontEnd/vitest.config.ts).
+Each feature exposes a root `index.ts` barrel for its library code, imported through `@features/<feature>` from outside that feature.
+
+> **Exception — island entries:** a page or layout that renders a component with `client:*` must import the `.svelte` file directly (e.g. `import OrderTracking from "@features/orders/components/public/OrderTracking.svelte"`). Astro bundles the module the page imports, so importing a barrel ships every export to the browser — this once put the whole admin bundle on the public tracking page. Alias mappings are defined in [tsconfig.json](/home/jrdz/Dev/fullStack/ishosFrontEnd/tsconfig.json), [astro.config.mjs](/home/jrdz/Dev/fullStack/ishosFrontEnd/astro.config.mjs), and [vitest.config.ts](/home/jrdz/Dev/fullStack/ishosFrontEnd/vitest.config.ts).
 
 ### Security and session handling
 
@@ -67,6 +69,8 @@ Each feature exposes a root `index.ts` barrel and should be imported through `@f
 - The BFF parses backend responses by `Content-Type` so non-JSON upstream errors are not masked.
 - BFF routes validate incoming requests with Zod and map validation errors to structured field-level responses.
 - Public order tracking uses `order_number + tracking_token`, and the tracking token is persisted client-side only for the secure tracking flow.
+- **Security headers:** `src/middleware.ts` adds `frame-ancestors 'none'`, `X-Frame-Options`, `nosniff`, Referrer/Permissions-Policy, COOP and HSTS to every response. Astro's hash-based CSP (`security.csp` in `astro.config.mjs`) locks scripts; inline `<script is:inline>` blocks must register their hash with `inlineScript()` (`src/shared/csp/inline-script.ts`).
+- **Client IP for rate limits:** the BFF forwards the shopper's IP (`X-Client-IP`) with `X-BFF-Secret` (`BFF_SHARED_SECRET`, same value as the backend), so backend per-IP limits apply per customer, not to the Worker's IP.
 - **CSRF posture:** The BFF does not use CSRF tokens. State-changing admin routes are protected by the `SameSite=Lax` auth cookie plus same-origin `Origin`/`Referer` checks in `src/middleware.ts`. This decision is documented and should be revisited only if cross-origin admin embedding is ever introduced.
 
 ## Routes
@@ -115,18 +119,24 @@ pnpm check:store-boundary
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22.23+ (Astro 7)
 - pnpm
 - Running `ishosBackEnd` instance
 
 ### Environment
 
-Create `.env`:
+Create `.env.development` (loaded by `astro dev` only — see `.env.example`):
 
 ```env
 PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
 PUBLIC_AUTH_COOKIE_TTL_HOURS=24
+BFF_SHARED_SECRET=<same value as the backend .env>
+SESSION_CACHE_SECRET=<openssl rand -hex 32>
 ```
+
+Do **not** create a plain `.env`: `pnpm deploy` builds on your machine and Vite would inline its `PUBLIC_API_BASE_URL` into the production bundle.
+
+`BFF_SHARED_SECRET` and `SESSION_CACHE_SECRET` are read at runtime through `astro:env` (never inlined into the build).
 
 If you test on LAN, include the backend port explicitly in `PUBLIC_API_BASE_URL`.
 
@@ -149,7 +159,11 @@ pnpm build
 pnpm preview
 pnpm build:cloudflare
 pnpm build:vercel
+pnpm icons:subset         # regenerate src/shared/icons/subset.json after adding an icon
 ```
+
+> **`pnpm preview` (workerd) calls the backend in `wrangler.jsonc` — production — unless a gitignored `.dev.vars` overrides it.**
+> For local previews create `.dev.vars` with `PUBLIC_API_BASE_URL=http://localhost:8080/api/v1` (plus the two secrets) and confirm one request reaches your local backend before browsing.
 
 Deployment:
 
@@ -157,7 +171,14 @@ Deployment:
 pnpm deploy
 ```
 
-`pnpm deploy` rebuilds before publishing. Rebuild whenever environment variables change because `PUBLIC_API_BASE_URL` is embedded into the SSR bundle at build time.
+`pnpm deploy` rebuilds before publishing (`wrangler login` first). On Cloudflare, `PUBLIC_API_BASE_URL` comes from `vars` in `wrangler.jsonc`; secrets are set once per Worker:
+
+```bash
+pnpm exec wrangler secret put BFF_SHARED_SECRET     # same value as the backend
+pnpm exec wrangler secret put SESSION_CACHE_SECRET
+```
+
+Vercel deployments need the same two variables in the project settings.
 
 ## Backend integration
 

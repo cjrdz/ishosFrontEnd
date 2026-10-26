@@ -20,9 +20,10 @@
     TRACKING_STATUS_LABELS,
     TRACKING_STATUS_ICONS_ACTIVE,
     TRACKING_STATUS_ICONS_STATIC,
-  } from "@features/analytics";
+  } from "@features/analytics/lib/tracking";
   import type { RecentTrackingOrder } from "@features/analytics/lib/tracking";
   import { subscribeOrderStatusSync } from "@features/orders/lib/status-sync";
+  import { copyToClipboard } from "@features/orders/lib/token-helpers";
   import "../../../../styles/order-tracking.css";
 
   type RecentHistoryConfirmState =
@@ -46,10 +47,22 @@
   let receiptActionMessage = $state("");
   let lastExternalRefreshAt = $state(0);
   let pendingRecentHistoryConfirm = $state<RecentHistoryConfirmState>(null);
+  let shareMessage = $state("");
 
   const TRACKING_RATE_LIMIT_COOLDOWN_MS = 60000;
   const RECENT_TRACKING_RETENTION_DAYS = 30;
   const TRACKING_EXTERNAL_REFRESH_MIN_INTERVAL_MS = 5000;
+  // Background refresh while the order is still in progress. 45s keeps a
+  // customer at ~80 requests/hour, within the backend's per-IP tracking limit.
+  const TRACKING_POLL_INTERVAL_MS = 45000;
+  // Refresh on returning to the tab if the last lookup is older than this.
+  const TRACKING_VISIBLE_REFRESH_MIN_AGE_MS = 15000;
+  const TRACKING_FINAL_STATUSES = new Set(["entregada", "cancelada"]);
+  let lastTrackingLookupAt = 0;
+  // The order number + token that produced the order on screen. Background
+  // refreshes and sharing use these, never the editable inputs, so typing a
+  // different number can't refresh (or share) the wrong order.
+  let loadedTracking: { orderNumber: string; token: string } | null = null;
 
   const trackedOrderItems = $derived(trackedOrder?.items ?? []);
   const trackingLookupActive = $derived(trackingBusy || trackingRefreshing);
@@ -92,8 +105,9 @@
       )
         return;
       if (trackingCooldownUntil > now) return;
+      if (!loadedTracking) return;
       lastExternalRefreshAt = now;
-      void runTrackingLookup({ silent: true });
+      void runTrackingLookup({ silent: true, target: loadedTracking });
     };
 
     const unsubscribeStatusSync = subscribeOrderStatusSync((event) => {
@@ -117,8 +131,31 @@
       }
     }
 
+    // Keep the status fresh without the customer reloading: poll while the
+    // tab is visible and the order is not final, and refresh on tab return.
+    const refreshInBackground = (minAgeMs: number) => {
+      if (document.visibilityState !== "visible") return;
+      if (!trackedOrder || TRACKING_FINAL_STATUSES.has(trackedOrder.status)) {
+        return;
+      }
+      if (trackingBusy || trackingRefreshing) return;
+      if (trackingCooldownUntil > Date.now()) return;
+      if (Date.now() - lastTrackingLookupAt < minAgeMs) return;
+      if (!loadedTracking) return;
+      void runTrackingLookup({ silent: true, target: loadedTracking });
+    };
+    const pollTimer = setInterval(
+      () => refreshInBackground(TRACKING_POLL_INTERVAL_MS - 1000),
+      TRACKING_POLL_INTERVAL_MS,
+    );
+    const onVisibilityChange = () =>
+      refreshInBackground(TRACKING_VISIBLE_REFRESH_MIN_AGE_MS);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       unsubscribeStatusSync();
+      clearInterval(pollTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (cooldownTimer) clearInterval(cooldownTimer);
     };
   });
@@ -148,9 +185,14 @@
     }
   }
 
-  async function runTrackingLookup(options?: { silent?: boolean }) {
-    const orderNumber = trackingOrderNumber.trim();
-    const token = trackingToken.trim();
+  async function runTrackingLookup(options?: {
+    silent?: boolean;
+    /** Look up this order instead of the input fields (background refresh). */
+    target?: { orderNumber: string; token: string };
+  }) {
+    const orderNumber =
+      options?.target?.orderNumber ?? trackingOrderNumber.trim();
+    const token = options?.target?.token ?? trackingToken.trim();
     const silent = options?.silent ?? false;
 
     if (trackingCooldownUntil > Date.now()) {
@@ -171,12 +213,15 @@
       return;
     }
 
-    trackingError = "";
+    if (!silent) {
+      trackingError = "";
+    }
     if (silent) {
       trackingRefreshing = true;
     } else {
       trackingBusy = true;
     }
+    lastTrackingLookupAt = Date.now();
 
     try {
       const order = await trackPublicOrder(orderNumber, token);
@@ -189,6 +234,8 @@
       }
 
       trackedOrder = order;
+      loadedTracking = { orderNumber, token };
+      trackingError = "";
       receiptActionMessage = "";
       clearTrackingCooldown();
       saveTracking(orderNumber, token);
@@ -205,9 +252,8 @@
         recentTrackingOrders = getRecentTrackingOrders();
       }
     } catch (error) {
-      trackedOrder = null;
-
       if (error instanceof ApiError && error.status === 404) {
+        trackedOrder = null;
         trackingError =
           "Tu orden fue cancelada. Contáctanos para más información.";
         return;
@@ -215,10 +261,21 @@
 
       if (error instanceof ApiError && error.status === 429) {
         startTrackingCooldown();
-        trackingError =
-          "Hiciste muchas consultas en poco tiempo. Espera 60 segundos e intenta de nuevo.";
+        // A background refresh keeps showing the last known status.
+        if (!silent || !trackedOrder) {
+          trackedOrder = null;
+          trackingError =
+            "Hiciste muchas consultas en poco tiempo. Espera 60 segundos e intenta de nuevo.";
+        }
         return;
       }
+
+      // Transient failures during a background refresh (network blip, server
+      // restart) must not blank the order the customer is looking at.
+      if (silent && trackedOrder) {
+        return;
+      }
+      trackedOrder = null;
 
       trackingError =
         error instanceof Error
@@ -402,21 +459,49 @@
     ].join("\n");
   }
 
+  /**
+   * Shares (or copies) a link that opens this order's tracking on any device.
+   * Same format as the WhatsApp link the backend sends.
+   */
+  async function shareTrackingLink() {
+    if (!loadedTracking) return;
+    const { orderNumber, token } = loadedTracking;
+    const query = new URLSearchParams({ order: orderNumber, token });
+    const url = `${window.location.origin}/order/tracking?${query.toString()}`;
+
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: `Pedido ${orderNumber}`,
+          text: "Sigue el estado de tu pedido en Isho's:",
+          url,
+        });
+        return;
+      } catch (shareError) {
+        // User dismissed the share sheet: nothing to do.
+        if (
+          shareError instanceof DOMException &&
+          shareError.name === "AbortError"
+        ) {
+          return;
+        }
+      }
+    }
+
+    const copied = await copyToClipboard(url, "link");
+    shareMessage = copied
+      ? "Enlace copiado. Ábrelo en otro dispositivo para seguir tu pedido."
+      : "No se pudo copiar el enlace.";
+    setTimeout(() => (shareMessage = ""), 4000);
+  }
+
   function printTrackedOrderReceipt() {
     if (!trackedOrder) return;
     const receiptText = buildReceiptText(trackedOrder);
-    const printWindow = window.open(
-      "",
-      "_blank",
-      "noopener,noreferrer,width=900,height=900",
-    );
 
-    if (!printWindow) {
-      receiptActionMessage =
-        "No se pudo abrir la ventana de impresion. Revisa si el navegador bloqueo ventanas emergentes.";
-      return;
-    }
-
+    // Print from a hidden iframe driven by this (CSP-hashed) bundle. A popup
+    // opened with "noopener" is always null, and a document.write'd inline
+    // <script> would be blocked by the page CSP it inherits.
     const html = `<!doctype html>
 <html lang="es">
 <head>
@@ -438,18 +523,38 @@
 <body>
   <h1>Comprobante de pedido</h1>
   <pre>${escapeHtml(receiptText)}</pre>
-  <script>
-    window.addEventListener("load", () => {
-      window.print();
-    });
-  <\/script>
 </body>
 </html>`;
 
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    receiptActionMessage = "Comprobante listo para imprimir.";
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.setAttribute("tabindex", "-1");
+    frame.title = "Comprobante para imprimir";
+    Object.assign(frame.style, {
+      position: "fixed",
+      right: "0",
+      bottom: "0",
+      width: "0",
+      height: "0",
+      border: "0",
+    });
+    frame.addEventListener("load", () => {
+      const printWindow = frame.contentWindow;
+      if (!printWindow) {
+        receiptActionMessage =
+          "No se pudo preparar la impresión. Usa el botón “Comprobante” para descargarlo.";
+        frame.remove();
+        return;
+      }
+      printWindow.addEventListener("afterprint", () => frame.remove(), {
+        once: true,
+      });
+      printWindow.focus();
+      printWindow.print();
+      receiptActionMessage = "Comprobante listo para imprimir.";
+    });
+    frame.srcdoc = html;
+    document.body.appendChild(frame);
   }
 
   function downloadTrackedOrderReceipt() {
@@ -621,6 +726,19 @@
             >
               {trackedOrder.order_number}
             </p>
+            <button
+              type="button"
+              class="btn btn-ghost btn-xs rounded-full gap-1.5 mt-1 -ml-2"
+              onclick={() => void shareTrackingLink()}
+            >
+              <Icon icon="lucide:share-2" width="12" height="12" />
+              Compartir seguimiento
+            </button>
+            {#if shareMessage}
+              <p class="text-xs text-success mt-1" role="status">
+                {shareMessage}
+              </p>
+            {/if}
           </div>
           <div
             class={`badge badge-lg font-bold border-0 px-4 py-3 rounded-full ${trackedOrder.status === "entregada" ? "bg-success/15 text-success" : "text-white"}`}
@@ -808,6 +926,14 @@
                 >
               {/if}
               <button
+                class="btn btn-ghost btn-xs rounded-full gap-1.5 hidden sm:inline-flex"
+                type="button"
+                onclick={printTrackedOrderReceipt}
+              >
+                <Icon icon="lucide:printer" width="12" height="12" />
+                Imprimir
+              </button>
+              <button
                 class="btn btn-success btn-xs rounded-full gap-1.5"
                 type="button"
                 onclick={downloadTrackedOrderReceipt}
@@ -970,7 +1096,7 @@
       {#if pendingRecentHistoryConfirm.kind === "delete-one"}
         <h3 class="text-base font-bold">Eliminar pedido del historial?</h3>
         <p class="mt-2 text-sm text-base-content/75">
-          Esta accion borrara
+          Esta acción borrará
           <span class="font-semibold"
             >{pendingRecentHistoryConfirm.order.orderNumber}</span
           >
@@ -979,7 +1105,7 @@
       {:else}
         <h3 class="text-base font-bold">Borrar historial completo?</h3>
         <p class="mt-2 text-sm text-base-content/75">
-          Esta accion eliminara
+          Esta acción eliminará
           <span class="font-semibold">{pendingRecentHistoryConfirm.count}</span>
           {pendingRecentHistoryConfirm.count === 1
             ? " pedido reciente"

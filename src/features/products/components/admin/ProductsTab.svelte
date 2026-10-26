@@ -305,7 +305,7 @@
       offerError =
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo cargar la configuracion de ofertas";
+          : "No se pudo cargar la configuración de ofertas";
     } finally {
       offerBusy = false;
     }

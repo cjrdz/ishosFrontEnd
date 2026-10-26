@@ -34,6 +34,16 @@
     type ProductCustomizationDraft,
   } from "@features/catalog/lib/customization";
   import ProductModal from "./shared/ProductModal.svelte";
+  import {
+    fetchStoreSettings,
+    type StoreOfferItem,
+  } from "@features/catalog/lib/api";
+  import { offerBasePrice } from "@features/catalog/lib/offers";
+  import {
+    MAX_CUSTOMER_NAME_LENGTH,
+    validateCheckoutContact,
+    type CheckoutFieldErrors,
+  } from "@features/catalog/lib/checkout-validation";
 
   type CheckoutStep = "cart" | "checkout";
 
@@ -53,6 +63,25 @@
   let submitting = $state(false);
   let message = $state("");
   let error = $state("");
+  // Mirrors the admin "orders enabled" switch. Defaults to open if settings
+  // cannot be loaded; the backend still rejects orders when the store is closed.
+  let ordersEnabled = $state(true);
+  let offers = $state<StoreOfferItem[]>([]);
+  // Menu data is needed to re-price items and detect unavailable ones.
+  let catalogLoaded = $state(false);
+  let catalogLoadFailed = $state(false);
+  let priceNotice = $state("");
+  let fieldErrors = $state<CheckoutFieldErrors>({});
+
+  const ORDER_TYPE_OPTIONS = [
+    { value: "para_llevar", label: "Para llevar" },
+    { value: "en_local", label: "En local" },
+  ] as const;
+  const PAYMENT_METHOD_OPTIONS = [
+    { value: "efectivo", label: "Efectivo" },
+    { value: "tarjeta", label: "Tarjeta" },
+    { value: "transferencia", label: "Transferencia" },
+  ] as const;
 
   let editingItem = $state<StoreCartItem | null>(null);
   let editingProduct = $state<PublicProduct | null>(null);
@@ -74,9 +103,12 @@
     items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0),
   );
 
+  // Unavailable items are excluded: they can't be edited, only removed, so
+  // they're reported separately (unavailableItems).
   const incompleteItems = $derived(
     items.filter((item) => {
       const product = productById(item.product_id);
+      if (catalogLoaded && (!product || !product.is_available)) return false;
       const draft = draftFromItem(item);
       return (
         requiresFlavorSelection(product, draft) ||
@@ -85,6 +117,74 @@
       );
     }),
   );
+
+  // Items whose product was removed or marked unavailable since it was added.
+  const unavailableItems = $derived(
+    catalogLoaded
+      ? items.filter((item) => {
+          const product = productById(item.product_id);
+          return !product || !product.is_available;
+        })
+      : [],
+  );
+
+  function isItemUnavailable(item: StoreCartItem): boolean {
+    return unavailableItems.includes(item);
+  }
+
+  /**
+   * Re-prices cart items from the current menu (same rule the backend uses:
+   * active offer price or regular price, plus paid add-ons), so the total the
+   * customer confirms is the total they are charged.
+   */
+  function reconcileCartPrices() {
+    let changed = false;
+    const next = items.map((item) => {
+      const product = productById(item.product_id);
+      if (!product || !product.is_available) return item;
+      const unit_price = computeUnitPrice(
+        product,
+        draftFromItem(item),
+        offerBasePrice(product.id, offers),
+      );
+      if (Math.abs(unit_price - item.unit_price) < 0.005) return item;
+      changed = true;
+      return { ...item, unit_price };
+    });
+    if (changed) {
+      setCartItems(next);
+      items = getCartItems();
+      priceNotice =
+        "Actualizamos los precios de tu carrito según el menú y las ofertas vigentes.";
+    }
+  }
+
+  async function loadCatalog() {
+    catalogLoadFailed = false;
+    const [productsResult, settingsResult] = await Promise.allSettled([
+      listPublicProducts({ all: true }, { fresh: true }),
+      fetchStoreSettings(),
+    ]);
+    if (settingsResult.status === "fulfilled") {
+      ordersEnabled = settingsResult.value.orders_enabled;
+      offers = settingsResult.value.offers ?? [];
+    } else {
+      // The backend still enforces a closed store.
+      ordersEnabled = true;
+    }
+    if (productsResult.status === "fulfilled") {
+      products = productsResult.value;
+      catalogLoaded = true;
+      // Re-price only with the offers in hand: without settings, every item
+      // would fall back to its regular price and the cart would show more than
+      // the backend (which applies offers itself) will charge.
+      if (settingsResult.status === "fulfilled") {
+        reconcileCartPrices();
+      }
+    } else {
+      catalogLoadFailed = true;
+    }
+  }
 
   function productById(productId: string): PublicProduct | undefined {
     return products.find((product) => product.id === productId);
@@ -213,7 +313,11 @@
   function handleEditConfirm(draft: ProductCustomizationDraft) {
     if (!editingItem || !editingProduct) return;
 
-    const unit_price = computeUnitPrice(editingProduct, draft);
+    const unit_price = computeUnitPrice(
+      editingProduct,
+      draft,
+      offerBasePrice(editingProduct.id, offers),
+    );
 
     const updated: StoreCartItem = {
       product_id: editingProduct.id,
@@ -289,9 +393,55 @@
     return Object.keys(customizations).length > 0 ? customizations : undefined;
   }
 
+  /**
+   * Turns backend order errors into messages a customer can act on.
+   */
+  function orderErrorMessage(requestError: unknown): string {
+    if (requestError instanceof ApiError) {
+      if (requestError.status === 400) {
+        return "Revisa tus datos: nombre, teléfono o correo no son válidos.";
+      }
+      if (requestError.status === 0) {
+        return "Sin conexión. Revisa tu internet e intenta de nuevo; tu carrito sigue guardado.";
+      }
+      if (requestError.status === 429) {
+        return "Has alcanzado el límite de pedidos. Intenta más tarde.";
+      }
+      if (requestError.status === 409) {
+        // The backend names the unavailable product: "conflict: <name>".
+        const product = requestError.message
+          .replace(/^conflict:\s*/i, "")
+          .trim();
+        return product
+          ? `“${product}” ya no está disponible. Quítalo del carrito para continuar.`
+          : "Algunos productos ya no están disponibles. Revisa tu carrito.";
+      }
+      if (requestError.status === 403 || requestError.status === 503) {
+        return "La tienda no está recibiendo pedidos en este momento.";
+      }
+      if (requestError.status >= 500) {
+        return "No pudimos procesar tu pedido. Intenta de nuevo en unos minutos.";
+      }
+    }
+    return requestError instanceof Error && requestError.message
+      ? requestError.message
+      : "No se pudo crear la orden.";
+  }
+
   async function submitOrder() {
+    if (!ordersEnabled) {
+      error = "La tienda no está recibiendo pedidos en este momento.";
+      return;
+    }
+
     if (items.length === 0) {
       error = "Tu carrito está vacío.";
+      step = "cart";
+      return;
+    }
+
+    if (unavailableItems.length > 0) {
+      error = "Quita los productos que ya no están disponibles para continuar.";
       step = "cart";
       return;
     }
@@ -302,8 +452,14 @@
       return;
     }
 
-    if (!form.customer_name.trim() || !form.customer_phone.trim()) {
-      error = "Nombre y teléfono son obligatorios.";
+    fieldErrors = validateCheckoutContact(form);
+    if (Object.keys(fieldErrors).length > 0) {
+      error = "Revisa los datos marcados.";
+      // Move focus to the first invalid field for keyboard and screen readers.
+      await tick();
+      document
+        .querySelector<HTMLElement>("#checkout-form [aria-invalid='true']")
+        ?.focus();
       return;
     }
 
@@ -339,14 +495,7 @@
       items = [];
       window.location.href = "/order/tracking";
     } catch (requestError: unknown) {
-      if (requestError instanceof ApiError && requestError.status === 429) {
-        error = "Has alcanzado el límite de pedidos. Intenta más tarde.";
-      } else {
-        error =
-          requestError instanceof Error
-            ? requestError.message
-            : "No se pudo crear la orden.";
-      }
+      error = orderErrorMessage(requestError);
     } finally {
       submitting = false;
     }
@@ -354,11 +503,7 @@
 
   onMount(async () => {
     refreshItems();
-    try {
-      products = await listPublicProducts();
-    } catch {
-      products = [];
-    }
+    await loadCatalog();
 
     void tick().then(() => {
       if (!containerRef) return;
@@ -444,10 +589,19 @@
       <ul class="steps steps-horizontal w-full">
         <li class={`step ${step === "cart" ? "step-brand" : ""}`}>Carrito</li>
         <li class={`step ${step === "checkout" ? "step-brand" : ""}`}>
-          Checkout
+          Datos y pago
         </li>
       </ul>
     </section>
+
+    {#if !ordersEnabled}
+      <div class="alert alert-warning rounded-2xl mb-6" role="status">
+        <span>
+          La tienda no está recibiendo pedidos en este momento. Tu carrito se
+          guarda en este dispositivo para que puedas pedir más tarde.
+        </span>
+      </div>
+    {/if}
 
     {#if items.length === 0}
       <div
@@ -465,6 +619,37 @@
     {:else if step === "cart"}
       <div class="grid grid-cols-1 xl:grid-cols-[1.35fr_0.9fr] gap-6">
         <div class="space-y-4">
+          {#if catalogLoadFailed}
+            <div class="alert alert-warning rounded-2xl text-sm" role="status">
+              <span>
+                No pudimos cargar el menú para verificar precios y
+                disponibilidad.
+              </span>
+              <button
+                type="button"
+                class="btn btn-sm btn-ghost"
+                onclick={() => void loadCatalog()}>Reintentar</button
+              >
+            </div>
+          {/if}
+
+          {#if priceNotice}
+            <div class="alert alert-info rounded-2xl text-sm" role="status">
+              <span>{priceNotice}</span>
+            </div>
+          {/if}
+
+          {#if unavailableItems.length > 0}
+            <div class="alert alert-error rounded-2xl text-sm" role="alert">
+              <span>
+                {unavailableItems.length === 1
+                  ? "Un producto de tu carrito ya no está disponible."
+                  : `${unavailableItems.length} productos de tu carrito ya no están disponibles.`}
+                Quítalo para continuar.
+              </span>
+            </div>
+          {/if}
+
           {#if incompleteItems.length > 0}
             <div class="alert alert-warning rounded-2xl text-sm">
               <span>
@@ -477,7 +662,7 @@
           {#each items as item, index (index)}
             {@const summary = customizationSummary(item)}
             <article
-              class="card bg-base-100 border border-base-200 rounded-3xl shadow-sm"
+              class={`card bg-base-100 border rounded-3xl shadow-sm ${isItemUnavailable(item) ? "border-error/60 opacity-75" : "border-base-200"}`}
             >
               <div class="p-5 md:p-6">
                 <div
@@ -487,6 +672,11 @@
                     <h3 class="text-xl font-extrabold leading-tight">
                       {item.name}
                     </h3>
+                    {#if isItemUnavailable(item)}
+                      <span class="badge badge-error badge-sm"
+                        >No disponible</span
+                      >
+                    {/if}
                     <p class="text-sm text-base-content/65">
                       {item.quantity} x {formatCurrency(item.unit_price)}
                     </p>
@@ -535,13 +725,15 @@
                   </div>
 
                   <div class="flex gap-2">
-                    <button
-                      type="button"
-                      class="btn btn-outline btn-sm rounded-full"
-                      onclick={() => openEditModal(item)}
-                    >
-                      Editar
-                    </button>
+                    {#if !isItemUnavailable(item)}
+                      <button
+                        type="button"
+                        class="btn btn-outline btn-sm rounded-full"
+                        onclick={() => openEditModal(item)}
+                      >
+                        Editar
+                      </button>
+                    {/if}
                     <button
                       type="button"
                       class="btn btn-ghost btn-sm rounded-full text-error"
@@ -579,10 +771,22 @@
               </div>
             </div>
 
+            {#if error}
+              <div class="alert alert-error rounded-2xl text-sm" role="alert">
+                <span>{error}</span>
+              </div>
+            {/if}
+
             <button
               type="button"
               class="btn btn-brand btn-lg w-full rounded-xl font-bold"
+              disabled={!ordersEnabled}
               onclick={() => {
+                if (unavailableItems.length > 0) {
+                  error =
+                    "Quita los productos que ya no están disponibles para continuar.";
+                  return;
+                }
                 if (incompleteItems.length > 0) {
                   error =
                     "Completa las personalizaciones pendientes antes de continuar.";
@@ -612,118 +816,182 @@
               >
             </div>
 
-            <div class="grid gap-4 md:grid-cols-2 md:gap-x-5 md:gap-y-4">
-              <label class="form-control w-full">
-                <span
-                  class="label-text font-bold text-base-content/70 ml-1 mb-1"
-                  >Nombre *</span
-                >
-                <input
-                  type="text"
-                  class="input input-bordered rounded-2xl w-full"
-                  bind:value={form.customer_name}
-                />
-              </label>
-              <label class="form-control w-full">
-                <span
-                  class="label-text font-bold text-base-content/70 ml-1 mb-1"
-                  >Teléfono *</span
-                >
-                <input
-                  type="tel"
-                  class="input input-bordered rounded-2xl w-full"
-                  bind:value={form.customer_phone}
-                />
-              </label>
+            <form
+              id="checkout-form"
+              class="space-y-5"
+              novalidate
+              onsubmit={(event) => {
+                event.preventDefault();
+                void submitOrder();
+              }}
+            >
+              <div class="grid gap-4 md:grid-cols-2 md:gap-x-5 md:gap-y-4">
+                <label class="form-control w-full">
+                  <span
+                    class="label-text font-bold text-base-content/70 ml-1 mb-1"
+                    >Nombre *</span
+                  >
+                  <input
+                    type="text"
+                    name="name"
+                    autocomplete="name"
+                    required
+                    maxlength={MAX_CUSTOMER_NAME_LENGTH}
+                    class={`input input-bordered rounded-2xl w-full ${fieldErrors.customer_name ? "input-error" : ""}`}
+                    aria-invalid={fieldErrors.customer_name
+                      ? "true"
+                      : undefined}
+                    aria-describedby={fieldErrors.customer_name
+                      ? "checkout-name-error"
+                      : undefined}
+                    bind:value={form.customer_name}
+                  />
+                  {#if fieldErrors.customer_name}
+                    <span
+                      id="checkout-name-error"
+                      class="text-error text-sm mt-1 ml-1"
+                      >{fieldErrors.customer_name}</span
+                    >
+                  {/if}
+                </label>
+                <label class="form-control w-full">
+                  <span
+                    class="label-text font-bold text-base-content/70 ml-1 mb-1"
+                    >Teléfono (WhatsApp) *</span
+                  >
+                  <input
+                    type="tel"
+                    name="tel"
+                    autocomplete="tel"
+                    inputmode="tel"
+                    required
+                    placeholder="7123 4567"
+                    class={`input input-bordered rounded-2xl w-full ${fieldErrors.customer_phone ? "input-error" : ""}`}
+                    aria-invalid={fieldErrors.customer_phone
+                      ? "true"
+                      : undefined}
+                    aria-describedby={fieldErrors.customer_phone
+                      ? "checkout-phone-error"
+                      : "checkout-phone-hint"}
+                    bind:value={form.customer_phone}
+                  />
+                  {#if fieldErrors.customer_phone}
+                    <span
+                      id="checkout-phone-error"
+                      class="text-error text-sm mt-1 ml-1"
+                      >{fieldErrors.customer_phone}</span
+                    >
+                  {:else}
+                    <span
+                      id="checkout-phone-hint"
+                      class="text-base-content/60 text-xs mt-1 ml-1"
+                      >Te avisaremos por WhatsApp cuando tu pedido esté listo.</span
+                    >
+                  {/if}
+                </label>
 
-              <label class="form-control w-full md:col-span-2">
-                <span
-                  class="label-text font-bold text-base-content/70 ml-1 mb-1"
-                  >Email (opcional)</span
-                >
-                <input
-                  type="email"
-                  class="input input-bordered rounded-2xl w-full"
-                  bind:value={form.customer_email}
-                />
-              </label>
-            </div>
-
-            <div class="space-y-2">
-              <span class="label-text font-bold text-base-content/70 ml-1"
-                >Tipo de pedido</span
-              >
-              <div class="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  class={`btn rounded-full ${form.order_type === "para_llevar" ? "btn-brand" : "btn-outline"}`}
-                  onclick={() => {
-                    form.order_type = "para_llevar";
-                    form.table_number = "";
-                  }}
-                >
-                  Para llevar
-                </button>
-                <button
-                  type="button"
-                  class={`btn rounded-full ${form.order_type === "en_local" ? "btn-brand" : "btn-outline"}`}
-                  onclick={() => {
-                    form.order_type = "en_local";
-                  }}
-                >
-                  En local
-                </button>
+                <label class="form-control w-full md:col-span-2">
+                  <span
+                    class="label-text font-bold text-base-content/70 ml-1 mb-1"
+                    >Email (opcional)</span
+                  >
+                  <input
+                    type="email"
+                    name="email"
+                    autocomplete="email"
+                    inputmode="email"
+                    class={`input input-bordered rounded-2xl w-full ${fieldErrors.customer_email ? "input-error" : ""}`}
+                    aria-invalid={fieldErrors.customer_email
+                      ? "true"
+                      : undefined}
+                    aria-describedby={fieldErrors.customer_email
+                      ? "checkout-email-error"
+                      : undefined}
+                    bind:value={form.customer_email}
+                  />
+                  {#if fieldErrors.customer_email}
+                    <span
+                      id="checkout-email-error"
+                      class="text-error text-sm mt-1 ml-1"
+                      >{fieldErrors.customer_email}</span
+                    >
+                  {/if}
+                </label>
               </div>
-              {#if form.order_type === "en_local"}
+
+              <fieldset class="space-y-2">
+                <legend
+                  class="label-text font-bold text-base-content/70 ml-1 mb-2"
+                  >Tipo de pedido</legend
+                >
+                <div class="flex flex-wrap gap-2">
+                  {#each ORDER_TYPE_OPTIONS as option (option.value)}
+                    <label
+                      class={`btn rounded-full has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 ${form.order_type === option.value ? "btn-brand" : "btn-outline"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="order_type"
+                        class="sr-only"
+                        value={option.value}
+                        bind:group={form.order_type}
+                        onchange={() => {
+                          if (option.value === "para_llevar")
+                            form.table_number = "";
+                        }}
+                      />
+                      {option.label}
+                    </label>
+                  {/each}
+                </div>
+                {#if form.order_type === "en_local"}
+                  <p class="text-sm text-base-content/70 px-1">
+                    El número de mesa se asigna al llegar al local.
+                  </p>
+                {/if}
+              </fieldset>
+
+              <fieldset class="space-y-2">
+                <legend
+                  class="label-text font-bold text-base-content/70 ml-1 mb-2"
+                  >Método de pago</legend
+                >
+                <div class="flex flex-wrap gap-2">
+                  {#each PAYMENT_METHOD_OPTIONS as option (option.value)}
+                    <label
+                      class={`btn rounded-full has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 ${form.payment_method === option.value ? "btn-brand" : "btn-outline"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="payment_method"
+                        class="sr-only"
+                        value={option.value}
+                        bind:group={form.payment_method}
+                      />
+                      {option.label}
+                    </label>
+                  {/each}
+                </div>
                 <p class="text-sm text-base-content/70 px-1">
-                  El número de mesa se asigna al llegar al local.
+                  Este método es informativo para preparar el cobro en local o
+                  entrega.
                 </p>
-              {/if}
-            </div>
+              </fieldset>
 
-            <div class="space-y-2">
-              <span class="label-text font-bold text-base-content/70 ml-1"
-                >Método de pago</span
-              >
-              <div class="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  class={`btn rounded-full ${form.payment_method === "efectivo" ? "btn-brand" : "btn-outline"}`}
-                  onclick={() => (form.payment_method = "efectivo")}
+              <label class="form-control w-full">
+                <span
+                  class="label-text font-bold text-base-content/70 ml-1 mb-1"
+                  >Notas (opcional)</span
                 >
-                  Efectivo
-                </button>
-                <button
-                  type="button"
-                  class={`btn rounded-full ${form.payment_method === "tarjeta" ? "btn-brand" : "btn-outline"}`}
-                  onclick={() => (form.payment_method = "tarjeta")}
-                >
-                  Tarjeta
-                </button>
-                <button
-                  type="button"
-                  class={`btn rounded-full ${form.payment_method === "transferencia" ? "btn-brand" : "btn-outline"}`}
-                  onclick={() => (form.payment_method = "transferencia")}
-                >
-                  Transferencia
-                </button>
-              </div>
-              <p class="text-sm text-base-content/70 px-1">
-                Este método es informativo para preparar el cobro en local o
-                entrega.
-              </p>
-            </div>
-
-            <label class="form-control w-full">
-              <span class="label-text font-bold text-base-content/70 ml-1 mb-1"
-                >Notas (opcional)</span
-              >
-              <textarea
-                class="textarea textarea-bordered rounded-2xl w-full"
-                rows="3"
-                bind:value={form.notes}
-              ></textarea>
-            </label>
+                <textarea
+                  name="notes"
+                  class="textarea textarea-bordered rounded-2xl w-full"
+                  rows="3"
+                  maxlength="500"
+                  bind:value={form.notes}
+                ></textarea>
+              </label>
+            </form>
           </div>
         </section>
 
@@ -758,7 +1026,7 @@
             </div>
 
             {#if error}
-              <div class="alert alert-error rounded-2xl text-sm">
+              <div class="alert alert-error rounded-2xl text-sm" role="alert">
                 <span>{error}</span>
               </div>
             {/if}
@@ -771,9 +1039,9 @@
 
             <button
               class="btn btn-brand btn-lg w-full rounded-xl font-extrabold"
-              type="button"
-              onclick={submitOrder}
-              disabled={submitting}
+              type="submit"
+              form="checkout-form"
+              disabled={submitting || !ordersEnabled}
             >
               {submitting
                 ? "Procesando orden..."
@@ -788,7 +1056,10 @@
 
 <ProductModal
   product={editingProduct}
-  ordersEnabled={true}
+  {ordersEnabled}
+  basePrice={editingProduct
+    ? offerBasePrice(editingProduct.id, offers)
+    : undefined}
   imageUrl={editingProduct
     ? toSafeImageUrl(editingProduct.image_url)
     : undefined}

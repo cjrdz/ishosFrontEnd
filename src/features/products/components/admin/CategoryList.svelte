@@ -161,14 +161,14 @@
   <div class="card-body gap-4">
     <!-- Toolbar: title, search, filter, create -->
     <div class="flex flex-wrap items-center gap-2">
-      <h2 class="card-title shrink-0 mr-1">Categorias</h2>
+      <h2 class="card-title shrink-0 mr-1">Categorías</h2>
 
       <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
 
       <input
         class="input input-sm input-bordered w-full sm:w-36 md:w-44 lg:w-52"
         type="text"
-        placeholder="Buscar categoria"
+        placeholder="Buscar categoría"
         value={searchQuery}
         oninput={(event) =>
           handleSearchInput((event.currentTarget as HTMLInputElement).value)}
@@ -214,7 +214,7 @@
         disabled={busy}
       >
         <Icon icon="lucide:plus" class="h-4 w-4" />
-        Categoria
+        Categoría
       </button>
     </div>
 
@@ -236,7 +236,7 @@
           {#if filteredCategories.length === 0}
             <tr
               ><td colspan="5" class="text-center py-6 text-base-content/50"
-                >No hay categorias</td
+                >No hay categorías</td
               ></tr
             >
           {:else}
@@ -285,7 +285,7 @@
                       type="button"
                       onclick={() => moveCategory(category, -1)}
                       disabled={busy || !canMoveUp}
-                      aria-label="Subir categoria"
+                      aria-label="Subir categoría"
                       title="Subir"
                     >
                       <Icon icon="lucide:arrow-up" class="h-4 w-4" />
@@ -295,7 +295,7 @@
                       type="button"
                       onclick={() => moveCategory(category, 1)}
                       disabled={busy || !canMoveDown}
-                      aria-label="Bajar categoria"
+                      aria-label="Bajar categoría"
                       title="Bajar"
                     >
                       <Icon icon="lucide:arrow-down" class="h-4 w-4" />
@@ -305,7 +305,7 @@
                       type="button"
                       onclick={() => onEdit(category)}
                       disabled={busy}
-                      aria-label="Editar categoria"
+                      aria-label="Editar categoría"
                     >
                       <Icon icon="lucide:pencil" class="h-4 w-4" />
                     </button>
@@ -314,7 +314,7 @@
                       type="button"
                       onclick={() => onRequestDelete(category)}
                       disabled={busy}
-                      aria-label="Eliminar categoria"
+                      aria-label="Eliminar categoría"
                     >
                       <Icon icon="lucide:trash-2" class="h-4 w-4" />
                     </button>

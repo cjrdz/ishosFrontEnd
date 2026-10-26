@@ -3,7 +3,8 @@
 @import "./variables.css";
 @import "./order-steps.css";
 @plugin "daisyui" {
-  themes: all;
+  /* Only the themes the app uses (src/shared/theme/constants.ts). */
+  themes: fantasy --default, night;
 }
 
 :root {

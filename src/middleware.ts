@@ -1,7 +1,11 @@
+import type { APIContext, MiddlewareNext } from "astro";
 import { defineMiddleware } from "astro:middleware";
+import { getSecret } from "astro:env/server";
 import { getSession } from "@features/auth";
 import { getAdminImageUploadMaxMB } from "@core/config";
 import type { Session } from "./types/auth";
+import { allowInlineStyles, mergeCspDirectives } from "@core/security/csp";
+import { SESSION_CACHE_COOKIE } from "@core/security/session-cache";
 
 /**
  * Routes that bypass session/role checks. All other /admin and /api/admin
@@ -15,8 +19,12 @@ const AUTH_EXEMPT_PREFIXES = [
 ];
 
 const ADMIN_API_PREFIX = "/api/admin/";
+const ADMIN_PAGE_ROOT = "/admin";
 const ADMIN_PAGE_PREFIX = "/admin/";
-const SESSION_CACHE_COOKIE = "ishos_session_cache";
+
+// Admin pages staff may open (the orders dashboard). Other admin pages
+// (settings, analytics) are admin-only and redirect staff back here.
+const STAFF_ALLOWED_PAGES = new Set([ADMIN_PAGE_ROOT, ADMIN_PAGE_PREFIX]);
 
 // Routes that staff/managers may use in addition to admins. All other
 // /api/admin/* routes remain admin-only.
@@ -40,7 +48,9 @@ function isAdminApiRoute(pathname: string): boolean {
 }
 
 function isAdminPageRoute(pathname: string): boolean {
-  return pathname.startsWith(ADMIN_PAGE_PREFIX);
+  // Match "/admin" exactly as well as "/admin/..."; a bare prefix check on
+  // "/admin/" let the dashboard at "/admin" skip authentication.
+  return pathname === ADMIN_PAGE_ROOT || pathname.startsWith(ADMIN_PAGE_PREFIX);
 }
 
 function isStaffAllowedApiRoute(pathname: string): boolean {
@@ -214,11 +224,27 @@ function requireRole(
 }
 
 function getSessionCacheSecret(): string | null {
-  const secret = import.meta.env.SESSION_CACHE_SECRET;
+  // astro:env resolves secrets at request time (Worker secret / process.env).
+  // import.meta.env would inline the build-time value, which is empty in CI,
+  // so the cache was silently disabled in production.
+  const secret = getSecret("SESSION_CACHE_SECRET");
   if (typeof secret === "string" && secret.length > 0) {
     return secret;
   }
   return null;
+}
+
+/**
+ * Short, non-reversible fingerprint of the auth token. Stored in the session
+ * cache so a cached session is only honoured for the token it was issued for
+ * (a logout, or a login as someone else, never reuses it).
+ */
+async function tokenFingerprint(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(token),
+  );
+  return encodeBase64(digest).slice(0, 22);
 }
 
 function encodeBase64(buffer: ArrayBuffer): string {
@@ -299,20 +325,22 @@ async function verifyCookie(
   return valid ? value : null;
 }
 
-function serializeSession(session: Session): string {
+function serializeSession(session: Session, fingerprint: string): string {
   return JSON.stringify({
     id: session.id,
     email: session.email,
     name: session.name,
     role: session.role,
     active: session.active,
+    tf: fingerprint,
   });
 }
 
-function parseSession(value: string): Session | null {
+function parseSession(value: string, fingerprint: string): Session | null {
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     if (
+      parsed.tf === fingerprint &&
       typeof parsed.id === "string" &&
       typeof parsed.email === "string" &&
       typeof parsed.name === "string" &&
@@ -323,7 +351,13 @@ function parseSession(value: string): Session | null {
         parsed.role === "staff" ||
         parsed.role === "employee")
     ) {
-      return parsed as unknown as Session;
+      return {
+        id: parsed.id,
+        email: parsed.email,
+        name: parsed.name,
+        role: parsed.role,
+        active: parsed.active,
+      } as Session;
     }
   } catch {
     // ignore malformed cache payload
@@ -331,11 +365,14 @@ function parseSession(value: string): Session | null {
   return null;
 }
 
-async function getCachedSession(context: {
-  cookies: {
-    get: (name: string) => { value?: string } | undefined;
-  };
-}): Promise<Session | null> {
+async function getCachedSession(
+  context: {
+    cookies: {
+      get: (name: string) => { value?: string } | undefined;
+    };
+  },
+  token: string,
+): Promise<Session | null> {
   const secret = getSessionCacheSecret();
   if (!secret) {
     return null;
@@ -351,7 +388,7 @@ async function getCachedSession(context: {
     return null;
   }
 
-  return parseSession(verified);
+  return parseSession(verified, await tokenFingerprint(token));
 }
 
 async function setCachedSession(
@@ -365,13 +402,17 @@ async function setCachedSession(
     };
   },
   session: Session,
+  token: string,
 ): Promise<void> {
   const secret = getSessionCacheSecret();
   if (!secret) {
     return;
   }
 
-  const signed = await signCookie(serializeSession(session), secret);
+  const signed = await signCookie(
+    serializeSession(session, await tokenFingerprint(token)),
+    secret,
+  );
   context.cookies.set(SESSION_CACHE_COOKIE, signed, {
     path: "/",
     httpOnly: true,
@@ -382,11 +423,73 @@ async function setCachedSession(
 }
 
 /**
- * Astro middleware: enforces body-size limits, CSRF origin checks, admin
- * authentication, and role authorization for admin routes. Operational routes
- * (orders, products, categories, flavors, addons) also accept manager/staff.
+ * CSP directives added to every response. Script/style hashes come from Astro's
+ * own CSP (astro.config.mjs `security.csp`); these cover what it does not set,
+ * notably frame-ancestors (clickjacking), which only works as a header.
+ */
+const EXTRA_CSP_DIRECTIVES = [
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+];
+
+/** Other security headers applied to every response. */
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy":
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+};
+
+export function applySecurityHeaders(response: Response, url: URL): Response {
+  let target = response;
+  try {
+    target.headers.set("X-Content-Type-Options", "nosniff");
+  } catch {
+    // Headers of a passthrough fetch() response are immutable; copy it.
+    target = new Response(response.body, response);
+  }
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    if (!target.headers.has(name)) {
+      target.headers.set(name, value);
+    }
+  }
+  target.headers.set(
+    "Content-Security-Policy",
+    allowInlineStyles(
+      mergeCspDirectives(
+        target.headers.get("Content-Security-Policy"),
+        EXTRA_CSP_DIRECTIVES,
+      ),
+    ),
+  );
+  if (url.protocol === "https:") {
+    target.headers.set(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+  }
+  return target;
+}
+
+/**
+ * Astro middleware: applies security headers to every response, and for admin
+ * routes enforces body-size limits, CSRF origin checks, authentication and role
+ * authorization. Operational routes (orders, products, categories, flavors,
+ * addons) and the orders dashboard also accept manager/staff.
  */
 export const onRequest = defineMiddleware(async (context, next) => {
+  const response = await handleRequest(context, next);
+  return applySecurityHeaders(response, context.url);
+});
+
+async function handleRequest(
+  context: APIContext,
+  next: MiddlewareNext,
+): Promise<Response> {
   const { pathname } = context.url;
 
   // Skip non-admin routes (public pages, static assets, etc.)
@@ -413,7 +516,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       return redirectToLogin(context.request);
     }
 
-    let session: Session | null = await getCachedSession(context);
+    let session: Session | null = await getCachedSession(context, token);
     if (!session) {
       try {
         session = await getSession(token);
@@ -426,11 +529,21 @@ export const onRequest = defineMiddleware(async (context, next) => {
       return redirectToLogin(context.request);
     }
 
-    const allowedRoles: Session["role"][] = isStaffAllowedApiRoute(pathname)
+    const staffAllowed = isAdminApiRoute(pathname)
+      ? isStaffAllowedApiRoute(pathname)
+      : STAFF_ALLOWED_PAGES.has(pathname);
+    const allowedRoles: Session["role"][] = staffAllowed
       ? ["admin", "manager", "staff", "employee"]
       : ["admin"];
     const roleError = requireRole(session, allowedRoles);
     if (roleError) {
+      // Pages redirect to the dashboard instead of showing raw JSON.
+      if (!isAdminApiRoute(pathname)) {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: ADMIN_PAGE_ROOT, "Cache-Control": "no-store" },
+        });
+      }
       return roleError;
     }
 
@@ -438,8 +551,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     context.locals.session = session;
 
     // Refresh the short-lived signed session cache cookie.
-    await setCachedSession(context, session);
+    await setCachedSession(context, session, token);
   }
 
   return next();
-});
+}

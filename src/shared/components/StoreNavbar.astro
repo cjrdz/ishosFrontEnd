@@ -2,13 +2,16 @@
 import "../../styles/component.css";
 import "../../styles/navbar.css";
 import ThemeToggle from "@shared/components/ThemeToggle.svelte";
-import { StoreCartIcon, StoreLogo } from "@features/catalog";
+// Island entries import the component file directly, not a feature barrel:
+// Astro bundles the imported module, so a barrel would ship every export.
+import StoreCartIcon from "@features/catalog/components/StoreCartIcon.svelte";
+import StoreLogo from "./StoreLogo.astro";
 
 const currentPath = Astro.url.pathname;
 
 const links = [
   { href: "/", label: "Inicio" },
-  { href: "/menu", label: "Menu" },
+  { href: "/menu", label: "Menú" },
   { href: "/about", label: "Nosotros" },
 ];
 ---
@@ -17,7 +20,7 @@ const links = [
   class="navbar navbar-brand relative bg-base-100/80 backdrop-blur-sm border-b border-base-300 sticky top-0 z-50 transition-all duration-300"
 >
   <div class="navbar-start">
-    <StoreLogo client:load />
+    <StoreLogo />
   </div>
 
   <div class="navbar-center">

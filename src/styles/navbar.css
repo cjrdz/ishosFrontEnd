@@ -145,3 +145,15 @@
     animation: none;
   }
 }
+
+/* Logo variant per theme (StoreLogo.astro). The light logo is the default;
+   the night theme swaps to the white logo. */
+.logo-variant--dark {
+  display: none;
+}
+[data-theme="night"] .logo-variant--light {
+  display: none;
+}
+[data-theme="night"] .logo-variant--dark {
+  display: inline-block;
+}

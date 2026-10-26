@@ -2,7 +2,6 @@ export { default as CartCheckout } from "./components/CartCheckout.svelte";
 export { default as HomeFeatured } from "./components/HomeFeatured.svelte";
 export { default as MenuCatalog } from "./components/MenuCatalog.svelte";
 export { default as StoreCartIcon } from "./components/StoreCartIcon.svelte";
-export { default as StoreLogo } from "./components/StoreLogo.svelte";
 export { default as StoreOffers } from "./components/StoreOffers.svelte";
 export * from "./lib/api";
 export * from "./lib/cart";

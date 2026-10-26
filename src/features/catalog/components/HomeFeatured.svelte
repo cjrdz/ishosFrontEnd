@@ -2,7 +2,10 @@
   import { onMount } from "svelte";
   import { toSafeImageUrl } from "@shared/utils/formatters";
   import { addCartItem } from "@features/catalog/lib/cart";
-  import { buildActiveOfferMap } from "@features/catalog/lib/offers";
+  import {
+    buildActiveOfferMap,
+    offerBasePrice,
+  } from "@features/catalog/lib/offers";
   import {
     fetchStoreSettings,
     listPublicProducts,
@@ -76,7 +79,8 @@
   ) {
     selectedProduct = product;
     selectedDraft = initialDraft ?? { quantity: 1 };
-    selectedBasePrice = basePrice;
+    // Same rule as the backend: an active offer sets the product's base price.
+    selectedBasePrice = basePrice ?? offerBasePrice(product.id, offers);
   }
 
   function addConfiguredProduct(
@@ -229,7 +233,7 @@
                 product_id: product.id,
                 name: product.name,
                 image_url: toSafeImageUrl(product.image_url),
-                unit_price: product.price,
+                unit_price: offerBasePrice(product.id, offers) ?? product.price,
                 quantity: 1,
               });
             }}

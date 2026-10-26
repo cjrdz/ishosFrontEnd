@@ -213,7 +213,7 @@
           <tr>
             <th class="font-bold">Nombre</th>
             <th class="font-bold">Tipo</th>
-            <th class="font-bold">Telefono</th>
+            <th class="font-bold">Teléfono</th>
             <th class="font-bold">Correo</th>
             <th class="text-center font-bold">Estado</th>
             <th class="text-center font-bold">Acciones</th>

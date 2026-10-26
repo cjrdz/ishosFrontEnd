@@ -112,6 +112,7 @@
         alt={product.name}
         class="pc-img"
         loading="lazy"
+        decoding="async"
         onerror={handleImgError}
       />
       <!-- Gradient ensures text stays readable without killing image visibility -->

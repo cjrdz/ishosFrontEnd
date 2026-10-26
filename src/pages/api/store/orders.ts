@@ -6,7 +6,9 @@
  */
 
 import type { APIRoute } from "astro";
+import { z } from "@core/zod";
 import { forwardUpstreamJson, getServerApiBaseUrl } from "@core/bff/proxy";
+import { clientIdentityHeaders } from "@core/bff/upstream-headers";
 import { CreatePublicOrderSchema } from "@features/catalog";
 
 export const prerender = false;
@@ -20,13 +22,14 @@ export const POST: APIRoute = async (context) => {
       return new Response(
         JSON.stringify({
           error: "Invalid order payload",
-          details: parsed.error.flatten(),
+          details: z.flattenError(parsed.error),
         }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
     const headers: Record<string, string> = {
+      ...clientIdentityHeaders(context),
       "Content-Type": "application/json",
     };
     const idempotencyKey = context.request.headers.get("Idempotency-Key");

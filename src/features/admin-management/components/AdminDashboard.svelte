@@ -1,6 +1,13 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import {
+    isNewOrderSoundEnabled,
+    playNewOrderChime,
+    setNewOrderSoundEnabled,
+    titleWithOrderBadge,
+    unlockNewOrderAudio,
+  } from "../lib/new-order-alert";
+  import {
     deleteAdminImage,
     listAdminImages,
     listCategories,
@@ -38,6 +45,10 @@
     type SessionRefreshController,
   } from "../lib/polling-helpers";
   import { createInactivityTracking } from "../lib/inactivity-tracking";
+  import {
+    isCounterModeEnabled,
+    setCounterModeEnabled,
+  } from "../lib/counter-mode";
   import {
     adminData,
     adminDashboardUi,
@@ -126,6 +137,29 @@
     null,
   );
   let newOrdersToastTimer: ReturnType<typeof setTimeout> | null = null;
+  // New orders that arrived while this tab was in the background; shown as a
+  // "(n) Nuevas órdenes" badge in the tab title until staff come back.
+  let unseenNewOrders = 0;
+  let newOrderSoundEnabled = $state(true);
+
+  function updateUnseenOrdersBadge(count: number) {
+    unseenNewOrders = count;
+    document.title = titleWithOrderBadge(document.title, unseenNewOrders);
+  }
+
+  function clearUnseenOrdersBadge() {
+    if (document.visibilityState === "visible" && unseenNewOrders > 0) {
+      updateUnseenOrdersBadge(0);
+    }
+  }
+
+  function toggleNewOrderSound() {
+    newOrderSoundEnabled = !newOrderSoundEnabled;
+    setNewOrderSoundEnabled(newOrderSoundEnabled);
+    if (newOrderSoundEnabled) {
+      unlockNewOrderAudio();
+    }
+  }
   let inactivityWarningToast = $state<{ secondsRemaining: number } | null>(
     null,
   );
@@ -303,6 +337,10 @@
       count,
       orderNumber: latestOrder?.order_number,
     };
+    playNewOrderChime();
+    if (document.visibilityState !== "visible") {
+      updateUnseenOrdersBadge(unseenNewOrders + count);
+    }
 
     if (newOrdersToastTimer) {
       clearTimeout(newOrdersToastTimer);
@@ -311,7 +349,7 @@
     newOrdersToastTimer = setTimeout(() => {
       newOrdersToast = null;
       newOrdersToastTimer = null;
-    }, 4500);
+    }, 8000);
   }
 
   function stopOrdersPolling() {
@@ -326,9 +364,21 @@
     sessionRefreshController = null;
   }
 
+  // Per-device counter mode: no client-side inactivity logout on this screen.
+  // Honoured only for staff roles, so an admin session left on a counter
+  // tablet still times out (admins can reach settings and employees).
+  let counterMode = $state(false);
+  const counterModeActive = $derived(counterMode && !isAdmin);
+
+  function toggleCounterMode() {
+    counterMode = !counterMode;
+    setCounterModeEnabled(counterMode);
+    inactivityTracking.schedule();
+  }
+
   const inactivityTracking = createInactivityTracking({
     getTimeoutSeconds: () => {
-      if (!session) return null;
+      if (!session || counterModeActive) return null;
       return (
         panelConfig.inactivity_logout_seconds ||
         DEFAULT_PANEL_CONFIG.inactivity_logout_seconds
@@ -424,7 +474,7 @@
     });
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload?.error || "No se pudo refrescar sesion");
+      throw new Error(payload?.error || "No se pudo refrescar sesión");
     }
     session = payload as Session;
   }
@@ -472,7 +522,7 @@
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Sesion invalida");
+        throw new Error(payload?.error || "Sesión inválida");
       }
 
       session = payload as Session;
@@ -483,7 +533,7 @@
       sessionError =
         requestError instanceof Error
           ? requestError.message
-          : "Sesion invalida";
+          : "Sesión inválida";
       loading = false;
       return;
     }
@@ -543,6 +593,9 @@
   }
 
   async function handleLogout() {
+    // Counter mode is per session on this device: the next person must opt in again.
+    setCounterModeEnabled(false);
+    counterMode = false;
     stopOrdersPolling();
     stopSessionRefresh();
     inactivityTracking.stop();
@@ -563,7 +616,7 @@
         "categorias",
         requestError instanceof Error
           ? requestError.message
-          : "No se pudieron cargar categorias",
+          : "No se pudieron cargar categorías",
       );
     } finally {
       setBusy("categorias", false);
@@ -645,7 +698,7 @@
         "productos",
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo cargar galeria de imagenes",
+          : "No se pudo cargar la galería de imágenes",
       );
     } finally {
       setProductGalleryBusy(false);
@@ -721,7 +774,7 @@
           "ordenes",
           requestError instanceof Error
             ? requestError.message
-            : "No se pudieron cargar ordenes",
+            : "No se pudieron cargar órdenes",
         );
       }
     } finally {
@@ -1201,6 +1254,25 @@
 
   onMount(() => {
     loadSession();
+
+    newOrderSoundEnabled = isNewOrderSoundEnabled();
+    counterMode = isCounterModeEnabled();
+    // Audio may only start after a user gesture; unlock it on the first one.
+    const unlockAudio = () => {
+      if (newOrderSoundEnabled) unlockNewOrderAudio();
+    };
+    window.addEventListener("pointerdown", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+    document.addEventListener("visibilitychange", clearUnseenOrdersBadge);
+    window.addEventListener("focus", clearUnseenOrdersBadge);
+
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+      document.removeEventListener("visibilitychange", clearUnseenOrdersBadge);
+      window.removeEventListener("focus", clearUnseenOrdersBadge);
+      updateUnseenOrdersBadge(0);
+    };
   });
 
   onDestroy(() => {
@@ -1218,7 +1290,7 @@
   <div class="flex min-h-[45vh] w-full items-center justify-center">
     <div class="flex items-center gap-3">
       <span class="loading loading-spinner loading-md"></span>
-      <span>Cargando sesion...</span>
+      <span>Cargando sesión...</span>
     </div>
   </div>
 {:else if sessionError}
@@ -1238,20 +1310,33 @@
       onLogout={handleLogout}
       onTabChange={handleTabChange}
       onOpenSettings={openSettingsPage}
+      counterMode={counterModeActive}
+      onToggleCounterMode={isAdmin ? undefined : toggleCounterMode}
     />
 
     {#if newOrdersToast}
       <div class="toast toast-top toast-end z-50 mt-24 mr-2 md:mr-4">
-        <div class="alert alert-success">
-          <span>
+        <div
+          class="alert alert-success shadow-lg"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="font-semibold">
             {#if newOrdersToast.count === 1}
               Nueva orden recibida{newOrdersToast.orderNumber
                 ? `: ${newOrdersToast.orderNumber}`
                 : ""}
             {:else}
-              {newOrdersToast.count} nuevas ordenes recibidas
+              {newOrdersToast.count} nuevas órdenes recibidas
             {/if}
           </span>
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs"
+            onclick={toggleNewOrderSound}
+          >
+            {newOrderSoundEnabled ? "Silenciar sonido" : "Activar sonido"}
+          </button>
         </div>
       </div>
     {/if}

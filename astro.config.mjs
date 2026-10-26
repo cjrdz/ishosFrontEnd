@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig } from 'astro/config';
+import { defineConfig, envField } from 'astro/config';
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -22,12 +22,52 @@ export default defineConfig({
         sessionKVBindingName: 'ishosfactory-session',
       }),
   output: 'server',
+  env: {
+    schema: {
+      // Shared with the Go backend; proves the BFF's X-Client-IP header is
+      // trustworthy so per-customer rate limits work. Read at runtime (Worker
+      // secret / process.env), never inlined into the build.
+      BFF_SHARED_SECRET: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
+      // Signs the short-lived admin session cache cookie. Optional: without it
+      // every admin request re-validates the session with the backend.
+      SESSION_CACHE_SECRET: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
+    },
+  },
   devToolbar: { enabled: false },
   server: {
     host: true,
   },
   security: {
     checkOrigin: process.env.NODE_ENV === 'production',
+    // Astro hashes every script/style it renders (production builds only). For
+    // SSR pages it sends the policy as a Content-Security-Policy header, which
+    // src/middleware.ts extends (frame-ancestors etc.) and relaxes for styles.
+    csp: {
+      directives: [
+        "default-src 'self'",
+        // Product images are served from the R2 public bucket.
+        "img-src 'self' data: blob: https://*.r2.dev",
+        "font-src 'self' https://fonts.gstatic.com",
+        "connect-src 'self'",
+        // Google Maps embed on /about.
+        'frame-src https://www.google.com',
+        "manifest-src 'self'",
+      ],
+      styleDirective: {
+        resources: ["'self'", 'https://fonts.googleapis.com'],
+      },
+      scriptDirective: {
+        resources: ["'self'"],
+      },
+    },
   },
   integrations: [svelte()],
   vite: {

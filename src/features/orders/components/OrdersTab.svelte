@@ -164,10 +164,7 @@
     customer_phone: "",
     customer_email: "",
     payment_method: "efectivo" as
-      | "efectivo"
-      | "tarjeta"
-      | "transferencia"
-      | "otro",
+      "efectivo" | "tarjeta" | "transferencia" | "otro",
     amount_received: "" as "" | number,
     order_type: "para_llevar" as "en_local" | "para_llevar",
     table_number: "" as "" | number,
@@ -837,7 +834,7 @@
     openConfirmDialog(
       confirmDialog,
       "Archivar orden",
-      `Archivar ${order.order_number}? Las ordenes archivadas no aparecen en la lista principal.`,
+      `Archivar ${order.order_number}? Las órdenes archivadas no aparecen en la lista principal.`,
       () => {
         void onArchive(order.id, true);
       },

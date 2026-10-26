@@ -74,7 +74,7 @@
       </div>
       <div class="form-control">
         <span id="save-user-phone-label" class="label-text text-xs mb-1"
-          >Telefono</span
+          >Teléfono</span
         >
         <input
           id="save-user-phone"
