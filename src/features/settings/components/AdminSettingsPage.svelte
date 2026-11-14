@@ -6,11 +6,8 @@
     createInactivityTracking,
     getAdminLocalSettings,
     saveAdminRowsPerTable,
-    saveAdminStoreSettings,
     saveAdminTabOrder,
     setCurrentAdminContext,
-    getAdminStoreSettings,
-    updateAdminStoreSettings,
     getOrderArchiveConfig,
     updateOrderArchiveConfig,
     runArchive,
@@ -18,7 +15,6 @@
     updateAdminPanelConfig,
     type RowsPerTableConfig,
     type PanelConfigValues,
-    type StoreOfferItem,
     type OrderArchiveConfig,
     DEFAULT_PANEL_CONFIG,
     DEFAULT_ROWS_PER_TABLE_CONFIG,
@@ -27,6 +23,7 @@
     type TabKey,
   } from "@features/admin-management";
   import SettingsTab from "../../admin-management/components/SettingsTab.svelte";
+  import LocationsSettings from "./LocationsSettings.svelte";
   import { trackAction, trackError } from "@shared/utils/analytics";
 
   type Session = {
@@ -34,8 +31,9 @@
     email: string;
     name: string;
     phone: string;
-    role: "admin" | "employee";
+    role: "admin" | "manager" | "employee";
     active?: boolean;
+    location_name?: string | null;
   };
 
   const SEARCH_ITEMS = [
@@ -70,15 +68,20 @@
     },
     {
       id: "operacion-tienda",
-      title: "Operacion de tienda",
-      description: "Pausar o reactivar pedidos públicos",
+      title: "Sucursales",
+      description:
+        "Horario, órdenes, pedidos en línea y datos de cada sucursal",
       icon: "lucide:store",
       keywords: [
-        "ofertas",
+        "sucursal",
+        "sucursales",
+        "horario",
         "tienda",
         "pedidos",
         "pausar",
         "activar",
+        "whatsapp",
+        "mapa",
         "kill switch",
       ],
     },
@@ -102,8 +105,6 @@
   let rowsPerTable = $state<RowsPerTableConfig>({
     ...DEFAULT_ROWS_PER_TABLE_CONFIG,
   });
-  let storeOrdersEnabled = $state(true);
-  let storeOffers = $state<StoreOfferItem[]>([]);
   const DEFAULT_ARCHIVE_CONFIG: OrderArchiveConfig = {
     enabled: true,
     age_days: 7,
@@ -257,9 +258,12 @@
       }
 
       const currentSession = payload as Session;
-      if (currentSession.role !== "admin") {
+      if (
+        currentSession.role !== "admin" &&
+        currentSession.role !== "manager"
+      ) {
         throw new Error(
-          "Solo administradores pueden acceder a esta configuración",
+          "Solo administradores y managers pueden acceder a esta configuración",
         );
       }
 
@@ -267,7 +271,8 @@
       trackAction("admin_settings_session_loaded", {
         role: currentSession.role,
       });
-      await loadSettings();
+      // Managers only edit their location (hours and orders switch).
+      if (currentSession.role === "admin") await loadSettings();
       inactivityTracking.start();
     } catch (requestError) {
       trackError(requestError, "AdminSettingsPage.loadPage");
@@ -288,8 +293,6 @@
       tabOrder = [...DEFAULT_TAB_ORDER];
       panelConfig = { ...DEFAULT_PANEL_CONFIG };
       rowsPerTable = { ...DEFAULT_ROWS_PER_TABLE_CONFIG };
-      storeOrdersEnabled = true;
-      storeOffers = [];
       busy = false;
       return;
     }
@@ -303,16 +306,6 @@
       panelConfig = await getAdminPanelConfig();
     } catch {
       panelConfig = { ...DEFAULT_PANEL_CONFIG };
-    }
-
-    try {
-      const storeSettings = await getAdminStoreSettings();
-      storeOrdersEnabled = storeSettings.orders_enabled;
-      storeOffers = storeSettings.offers ?? [];
-      saveAdminStoreSettings(session.id, storeSettings);
-    } catch {
-      storeOrdersEnabled = settings.store_settings.orders_enabled;
-      storeOffers = settings.store_settings.offers ?? [];
     }
 
     try {
@@ -372,38 +365,6 @@
         requestError instanceof Error
           ? requestError.message
           : "No se pudo guardar la configuración de seguridad";
-    } finally {
-      busy = false;
-    }
-  }
-
-  async function handleToggleStoreOrders(enabled: boolean) {
-    busy = true;
-    moduleError = "";
-
-    try {
-      if (!session?.id) {
-        throw new Error("No se pudo identificar la sesión de administrador");
-      }
-      const response = await updateAdminStoreSettings({
-        orders_enabled: enabled,
-        offers: storeOffers,
-      });
-      storeOrdersEnabled = response.orders_enabled;
-      storeOffers = response.offers ?? [];
-      saveAdminStoreSettings(session.id, response);
-      setNotice(
-        enabled ? "Pedidos públicos activados" : "Pedidos públicos pausados",
-      );
-      trackAction("admin_settings_store_orders_toggled", { enabled });
-    } catch (requestError) {
-      trackError(requestError, "AdminSettingsPage.handleToggleStoreOrders", {
-        enabled,
-      });
-      moduleError =
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo actualizar la operacion de tienda";
     } finally {
       busy = false;
     }
@@ -565,7 +526,10 @@
             Configuraciones
           </h1>
           <p class="mt-1 text-sm text-base-content/70">
-            Administrador, <strong>{session.name}</strong>
+            {session.role === "admin" ? "Administrador" : "Manager"},
+            <strong>{session.name}</strong>{session.location_name
+              ? ` · ${session.location_name}`
+              : ""}
           </p>
         </div>
 
@@ -601,22 +565,24 @@
 
     <!-- Settings forms -->
     <div class="space-y-6">
-      <SettingsTab
-        {tabOrder}
-        {panelConfig}
-        rowsPerTable={rowsPerTable as unknown as any}
-        {storeOrdersEnabled}
-        {archiveConfig}
-        {busy}
-        {moduleError}
-        onSave={handleSaveTabOrder}
-        onSavePanelConfig={handleSavePanelConfig}
-        onToggleStoreOrders={handleToggleStoreOrders}
-        onSaveRowsPerTable={(rows) =>
-          void handleSaveRowsPerTable(rows as unknown as RowsPerTableConfig)}
-        onSaveArchiveConfig={handleSaveArchiveConfig}
-        onRunArchive={handleRunArchive}
-      />
+      {#if session.role !== "admin"}
+        <LocationsSettings isAdmin={false} />
+      {:else}
+        <SettingsTab
+          {tabOrder}
+          {panelConfig}
+          rowsPerTable={rowsPerTable as unknown as any}
+          {archiveConfig}
+          {busy}
+          {moduleError}
+          onSave={handleSaveTabOrder}
+          onSavePanelConfig={handleSavePanelConfig}
+          onSaveRowsPerTable={(rows) =>
+            void handleSaveRowsPerTable(rows as unknown as RowsPerTableConfig)}
+          onSaveArchiveConfig={handleSaveArchiveConfig}
+          onRunArchive={handleRunArchive}
+        />
+      {/if}
     </div>
   </div>
 

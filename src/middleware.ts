@@ -22,18 +22,31 @@ const ADMIN_API_PREFIX = "/api/admin/";
 const ADMIN_PAGE_ROOT = "/admin";
 const ADMIN_PAGE_PREFIX = "/admin/";
 
-// Admin pages staff may open (the orders dashboard). Other admin pages
-// (settings, analytics) are admin-only and redirect staff back here.
+// Admin pages staff may open (the orders dashboard). Managers also open the
+// settings page (only their location's section is shown); analytics stays
+// admin-only. Other roles are redirected back to the dashboard.
 const STAFF_ALLOWED_PAGES = new Set([ADMIN_PAGE_ROOT, ADMIN_PAGE_PREFIX]);
+const MANAGER_ALLOWED_PAGES = new Set([
+  ...STAFF_ALLOWED_PAGES,
+  "/admin/settings",
+]);
 
-// Routes that staff/managers may use in addition to admins. All other
-// /api/admin/* routes remain admin-only.
+// Routes every staff member may use (orders, Agotados, catalog reads). The
+// backend still enforces roles and the staff member's own location.
 const STAFF_ALLOWED_API_PREFIXES = [
   "/api/admin/orders",
   "/api/admin/products",
   "/api/admin/categories",
   "/api/admin/flavors",
   "/api/admin/addons",
+  "/api/admin/locations",
+];
+
+// Routes managers may use in addition: their location's stock and settings.
+const MANAGER_ALLOWED_API_PREFIXES = [
+  ...STAFF_ALLOWED_API_PREFIXES,
+  "/api/admin/inventory",
+  "/api/admin/container-types",
 ];
 
 const DEFAULT_JSON_BODY_LIMIT_BYTES = 64 * 1024; // 64 KiB
@@ -57,6 +70,30 @@ function isStaffAllowedApiRoute(pathname: string): boolean {
   return STAFF_ALLOWED_API_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix),
   );
+}
+
+function isManagerAllowedApiRoute(pathname: string): boolean {
+  return MANAGER_ALLOWED_API_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix),
+  );
+}
+
+/** Roles allowed on a protected admin route. */
+export function allowedRolesFor(pathname: string): Session["role"][] {
+  const isApi = isAdminApiRoute(pathname);
+  if (
+    isApi ? isStaffAllowedApiRoute(pathname) : STAFF_ALLOWED_PAGES.has(pathname)
+  ) {
+    return ["admin", "manager", "staff", "employee"];
+  }
+  if (
+    isApi
+      ? isManagerAllowedApiRoute(pathname)
+      : MANAGER_ALLOWED_PAGES.has(pathname)
+  ) {
+    return ["admin", "manager"];
+  }
+  return ["admin"];
 }
 
 function isImageUploadRoute(pathname: string): boolean {
@@ -332,6 +369,8 @@ function serializeSession(session: Session, fingerprint: string): string {
     name: session.name,
     role: session.role,
     active: session.active,
+    location_id: session.location_id ?? null,
+    location_name: session.location_name ?? null,
     tf: fingerprint,
   });
 }
@@ -357,6 +396,12 @@ function parseSession(value: string, fingerprint: string): Session | null {
         name: parsed.name,
         role: parsed.role,
         active: parsed.active,
+        location_id:
+          typeof parsed.location_id === "string" ? parsed.location_id : null,
+        location_name:
+          typeof parsed.location_name === "string"
+            ? parsed.location_name
+            : null,
       } as Session;
     }
   } catch {
@@ -529,13 +574,7 @@ async function handleRequest(
       return redirectToLogin(context.request);
     }
 
-    const staffAllowed = isAdminApiRoute(pathname)
-      ? isStaffAllowedApiRoute(pathname)
-      : STAFF_ALLOWED_PAGES.has(pathname);
-    const allowedRoles: Session["role"][] = staffAllowed
-      ? ["admin", "manager", "staff", "employee"]
-      : ["admin"];
-    const roleError = requireRole(session, allowedRoles);
+    const roleError = requireRole(session, allowedRolesFor(pathname));
     if (roleError) {
       // Pages redirect to the dashboard instead of showing raw JSON.
       if (!isAdminApiRoute(pathname)) {

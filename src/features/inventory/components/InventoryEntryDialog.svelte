@@ -22,7 +22,8 @@
       inventory_item_id?: string;
       quantity?: number;
     }) => void;
-    onOpenContainerTypes: () => void;
+    /** Absent for managers: only admins edit container types. */
+    onOpenContainerTypes?: () => void;
   }
 
   let {
@@ -129,7 +130,7 @@
   }
 
   function handleOpenContainerTypes() {
-    onOpenContainerTypes();
+    onOpenContainerTypes?.();
     onClose();
   }
 
@@ -268,14 +269,16 @@
         </div>
 
         <div class="flex justify-end">
-          <button
-            type="button"
-            class="btn btn-xs btn-ghost gap-1"
-            onclick={handleOpenContainerTypes}
-          >
-            <Icon icon="lucide:settings" width="12" height="12" />
-            Gestionar contenedores
-          </button>
+          {#if onOpenContainerTypes}
+            <button
+              type="button"
+              class="btn btn-xs btn-ghost gap-1"
+              onclick={handleOpenContainerTypes}
+            >
+              <Icon icon="lucide:settings" width="12" height="12" />
+              Gestionar contenedores
+            </button>
+          {/if}
         </div>
       </div>
     {/if}

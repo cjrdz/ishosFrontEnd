@@ -28,8 +28,19 @@ export interface ReceiptItem {
   customizations?: { [key: string]: unknown } | null;
 }
 
+/** The location (sucursal) a ticket belongs to. */
+export interface ReceiptLocation {
+  name: string;
+  address?: string | null;
+  whatsapp?: string | null;
+  phone?: string | null;
+}
+
 export interface ReceiptOrder {
   order_number: string;
+  /** Looked up in the registered locations when `location` is absent. */
+  location_id?: string | null;
+  location?: ReceiptLocation | null;
   created_at?: string;
   customer_name?: string | null;
   customer_phone?: string | null;
@@ -48,6 +59,52 @@ export const STORE_NAME = "Isho's Factory";
 export const STORE_TAGLINE = "Gelatos y sorbetes artesanales";
 export const STORE_CONTACT = "Ahuachapán, El Salvador · WhatsApp 7645-4347";
 export const STORE_SOCIAL = "Síguenos en Instagram @ishos_factory";
+
+const registeredLocations = new Map<string, ReceiptLocation>();
+
+/** Makes locations known so tickets can print an order's sucursal. */
+export function registerReceiptLocations(
+  locations: ({ id: string } & ReceiptLocation)[],
+): void {
+  for (const l of locations) {
+    registeredLocations.set(l.id, {
+      name: l.name,
+      address: l.address,
+      whatsapp: l.whatsapp,
+      phone: l.phone,
+    });
+  }
+}
+
+/** The sucursal an order was placed at, if known. */
+export function receiptLocation(order: ReceiptOrder): ReceiptLocation | null {
+  if (order.location) return order.location;
+  return order.location_id
+    ? (registeredLocations.get(order.location_id) ?? null)
+    : null;
+}
+
+/** "50376454347" → "7645-4347" for El Salvador numbers; others unchanged. */
+export function formatPhoneDisplay(value: string | null | undefined): string {
+  const digits = (value ?? "").replace(/\D/g, "");
+  const local =
+    digits.startsWith("503") && digits.length === 11 ? digits.slice(3) : digits;
+  return local.length === 8
+    ? `${local.slice(0, 4)}-${local.slice(4)}`
+    : (value ?? "");
+}
+
+/** Contact line under the brand: the order's sucursal or the store default. */
+export function receiptContactLine(order: ReceiptOrder): string {
+  const location = receiptLocation(order);
+  if (!location) return STORE_CONTACT;
+  const phone = formatPhoneDisplay(location.whatsapp || location.phone);
+  return (
+    [location.address, phone ? `WhatsApp ${phone}` : ""]
+      .filter(Boolean)
+      .join(" · ") || STORE_CONTACT
+  );
+}
 
 const PAPER_WIDTH_KEY = "ishos.receipt-paper-width";
 const STORE_TIME_ZONE = "America/El_Salvador";
@@ -240,7 +297,8 @@ function customerTicket(order: ReceiptOrder): string {
   <div class="center">
     <div class="brand">${escapeHtml(STORE_NAME)}</div>
     <div class="tag">${escapeHtml(STORE_TAGLINE)}</div>
-    <div class="tag">${escapeHtml(STORE_CONTACT)}</div>
+    ${receiptLocation(order) ? `<div class="tag strong">${escapeHtml(receiptLocation(order)?.name ?? "")}</div>` : ""}
+    <div class="tag">${escapeHtml(receiptContactLine(order))}</div>
   </div>
 
   <div class="rule"></div>
@@ -310,6 +368,7 @@ function kitchenTicket(order: ReceiptOrder): string {
   return `<section class="ticket">
   <div class="center">
     <div class="k-kind">COMANDA · COCINA</div>
+    ${receiptLocation(order) ? `<div class="k-detail">${escapeHtml(receiptLocation(order)?.name ?? "")}</div>` : ""}
     <div class="k-order">#${escapeHtml(shortOrderNumber(order.order_number))}</div>
     <div class="k-where">${escapeHtml(where)}</div>
   </div>

@@ -13,12 +13,14 @@
   import {
     getPaperWidth,
     printOrderReceipt,
+    registerReceiptLocations,
     setPaperWidth,
     type PaperWidth,
     type TicketKind,
   } from "../lib/receipt-renderer";
   import type { CreatedOrder } from "@features/admin-management/lib/order-handlers";
-  import { getOrder } from "@features/admin-management/lib/bff";
+  import { getOrder, listLocations } from "@features/admin-management/lib/bff";
+  import { onMount } from "svelte";
   import {
     statusLabels,
     statusBadgeClass,
@@ -61,6 +63,15 @@
     OrderFormState,
   } from "../types/orders-tab";
   import { normalizeIdList } from "../lib/list";
+
+  // Tickets print the sucursal of each order (name, address, WhatsApp).
+  onMount(() => {
+    void listLocations()
+      .then(({ data }) => registerReceiptLocations(data ?? []))
+      .catch(() => {
+        // Tickets fall back to the store's general contact line.
+      });
+  });
 
   const MANUAL_ORDER_DRAFT_STORAGE_KEY = "ishos.manual-order-draft.v1";
   const ORDERS_VIEW_STORAGE_KEY = "ishos.orders-view";

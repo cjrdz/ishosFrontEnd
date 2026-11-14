@@ -99,6 +99,15 @@ interface PublicOrderCreateResponse {
 
 export interface PublicOrderTrackingResponse {
   order_number: string;
+  /** Where to pick the order up. */
+  location?: {
+    id: string;
+    name: string;
+    address?: string;
+    maps_url?: string;
+    whatsapp?: string;
+    phone?: string;
+  } | null;
   customer_name?: string;
   customer_phone?: string;
   status: PublicOrderStatus;
@@ -351,6 +360,51 @@ export async function fetchStoreSettings(
   sharedSettings = { at: now, promise };
   promise.catch(() => {
     if (sharedSettings?.promise === promise) sharedSettings = null;
+  });
+  return promise;
+}
+
+// ── Public Locations (sucursales) ────────────────────────────────────
+
+export interface PublicLocation {
+  id: string;
+  slug: string;
+  name: string;
+  address: string;
+  maps_url: string;
+  maps_embed_url: string;
+  /** Digits with country code, e.g. "50376454347" (may be empty). */
+  whatsapp: string;
+  phone: string;
+  accepts_online_orders: boolean;
+  hours: StoreHoursStatus;
+}
+
+const LOCATIONS_SHARE_MS = 10_000;
+let sharedLocations: {
+  at: number;
+  promise: Promise<PublicLocation[]>;
+} | null = null;
+
+/** Active locations with live hours; one request shared across islands. */
+export async function fetchStoreLocations(
+  options: { fresh?: boolean } = {},
+): Promise<PublicLocation[]> {
+  const now = Date.now();
+  if (
+    !options.fresh &&
+    sharedLocations &&
+    now - sharedLocations.at < LOCATIONS_SHARE_MS
+  ) {
+    return sharedLocations.promise;
+  }
+  const promise = bffRequest<{ data: PublicLocation[] }>(
+    "/api/store/locations",
+    options.fresh ? { cache: "no-cache" } : undefined,
+  ).then((body) => body?.data ?? []);
+  sharedLocations = { at: now, promise };
+  promise.catch(() => {
+    if (sharedLocations?.promise === promise) sharedLocations = null;
   });
   return promise;
 }

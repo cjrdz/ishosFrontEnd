@@ -118,7 +118,9 @@ export const employeeCreateSchema = z.object({
   password: z.string().trim().min(6).max(100),
   name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(7).max(25).optional(),
-  role: z.enum(["admin", "employee"]),
+  role: z.enum(["admin", "manager", "employee"]),
+  // Required for managers and employees, empty for admins (backend checks).
+  location_id: z.union([z.uuid(), z.literal("")]).optional(),
   state: z.enum(["active", "inactive"]).optional(),
 });
 
@@ -164,6 +166,38 @@ export const storeHoursUpdateSchema = z.object({
     z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
     z.array(timeRangeSchema).max(3),
   ),
+});
+
+// Locations (sucursales). The backend decides which fields a manager may
+// change (hours and the orders switch of their own location).
+const weeklyHoursSchema = z.partialRecord(
+  z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
+  z.array(timeRangeSchema).max(3),
+);
+export const locationUpdateSchema = z
+  .object({
+    slug: z.string().trim().min(1).max(60),
+    name: z.string().trim().min(1).max(120),
+    address: z.string().trim().max(255),
+    maps_url: z.string().trim().max(2000),
+    maps_embed_url: z.string().trim().max(2000),
+    whatsapp: z.string().trim().max(30),
+    phone: z.string().trim().max(30),
+    hours: weeklyHoursSchema,
+    orders_enabled: z.boolean(),
+    online_orders_enabled: z.boolean(),
+    is_active: z.boolean(),
+    sort_order: z.number().int().min(0).max(1000),
+  })
+  .partial();
+export const locationCreateSchema = locationUpdateSchema.required({
+  slug: true,
+  name: true,
+});
+export const locationAvailabilitySchema = z.object({
+  item_type: z.enum(["product", "flavor"]),
+  item_id: z.uuid(),
+  sold_out: z.boolean(),
 });
 
 export const archiveConfigUpdateSchema = z.object({

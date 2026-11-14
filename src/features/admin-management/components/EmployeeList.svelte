@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ROLE_LABELS } from "@features/admin-management/lib/roles";
   import {
     getCurrentRowsPerTable,
     getCurrentAdminId,
@@ -12,6 +13,8 @@
   interface Props {
     employees: Employee[];
     busy: boolean;
+    /** Location names by id, to show where each employee works. */
+    locationNames?: Record<string, string>;
     onCreateEmployee: () => void;
     onToggleState: (employee: Employee, checked: boolean) => void;
     onEdit: (employee: Employee) => void;
@@ -22,12 +25,22 @@
   let {
     employees,
     busy,
+    locationNames = {},
     onCreateEmployee,
     onToggleState,
     onEdit,
     onRequestDelete,
     onOpenLockoutReset,
   }: Props = $props();
+
+  function roleText(employee: Employee): string {
+    const label =
+      ROLE_LABELS[employee.role as keyof typeof ROLE_LABELS] ?? employee.role;
+    const location = employee.location_id
+      ? locationNames[employee.location_id]
+      : "";
+    return location ? `${label} · ${location}` : label;
+  }
 
   const rowLimitOptions = [5, 10, 25, 50, 100] as const;
   let employeeRowLimit = $state<number>(5);
@@ -230,7 +243,7 @@
           <tr>
             <th class="font-bold">Email</th>
             <th class="hidden font-bold sm:table-cell">Nombre</th>
-            <th class="hidden font-bold sm:table-cell">Rol</th>
+            <th class="hidden font-bold sm:table-cell">Rol y sucursal</th>
             <th class="text-center font-bold">Estado</th>
             <th class="text-center font-bold">Acciones</th>
           </tr>
@@ -249,11 +262,11 @@
                   {employee.email}
                   <!-- Phones: name and role under the email instead of in columns. -->
                   <span class="block text-xs text-base-content/60 sm:hidden"
-                    >{employee.name || "-"} · {employee.role}</span
+                    >{employee.name || "-"} · {roleText(employee)}</span
                   >
                 </td>
                 <td class="hidden sm:table-cell">{employee.name || "-"}</td>
-                <td class="hidden sm:table-cell">{employee.role}</td>
+                <td class="hidden sm:table-cell">{roleText(employee)}</td>
                 <td class="text-center align-middle">
                   <input
                     class="toggle toggle-sm {employee.state !== 'inactive'

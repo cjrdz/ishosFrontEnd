@@ -56,6 +56,8 @@
   ]);
 
   interface Props {
+    /** Admins edit flavours, add-ons and container types; managers only stock. */
+    canEditCatalog?: boolean;
     busy?: boolean;
     moduleError?: string;
     flavors?: Flavor[];
@@ -94,6 +96,7 @@
   }
 
   let {
+    canEditCatalog = true,
     busy = false,
     moduleError = "",
     flavors = [],
@@ -605,22 +608,24 @@
 
         <div class="hidden sm:block w-px h-5 bg-base-300 self-center"></div>
 
-        <button
-          class="btn btn-sm btn-outline gap-2"
-          onclick={openGlobalFlavors}
-          disabled={loading || busy}
-        >
-          <Icon icon="lucide:ice-cream-bowl" class="h-4 w-4" />
-          Sabores
-        </button>
-        <button
-          class="btn btn-sm btn-outline gap-2"
-          onclick={openGlobalAddons}
-          disabled={loading || busy}
-        >
-          <Icon icon="lucide:puzzle" class="h-4 w-4" />
-          Complementos
-        </button>
+        {#if canEditCatalog}
+          <button
+            class="btn btn-sm btn-outline gap-2"
+            onclick={openGlobalFlavors}
+            disabled={loading || busy}
+          >
+            <Icon icon="lucide:ice-cream-bowl" class="h-4 w-4" />
+            Sabores
+          </button>
+          <button
+            class="btn btn-sm btn-outline gap-2"
+            onclick={openGlobalAddons}
+            disabled={loading || busy}
+          >
+            <Icon icon="lucide:puzzle" class="h-4 w-4" />
+            Complementos
+          </button>
+        {/if}
         <button
           class="btn btn-sm btn-ghost btn-square shrink-0 sm:ml-auto"
           type="button"
@@ -813,14 +818,16 @@
             </button>
           </div>
 
-          <button
-            class="btn btn-sm btn-outline shrink-0 gap-2 sm:ml-auto"
-            onclick={openContainerTypes}
-            disabled={loading || busy}
-          >
-            <Icon icon="lucide:container" class="h-4 w-4" />
-            Contenedores
-          </button>
+          {#if canEditCatalog}
+            <button
+              class="btn btn-sm btn-outline shrink-0 gap-2 sm:ml-auto"
+              onclick={openContainerTypes}
+              disabled={loading || busy}
+            >
+              <Icon icon="lucide:container" class="h-4 w-4" />
+              Contenedores
+            </button>
+          {/if}
           <button
             class="btn btn-sm btn-primary shrink-0 gap-2"
             onclick={openEntry}
@@ -1082,7 +1089,7 @@
   {unitItems}
   onClose={() => (showEntryDialog = false)}
   onSubmit={handleEntry}
-  onOpenContainerTypes={openContainerTypes}
+  onOpenContainerTypes={canEditCatalog ? openContainerTypes : undefined}
 />
 
 <InventoryAdjustmentDialog

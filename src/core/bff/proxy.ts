@@ -11,6 +11,7 @@
 import type { APIContext } from "astro";
 import { getApiBaseUrl } from "../config";
 import { clientIdentityHeaders } from "./upstream-headers";
+import { locationHeaders } from "./location";
 import { resolveClientIp } from "./client-identity";
 
 const DEFAULT_BODY_LIMIT_BYTES = 64 * 1024; // 64 KiB
@@ -205,6 +206,7 @@ export async function proxyToBackend(
 
   const headers: Record<string, string> = {
     ...clientIdentityHeaders(context),
+    ...locationHeaders(context),
     Authorization: `Bearer ${token}`,
     ...options.headers,
   };
@@ -348,6 +350,7 @@ export async function proxyToBackendStream(
 
   const headers: Record<string, string> = {
     ...clientIdentityHeaders(context),
+    ...locationHeaders(context),
     Authorization: `Bearer ${token}`,
     ...options.headers,
   };

@@ -33,6 +33,19 @@ export const ADMIN_ONLY_TABS = new Set<TabKey>([
   "analitica",
 ]);
 
+/** Tabs a manager sees: their location's orders and stock. */
+export const MANAGER_TABS = new Set<TabKey>(["ordenes", "inventario"]);
+
+/**
+ * Whether a role may open a tab. Admins see everything; managers their
+ * location's orders and inventory; employees only orders.
+ */
+export function canSeeTab(role: string | undefined, tab: TabKey): boolean {
+  if (role === "admin") return true;
+  if (role === "manager") return MANAGER_TABS.has(tab);
+  return !ADMIN_ONLY_TABS.has(tab);
+}
+
 export const DEFAULT_TAB_ORDER: TabKey[] = [
   "ordenes",
   "categorias",

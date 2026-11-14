@@ -1,15 +1,15 @@
 <script lang="ts">
   /**
-   * Weekly opening hours. Customers see "Abierto · cierra 9:00 pm" from this
-   * schedule, and online orders are refused outside it. Leaving every day
-   * empty means "no schedule": only the orders switch applies.
+   * Weekly opening hours of one location. Customers see "Abierto · cierra
+   * 9:00 pm" from this schedule, and online orders are refused outside it.
+   * Leaving every day empty means "no schedule": only the orders switch
+   * applies.
    */
-  import { onMount } from "svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import { showToast } from "@shared/toast/toast";
   import {
-    getStoreHours,
-    updateStoreHours,
+    updateLocation,
+    type AdminLocation,
     type WeekDay,
     type WeeklyHours,
   } from "@features/admin-management/lib/bff";
@@ -21,11 +21,26 @@
     validateWeek,
   } from "../lib/store-hours-form";
 
-  let week = $state<WeeklyHours>(emptyWeek());
-  let saved = $state("");
-  let loading = $state(true);
+  interface Props {
+    locationId: string;
+    initialHours: Partial<WeeklyHours>;
+    onSaved?: (location: AdminLocation) => void;
+  }
+
+  let { locationId, initialHours, onSaved }: Props = $props();
+
+  function toWeek(hours: Partial<WeeklyHours> | undefined): WeeklyHours {
+    const next = emptyWeek();
+    for (const { key } of WEEK_DAYS) next[key] = hours?.[key] ?? [];
+    return next;
+  }
+
+  // The editor owns its draft; the initial value only seeds it.
+  // svelte-ignore state_referenced_locally
+  let week = $state<WeeklyHours>(toWeek(initialHours));
+  // svelte-ignore state_referenced_locally
+  let saved = $state(JSON.stringify(toWeek(initialHours)));
   let saving = $state(false);
-  let loadError = $state("");
   let showErrors = $state(false);
 
   const errors = $derived(validateWeek(week));
@@ -34,26 +49,6 @@
   const configured = $derived(
     WEEK_DAYS.some(({ key }) => week[key].length > 0),
   );
-
-  onMount(() => {
-    void load();
-  });
-
-  async function load() {
-    loading = true;
-    loadError = "";
-    try {
-      const { days } = await getStoreHours();
-      const next = emptyWeek();
-      for (const { key } of WEEK_DAYS) next[key] = days?.[key] ?? [];
-      week = next;
-      saved = JSON.stringify(next);
-    } catch {
-      loadError = "No se pudo cargar el horario.";
-    } finally {
-      loading = false;
-    }
-  }
 
   function setOpen(day: WeekDay, open: boolean) {
     week[day] = open ? [{ open: "14:00", close: "21:00" }] : [];
@@ -76,11 +71,11 @@
     if (hasErrors) return;
     saving = true;
     try {
-      const { days } = await updateStoreHours(week);
-      const next = emptyWeek();
-      for (const { key } of WEEK_DAYS) next[key] = days?.[key] ?? [];
+      const updated = await updateLocation(locationId, { hours: week });
+      const next = toWeek(updated.hours);
       week = next;
       saved = JSON.stringify(next);
+      onSaved?.(updated);
       showErrors = false;
       showToast("Horario guardado", { tone: "success" });
     } catch {
@@ -119,114 +114,101 @@
     {/if}
   </div>
 
-  {#if loading}
-    <div class="skeleton h-48 w-full"></div>
-  {:else if loadError}
-    <div class="alert alert-warning">
-      <span>{loadError}</span>
-      <button type="button" class="btn btn-sm" onclick={() => void load()}
-        >Reintentar</button
+  <ul class="divide-y divide-base-300">
+    {#each WEEK_DAYS as day (day.key)}
+      {@const ranges = week[day.key]}
+      {@const error = showErrors ? errors[day.key] : undefined}
+      <li
+        class="grid gap-2 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-start"
       >
-    </div>
-  {:else}
-    <ul class="divide-y divide-base-300">
-      {#each WEEK_DAYS as day (day.key)}
-        {@const ranges = week[day.key]}
-        {@const error = showErrors ? errors[day.key] : undefined}
-        <li
-          class="grid gap-2 py-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-start"
-        >
-          <label class="flex min-h-10 items-center gap-3">
-            <input
-              type="checkbox"
-              class="toggle toggle-primary toggle-sm"
-              checked={ranges.length > 0}
-              onchange={(event) =>
-                setOpen(
-                  day.key,
-                  (event.currentTarget as HTMLInputElement).checked,
-                )}
-            />
-            <span class="font-medium">{day.label}</span>
-          </label>
+        <label class="flex min-h-10 items-center gap-3">
+          <input
+            type="checkbox"
+            class="toggle toggle-primary toggle-sm"
+            checked={ranges.length > 0}
+            onchange={(event) =>
+              setOpen(
+                day.key,
+                (event.currentTarget as HTMLInputElement).checked,
+              )}
+          />
+          <span class="font-medium">{day.label}</span>
+        </label>
 
-          <div class="space-y-2">
-            {#if ranges.length === 0}
-              <p
-                class="flex min-h-10 items-center text-sm text-base-content/60"
-              >
-                Cerrado
-              </p>
-            {/if}
-            {#each ranges as range, index (index)}
-              <div
-                class="grid max-w-sm grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2"
-              >
-                <input
-                  type="time"
-                  step="900"
-                  class="input input-sm w-full min-w-0"
-                  class:input-error={!!error}
-                  aria-label={`${day.label}: abre`}
-                  bind:value={range.open}
-                />
-                <span class="text-sm text-base-content/60">a</span>
-                <input
-                  type="time"
-                  step="900"
-                  class="input input-sm w-full min-w-0"
-                  class:input-error={!!error}
-                  aria-label={`${day.label}: cierra`}
-                  bind:value={range.close}
-                />
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm btn-square"
-                  aria-label={`Quitar horario ${index + 1} del ${day.label.toLowerCase()}`}
-                  onclick={() => removeRange(day.key, index)}
-                >
-                  <Icon icon="lucide:x" class="size-4" aria-hidden="true" />
-                </button>
-              </div>
-            {/each}
-            {#if ranges.length > 0 && ranges.length < MAX_RANGES_PER_DAY}
+        <div class="space-y-2">
+          {#if ranges.length === 0}
+            <p class="flex min-h-10 items-center text-sm text-base-content/60">
+              Cerrado
+            </p>
+          {/if}
+          {#each ranges as range, index (index)}
+            <div
+              class="grid max-w-sm grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] items-center gap-2"
+            >
+              <input
+                type="time"
+                step="900"
+                class="input input-sm w-full min-w-0"
+                class:input-error={!!error}
+                aria-label={`${day.label}: abre`}
+                bind:value={range.open}
+              />
+              <span class="text-sm text-base-content/60">a</span>
+              <input
+                type="time"
+                step="900"
+                class="input input-sm w-full min-w-0"
+                class:input-error={!!error}
+                aria-label={`${day.label}: cierra`}
+                bind:value={range.close}
+              />
               <button
                 type="button"
-                class="btn btn-ghost btn-xs"
-                onclick={() => addRange(day.key)}
+                class="btn btn-ghost btn-sm btn-square"
+                aria-label={`Quitar horario ${index + 1} del ${day.label.toLowerCase()}`}
+                onclick={() => removeRange(day.key, index)}
               >
-                <Icon icon="lucide:plus" class="size-3.5" aria-hidden="true" />
-                Agregar horario (p. ej. turno partido)
+                <Icon icon="lucide:x" class="size-4" aria-hidden="true" />
               </button>
-            {/if}
-            {#if error}
-              <p class="text-sm text-error" role="alert">{error}</p>
-            {/if}
-          </div>
-        </li>
-      {/each}
-    </ul>
+            </div>
+          {/each}
+          {#if ranges.length > 0 && ranges.length < MAX_RANGES_PER_DAY}
+            <button
+              type="button"
+              class="btn btn-ghost btn-xs"
+              onclick={() => addRange(day.key)}
+            >
+              <Icon icon="lucide:plus" class="size-3.5" aria-hidden="true" />
+              Agregar horario (p. ej. turno partido)
+            </button>
+          {/if}
+          {#if error}
+            <p class="text-sm text-error" role="alert">{error}</p>
+          {/if}
+        </div>
+      </li>
+    {/each}
+  </ul>
 
-    <div class="flex flex-wrap items-center justify-end gap-2">
-      {#if dirty}
-        <span class="text-sm text-base-content/60">Cambios sin guardar</span>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          onclick={() => void load()}
-          disabled={saving}
-        >
-          Descartar
-        </button>
-      {/if}
+  <div class="flex flex-wrap items-center justify-end gap-2">
+    {#if dirty}
+      <span class="text-sm text-base-content/60">Cambios sin guardar</span>
       <button
         type="button"
-        class="btn btn-primary btn-sm"
-        onclick={() => void save()}
-        disabled={saving || !dirty}
+        class="btn btn-ghost btn-sm"
+        onclick={() => void load()}
+        disabled={saving}
       >
-        {saving ? "Guardando…" : "Guardar horario"}
+        Descartar
       </button>
-    </div>
-  {/if}
+    {/if}
+    <button
+      type="button"
+      class="btn btn-primary btn-sm"
+      onclick={() => void save()}
+      disabled={saving || !dirty}
+    >
+      {saving ? "Guardando…" : "Guardar horario"}
+    </button>
+  </div>
 </div>

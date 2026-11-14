@@ -78,7 +78,15 @@ export function describeStoreStatus(
     );
   }
   if (!settings.orders_enabled) {
-    return closed("No estamos recibiendo pedidos en línea en este momento.");
+    // No location takes online orders right now: the shops may well be
+    // open, so don't call the store "closed".
+    return {
+      canOrder: false,
+      label: "Pedidos en sucursal",
+      detail:
+        "Por ahora no tomamos pedidos en línea. ¡Visítanos en cualquiera de nuestras sucursales!",
+      tone: "closed",
+    };
   }
   if (hours?.configured && hours.closes_at) {
     const closesIn = new Date(hours.closes_at).getTime() - now.getTime();

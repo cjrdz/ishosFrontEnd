@@ -16,15 +16,12 @@
     type PublicProduct,
     type StorePublicSettings,
   } from "@features/catalog/lib/api";
-  import {
-    describeStoreStatus,
-    scheduleRows,
-  } from "@features/catalog/lib/store-status";
+  import { describeStoreStatus } from "@features/catalog/lib/store-status";
   import ProductCard from "./shared/ProductCard.svelte";
   import ProductModal from "./shared/ProductModal.svelte";
   import StoreOffers from "./StoreOffers.svelte";
   import StoreHoursCard from "./StoreHoursCard.svelte";
-  import { BRANCHES } from "@features/catalog/lib/branches";
+  import StoreLocationsList from "@features/catalog/components/StoreLocationsList.svelte";
   import {
     computeUnitPrice,
     isProductConfigurable,
@@ -47,8 +44,6 @@
   const activeOfferMap = $derived(buildActiveOfferMap(offers));
   const status = $derived(describeStoreStatus(settings, now));
   const ordersEnabled = $derived(status.canOrder);
-  const schedule = $derived(scheduleRows(settings?.hours, now));
-  const todayRow = $derived(schedule.find((row) => row.isToday));
 
   onMount(() => {
     void loadHome();
@@ -310,38 +305,10 @@
           <h2 class="text-lg font-bold">Visítanos</h2>
         </div>
         <p class="text-base-content/75">
-          Dos sucursales en Ahuachapán, El Salvador.
-          {#if todayRow}
-            Hoy: {todayRow.hours}.
-          {/if}
+          Nuestras sucursales en Ahuachapán, El Salvador.
         </p>
       </div>
-      <ul class="divide-y divide-base-300 rounded-field border border-base-300">
-        {#each BRANCHES as branch (branch.name)}
-          <li class="flex items-center justify-between gap-3 px-3 py-2.5">
-            <span class="min-w-0">
-              <span class="block font-semibold">{branch.name}</span>
-              <span class="block text-sm text-base-content/65"
-                >{branch.area}</span
-              >
-            </span>
-            <a
-              href={branch.maps}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn-outline btn-sm shrink-0 rounded-full"
-              aria-label={`Cómo llegar a ${branch.name}`}
-            >
-              <Icon
-                icon="lucide:navigation"
-                class="size-4"
-                aria-hidden="true"
-              />
-              Cómo llegar
-            </a>
-          </li>
-        {/each}
-      </ul>
+      <StoreLocationsList variant="list" />
       <a
         href="/about#sucursales"
         class="link link-hover self-start text-sm font-medium text-primary"

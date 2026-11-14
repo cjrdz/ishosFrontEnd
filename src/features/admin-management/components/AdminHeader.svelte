@@ -2,8 +2,9 @@
   import { onMount } from "svelte";
   import ThemeToggle from "@shared/components/ThemeToggle.svelte";
   import Icon from "@shared/components/AppIcon.svelte";
+  import LocationSwitcher from "@features/admin-management/components/LocationSwitcher.svelte";
   import {
-    ADMIN_ONLY_TABS,
+    canSeeTab,
     TAB_ICONS,
     TAB_LABELS,
     type TabKey,
@@ -11,6 +12,9 @@
 
   interface Props {
     userName: string;
+    role: string;
+    /** The staff member's own location (null for admins). */
+    locationName: string | null;
     activeTab: TabKey;
     isAdmin: boolean;
     tabOrder: TabKey[];
@@ -24,6 +28,8 @@
 
   let {
     userName,
+    role,
+    locationName,
     activeTab,
     isAdmin,
     tabOrder,
@@ -35,9 +41,7 @@
   }: Props = $props();
   let currentHour = $state(new Date().getHours());
 
-  const visibleTabs = $derived(
-    tabOrder.filter((tab) => isAdmin || !ADMIN_ONLY_TABS.has(tab)),
-  );
+  const visibleTabs = $derived(tabOrder.filter((tab) => canSeeTab(role, tab)));
 
   const greetingMeta = $derived.by(() => {
     if (currentHour < 12) {
@@ -100,7 +104,10 @@
       </p>
     </div>
   </div>
-  <div class="flex items-center gap-2 self-end sm:self-auto">
+  <div
+    class="flex flex-wrap items-center justify-end gap-2 self-end sm:self-auto"
+  >
+    <LocationSwitcher {role} {locationName} />
     <ThemeToggle />
     {#if onToggleCounterMode}
       <button
@@ -116,7 +123,7 @@
         <Icon icon="lucide:monitor-check" class="h-6 w-6" />
       </button>
     {/if}
-    {#if isAdmin}
+    {#if isAdmin || role === "manager"}
       <button
         class="btn btn-ghost btn-circle"
         type="button"

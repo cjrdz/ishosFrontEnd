@@ -1,35 +1,36 @@
 <script lang="ts">
-  /** Header chip: "Abierto · cierra 9:00 pm" / "Cerrado". Refreshes each minute. */
+  /**
+   * Header chip summarising the locations: "Abierto", "2 de 3 abiertas" or
+   * "Cerrado · abrimos 2:00 pm". Refreshes each minute.
+   */
   import { onMount } from "svelte";
   import {
-    fetchStoreSettings,
-    type StorePublicSettings,
+    fetchStoreLocations,
+    type PublicLocation,
   } from "@features/catalog/lib/api";
-  import {
-    describeStoreStatus,
-    type StoreStatus,
-  } from "@features/catalog/lib/store-status";
+  import { describeLocations } from "@features/catalog/lib/locations";
+  import type { StoreStatus } from "@features/catalog/lib/store-status";
 
   let status = $state<StoreStatus | null>(null);
-  let settings: StorePublicSettings | null = null;
+  let locations: PublicLocation[] = [];
 
   async function refresh(fresh = false) {
     try {
-      settings = await fetchStoreSettings({ fresh });
+      locations = await fetchStoreLocations({ fresh });
     } catch {
-      return; // keep the last known status; ordering still works server-side
+      return; // keep the last known status
     }
-    status = describeStoreStatus(settings);
+    status = describeLocations(locations);
   }
 
   onMount(() => {
     void refresh();
-    // Re-evaluate the label every minute ("cierra pronto"), refetch every 5.
+    // Re-evaluate the label every minute, refetch every 5.
     let ticks = 0;
     const timer = setInterval(() => {
       ticks += 1;
       if (ticks % 5 === 0) void refresh(true);
-      else if (settings) status = describeStoreStatus(settings);
+      else if (locations.length) status = describeLocations(locations);
     }, 60_000);
     return () => clearInterval(timer);
   });

@@ -82,3 +82,44 @@ describe("receipt", () => {
     expect(html).toContain("break-before: page");
   });
 });
+
+describe("ticket location", () => {
+  it("prints the order's sucursal and its WhatsApp", async () => {
+    const mod = await import("./receipt-renderer");
+    mod.registerReceiptLocations([
+      {
+        id: "loc-3",
+        name: "Isho's Sucursal 3",
+        address: "Colonia El Ivu",
+        whatsapp: "50376454347",
+      },
+    ]);
+    const order = {
+      order_number: "ORD-20261113-0001",
+      order_type: "para_llevar" as const,
+      total_amount: 1,
+      location_id: "loc-3",
+    };
+    expect(mod.receiptContactLine(order)).toBe(
+      "Colonia El Ivu · WhatsApp 7645-4347",
+    );
+    expect(mod.receiptLocation(order)?.name).toBe("Isho's Sucursal 3");
+  });
+
+  it("falls back to the store contact when the location is unknown", async () => {
+    const mod = await import("./receipt-renderer");
+    expect(
+      mod.receiptContactLine({
+        order_number: "ORD-20261113-0002",
+        order_type: "para_llevar",
+        total_amount: 1,
+      }),
+    ).toBe(mod.STORE_CONTACT);
+  });
+
+  it("formats El Salvador numbers", async () => {
+    const { formatPhoneDisplay } = await import("./receipt-renderer");
+    expect(formatPhoneDisplay("50376454347")).toBe("7645-4347");
+    expect(formatPhoneDisplay("76454347")).toBe("7645-4347");
+  });
+});
