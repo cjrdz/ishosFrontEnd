@@ -205,6 +205,9 @@
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
 
+  <!-- Locations first: hours, switches and contact change most often -->
+  <LocationsSettings isAdmin={true} />
+
   <!-- Navigation -->
   <div id="navegacion-panel" class="card bg-base-100 shadow">
     <div class="card-body gap-4">
@@ -260,9 +263,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Locations: switches, contact details and hours per sucursal -->
-  <LocationsSettings isAdmin={true} />
 
   <!-- Security -->
   <div id="seguridad-panel" class="card bg-base-100 shadow">

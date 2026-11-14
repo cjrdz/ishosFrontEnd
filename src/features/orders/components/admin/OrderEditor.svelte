@@ -16,6 +16,13 @@
   } from "../../types/orders-tab";
   import type { CreatedOrder } from "@features/admin-management/lib/order-handlers";
   import type { TicketKind } from "../../lib/receipt-renderer";
+  import type { AutoPrintMode } from "../../types/orders-tab";
+
+  const AUTO_PRINT_OPTIONS: { value: AutoPrintMode; label: string }[] = [
+    { value: "both", label: "Imprimir ambos" },
+    { value: "kitchen", label: "Solo comanda" },
+    { value: "none", label: "No imprimir" },
+  ];
   import { fly } from "svelte/transition";
   import { motionMs, celebrate } from "@shared/motion/motion";
 
@@ -84,9 +91,11 @@
     onDraftItemKey: (item: ManualOrderItemDraft, index: number) => string;
     /** Set once a new order was created: the editor shows the print/next screen. */
     createdOrder?: CreatedOrder | null;
-    autoPrint?: boolean;
-    onAutoPrintChange?: (value: boolean) => void;
+    autoPrint?: AutoPrintMode;
+    onAutoPrintChange?: (value: AutoPrintMode) => void;
     onPrint?: (kinds: TicketKind[]) => void;
+    /** Move the new order to "Preparando" (starts preparation, uses stock). */
+    onStartPreparing?: () => void;
     onNewOrder?: () => void;
   }
 
@@ -142,9 +151,10 @@
     onManualItemSubtotal,
     onDraftItemKey,
     createdOrder = null,
-    autoPrint = false,
+    autoPrint = "both",
     onAutoPrintChange,
     onPrint,
+    onStartPreparing,
     onNewOrder,
   }: Props = $props();
 
@@ -386,7 +396,14 @@
         >
           <Icon icon="lucide:check" class="size-7" aria-hidden="true" />
         </span>
-        <p class="text-sm font-medium text-base-content/70">Orden creada</p>
+        <p class="text-sm font-medium text-base-content/70">
+          Orden creada ·
+          {#if createdOrder.order?.status === "en_proceso"}
+            <span class="font-semibold text-info">Preparando</span>
+          {:else}
+            <span class="font-semibold text-success">Aceptada</span>
+          {/if}
+        </p>
         <p class="font-display text-6xl font-bold leading-none">
           #{shortNumber(createdOrder.orderNumber)}
         </p>
@@ -423,18 +440,25 @@
             />
             Tickets
           </h4>
-          <label class="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              class="toggle toggle-primary toggle-sm"
-              checked={autoPrint}
-              onchange={(event) =>
-                onAutoPrintChange?.(
-                  (event.currentTarget as HTMLInputElement).checked,
-                )}
-            />
-            Imprimir ambos al crear
-          </label>
+          <div
+            class="flex flex-wrap items-center gap-2 text-sm"
+            role="radiogroup"
+            aria-label="Al crear una orden en este dispositivo"
+          >
+            <span class="text-base-content/70">Al crear:</span>
+            <div class="join">
+              {#each AUTO_PRINT_OPTIONS as option (option.value)}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={autoPrint === option.value}
+                  class={`btn btn-xs join-item ${autoPrint === option.value ? "btn-primary" : "btn-ghost border-base-300"}`}
+                  onclick={() => onAutoPrintChange?.(option.value)}
+                  >{option.label}</button
+                >
+              {/each}
+            </div>
+          </div>
         </div>
         {#if createdOrder.order}
           <div class="grid gap-2 sm:grid-cols-3">
@@ -486,6 +510,17 @@
         <button type="button" class="btn btn-ghost" onclick={onClose}
           >Cerrar</button
         >
+        {#if onStartPreparing && createdOrder.order && createdOrder.order.status === "recibida"}
+          <button
+            type="button"
+            class="btn btn-outline"
+            onclick={() => onStartPreparing?.()}
+            title="La orden pasa a Preparando y se descuenta el inventario"
+          >
+            <Icon icon="lucide:chef-hat" class="size-4" aria-hidden="true" />
+            Pasar a Preparando
+          </button>
+        {/if}
         <button
           type="button"
           class="btn btn-primary"

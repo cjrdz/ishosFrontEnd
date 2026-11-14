@@ -118,3 +118,13 @@ describe("store status", () => {
     expect(scheduleRows({ ...base.hours, configured: false }, NOW)).toEqual([]);
   });
 });
+
+describe("online ordering off everywhere", () => {
+  it("says orders are in-store instead of closed", async () => {
+    const { describeStoreStatus } = await import("./store-status");
+    const status = describeStoreStatus({ orders_enabled: false });
+    expect(status.canOrder).toBe(false);
+    expect(status.inStoreOnly).toBe(true);
+    expect(status.label).toBe("Pedidos en sucursal");
+  });
+});

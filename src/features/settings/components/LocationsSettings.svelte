@@ -33,6 +33,11 @@
   let fieldErrors = $state<Record<string, Record<string, string>>>({});
   let newLocation = $state({ name: "", slug: "" });
   let creating = $state(false);
+  /** Location shown in the editor (admins switch with the tabs). */
+  let selectedId = $state<string | null>(null);
+  const selected = $derived(
+    locations.find((l) => l.id === selectedId) ?? locations[0] ?? null,
+  );
 
   type ContactDraft = {
     name: string;
@@ -65,6 +70,7 @@
       const { data } = await listLocations();
       locations = data ?? [];
       drafts = Object.fromEntries(locations.map((l) => [l.id, toDraft(l)]));
+      selectedId ??= locations[0]?.id ?? null;
     } catch {
       loadError = "No se pudieron cargar las sucursales.";
     } finally {
@@ -162,6 +168,7 @@
       });
       locations = [...locations, created];
       drafts = { ...drafts, [created.id]: toDraft(created) };
+      selectedId = created.id;
       newLocation = { name: "", slug: "" };
       showToast(`${created.name} agregada. Completa sus datos y horario.`, {
         tone: "success",
@@ -178,6 +185,12 @@
     }
   }
 
+  function statusTone(l: AdminLocation): string {
+    if (!l.is_active || !l.orders_enabled) return "bg-base-content/30";
+    if (l.status?.configured && !l.status.is_open) return "bg-warning";
+    return "bg-success";
+  }
+
   function statusText(l: AdminLocation): string {
     if (!l.is_active) return "Inactiva";
     if (!l.orders_enabled) return "Órdenes pausadas";
@@ -186,7 +199,7 @@
   }
 </script>
 
-<div id="operacion-tienda" class="card bg-base-100 shadow">
+<div id="operacion-tienda" class="card scroll-mt-4 bg-base-100 shadow">
   <div class="card-body gap-4">
     <div>
       <h2 class="card-title">
@@ -209,11 +222,40 @@
         >
       </div>
     {:else}
-      {#each locations as location (location.id)}
+      {#if locations.length > 1}
+        <div
+          role="tablist"
+          aria-label="Sucursales"
+          class="flex gap-2 overflow-x-auto pb-1"
+        >
+          {#each locations as location (location.id)}
+            {@const active = selected?.id === location.id}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              aria-controls={`loc-panel-${location.id}`}
+              class={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors ${active ? "border-primary bg-primary/10 font-semibold text-primary" : "border-base-300 hover:bg-base-200"}`}
+              onclick={() => (selectedId = location.id)}
+            >
+              <span
+                class={`size-2 rounded-full ${statusTone(location)}`}
+                aria-hidden="true"
+              ></span>
+              {location.name}
+              <span class="sr-only">· {statusText(location)}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      {#each selected ? [selected] : [] as location (location.id)}
         {@const draft = drafts[location.id]}
         {@const errors = fieldErrors[location.id] ?? {}}
         {@const busy = savingId === location.id}
         <section
+          id={`loc-panel-${location.id}`}
+          role={locations.length > 1 ? "tabpanel" : undefined}
           class="space-y-4 rounded-box border border-base-300 p-4"
           aria-labelledby={`loc-${location.id}`}
         >
@@ -394,11 +436,16 @@
             </details>
           {/if}
 
-          <StoreHoursEditor
-            locationId={location.id}
-            initialHours={location.hours}
-            onSaved={replace}
-          />
+          {#key location.id}
+            <StoreHoursEditor
+              locationId={location.id}
+              initialHours={location.hours}
+              copySources={locations
+                .filter((l) => l.id !== location.id)
+                .map((l) => ({ name: l.name, hours: l.hours }))}
+              onSaved={replace}
+            />
+          {/key}
         </section>
       {:else}
         <p class="text-sm text-base-content/60">No hay sucursales.</p>

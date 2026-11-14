@@ -24,10 +24,23 @@
   interface Props {
     locationId: string;
     initialHours: Partial<WeeklyHours>;
+    /** Other locations whose schedule can be copied in one step. */
+    copySources?: { name: string; hours: Partial<WeeklyHours> }[];
     onSaved?: (location: AdminLocation) => void;
   }
 
-  let { locationId, initialHours, onSaved }: Props = $props();
+  let { locationId, initialHours, copySources = [], onSaved }: Props = $props();
+
+  function copyFrom(event: Event) {
+    const select = event.currentTarget as HTMLSelectElement;
+    const source = copySources[Number(select.value)];
+    select.value = "";
+    if (!source) return;
+    week = toWeek(source.hours);
+    showToast(`Horario de ${source.name} copiado. Revisa y guarda.`, {
+      tone: "info",
+    });
+  }
 
   function toWeek(hours: Partial<WeeklyHours> | undefined): WeeklyHours {
     const next = emptyWeek();
@@ -102,16 +115,30 @@
           : "Sin horario: la tienda acepta pedidos mientras el interruptor de pedidos esté activo."}
       </p>
     </div>
-    {#if week.mon.length > 0}
-      <button
-        type="button"
-        class="btn btn-ghost btn-sm"
-        onclick={() => (week = copyDayToAll(week, "mon"))}
-      >
-        <Icon icon="lucide:copy" class="size-4" aria-hidden="true" />
-        Copiar lunes a todos
-      </button>
-    {/if}
+    <div class="flex flex-wrap items-center gap-2">
+      {#if copySources.length > 0}
+        <select
+          class="select select-sm select-bordered w-auto"
+          aria-label="Copiar horario de otra sucursal"
+          onchange={copyFrom}
+        >
+          <option value="">Copiar horario de…</option>
+          {#each copySources as source, index (source.name)}
+            <option value={String(index)}>{source.name}</option>
+          {/each}
+        </select>
+      {/if}
+      {#if week.mon.length > 0}
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          onclick={() => (week = copyDayToAll(week, "mon"))}
+        >
+          <Icon icon="lucide:copy" class="size-4" aria-hidden="true" />
+          Copiar lunes a todos
+        </button>
+      {/if}
+    </div>
   </div>
 
   <ul class="divide-y divide-base-300">

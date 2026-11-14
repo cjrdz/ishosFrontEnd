@@ -1095,6 +1095,8 @@ export async function updateOrderArchiveConfig(payload: OrderArchiveConfig) {
 
 export interface InventoryItem {
   id: string;
+  /** Location (sucursal) whose stock this row is. */
+  location_id?: string;
   name: string;
   type: "ball_based" | "unit_based";
   current_stock: number;

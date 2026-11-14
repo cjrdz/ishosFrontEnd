@@ -16,6 +16,7 @@
   import AddedItemsList from "./AddedItemsList.svelte";
   import ProductSelector from "./ProductSelector.svelte";
   import Icon from "@shared/components/AppIcon.svelte";
+  import { loadWorkingSoldOut } from "@features/admin-management/lib/location-selection";
 
   interface AddonGroup {
     key: string;
@@ -302,8 +303,25 @@
     onQuantityChange(Math.max(1, orderForm.quantity - 1));
   }
 
+  // Agotados of the location the order is taken at: shown greyed out so
+  // staff don't pick them (the backend refuses them anyway).
+  let soldOutProductIds = $state<string[]>([]);
+  let soldOutFlavorIds = $state<string[]>([]);
+  let workingLocationName = $state<string | null>(null);
+  let noLocationSelected = $state(false);
+
   onMount(() => {
     loadRecentProducts();
+    void loadWorkingSoldOut()
+      .then(({ location, products, flavors }) => {
+        soldOutProductIds = products;
+        soldOutFlavorIds = flavors;
+        workingLocationName = location?.name ?? null;
+        noLocationSelected = !location;
+      })
+      .catch(() => {
+        // Without the list nothing is greyed out; the backend still checks.
+      });
   });
 
   function isExtraInGroup(group: AddonGroup): string[] {
@@ -317,6 +335,28 @@
   }
 </script>
 
+{#if noLocationSelected}
+  <div role="alert" class="alert alert-warning alert-soft mb-3">
+    <Icon icon="lucide:store" class="size-5" aria-hidden="true" />
+    <span
+      >Estás viendo todas las sucursales. Elige una sucursal en la parte
+      superior del panel para tomar la orden.</span
+    >
+  </div>
+{:else if workingLocationName}
+  <p class="mb-2 flex items-center gap-1.5 text-sm text-base-content/70">
+    <Icon icon="lucide:store" class="size-4" aria-hidden="true" />
+    Orden para <strong class="text-base-content">{workingLocationName}</strong>
+    {#if soldOutProductIds.length + soldOutFlavorIds.length > 0}
+      · {soldOutProductIds.length + soldOutFlavorIds.length} agotado{soldOutProductIds.length +
+        soldOutFlavorIds.length ===
+      1
+        ? ""
+        : "s"}
+    {/if}
+  </p>
+{/if}
+
 <div class="builder" class:builder-configuring={showConfig}>
   <!-- Left: catalog -->
   <div class="builder-catalog">
@@ -326,6 +366,7 @@
       activeProductId={showConfig ? orderForm.product_id : ""}
       {recentProducts}
       {countsById}
+      soldOutIds={soldOutProductIds}
       onPick={pickProduct}
     />
   </div>
@@ -376,6 +417,7 @@
               error={attempted && requiresFlavorSelection
                 ? "Elige el sabor"
                 : ""}
+              soldOutIds={soldOutFlavorIds}
               onChange={handleFlavorChange}
             />
           {/if}
@@ -477,9 +519,7 @@
           >
             <span>
               {#if draftItemEditIndex !== null}Guardar{:else}Agregar<span
-                  class="hidden sm:inline"
-                >
-                  a la orden</span
+                  class="hidden sm:inline">{" a la orden"}</span
                 >{/if}
             </span>
             <span class="tabular-nums">{formatCurrency(totalPreview)}</span>

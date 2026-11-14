@@ -204,7 +204,45 @@
     searchDialog?.close();
   }
 
+  // Section menu: same entries as the search, in page order.
+  const NAV_ORDER = [
+    "operacion-tienda",
+    "navegacion-panel",
+    "seguridad-panel",
+    "filas-tablas",
+    "archivo-ordenes",
+  ];
+  const NAV_ITEMS = NAV_ORDER.map((id) =>
+    SEARCH_ITEMS.find((item) => item.id === id),
+  ).filter((item): item is (typeof SEARCH_ITEMS)[number] => !!item);
+  let activeSection = $state(NAV_ORDER[0]);
+
+  // Highlight the section being read.
+  $effect(() => {
+    if (!session || session.role !== "admin" || loading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) activeSection = visible[0].target.id;
+      },
+      { rootMargin: "-20% 0px -70% 0px" },
+    );
+    const timer = setTimeout(() => {
+      for (const id of NAV_ORDER) {
+        const el = document.getElementById(id);
+        if (el) observer.observe(el);
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  });
+
   function navigateTo(id: string) {
+    activeSection = id;
     closeSearch();
     requestAnimationFrame(() => {
       document
@@ -563,26 +601,61 @@
       </div>
     {/if}
 
-    <!-- Settings forms -->
-    <div class="space-y-6">
-      {#if session.role !== "admin"}
-        <LocationsSettings isAdmin={false} />
-      {:else}
-        <SettingsTab
-          {tabOrder}
-          {panelConfig}
-          rowsPerTable={rowsPerTable as unknown as any}
-          {archiveConfig}
-          {busy}
-          {moduleError}
-          onSave={handleSaveTabOrder}
-          onSavePanelConfig={handleSavePanelConfig}
-          onSaveRowsPerTable={(rows) =>
-            void handleSaveRowsPerTable(rows as unknown as RowsPerTableConfig)}
-          onSaveArchiveConfig={handleSaveArchiveConfig}
-          onRunArchive={handleRunArchive}
-        />
+    <!-- Settings forms, with a section menu for admins -->
+    <div
+      class={session.role === "admin"
+        ? "lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start lg:gap-6"
+        : ""}
+    >
+      {#if session.role === "admin"}
+        <nav
+          aria-label="Secciones de configuración"
+          class="mb-4 lg:sticky lg:top-4 lg:mb-0"
+        >
+          <ul
+            class="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1 lg:overflow-visible"
+          >
+            {#each NAV_ITEMS as item (item.id)}
+              <li class="shrink-0">
+                <a
+                  href={`#${item.id}`}
+                  class={`flex items-center gap-2 rounded-field px-3 py-2 text-sm transition-colors ${activeSection === item.id ? "bg-primary/10 font-semibold text-primary" : "text-base-content/75 hover:bg-base-200"}`}
+                  aria-current={activeSection === item.id ? "true" : undefined}
+                  onclick={(event) => {
+                    event.preventDefault();
+                    navigateTo(item.id);
+                  }}
+                >
+                  <Icon icon={item.icon} class="h-4 w-4 shrink-0" />
+                  {item.title}
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </nav>
       {/if}
+      <div class="min-w-0 space-y-6">
+        {#if session.role !== "admin"}
+          <LocationsSettings isAdmin={false} />
+        {:else}
+          <SettingsTab
+            {tabOrder}
+            {panelConfig}
+            rowsPerTable={rowsPerTable as unknown as any}
+            {archiveConfig}
+            {busy}
+            {moduleError}
+            onSave={handleSaveTabOrder}
+            onSavePanelConfig={handleSavePanelConfig}
+            onSaveRowsPerTable={(rows) =>
+              void handleSaveRowsPerTable(
+                rows as unknown as RowsPerTableConfig,
+              )}
+            onSaveArchiveConfig={handleSaveArchiveConfig}
+            onRunArchive={handleRunArchive}
+          />
+        {/if}
+      </div>
     </div>
   </div>
 

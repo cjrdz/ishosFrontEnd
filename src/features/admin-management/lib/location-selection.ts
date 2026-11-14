@@ -6,6 +6,12 @@
  * always on their own location: the backend ignores the cookie for them.
  */
 
+import {
+  getLocationAvailability,
+  listLocations,
+  type AdminLocation,
+} from "./bff";
+
 export const ADMIN_LOCATION_COOKIE = "ishos_admin_location";
 export const ALL_LOCATIONS = "all";
 export const LOCATION_CHANGE_EVENT = "ishos:location-change";
@@ -48,4 +54,34 @@ export function effectiveLocationId(session: {
   if (session.role !== "admin") return session.location_id ?? null;
   const selected = readSelectedLocation();
   return selected === ALL_LOCATIONS ? null : selected;
+}
+
+/**
+ * The location the panel acts on: the staff member's own (the only one the
+ * backend returns them), or the admin's header choice. null while an admin
+ * looks at "all" locations.
+ */
+export async function resolveWorkingLocation(): Promise<AdminLocation | null> {
+  const { data } = await listLocations();
+  const all = data ?? [];
+  if (all.length === 1) return all[0];
+  const selected = readSelectedLocation();
+  if (selected === ALL_LOCATIONS) return null;
+  return all.find((l) => l.id === selected) ?? null;
+}
+
+/** Sold-out ("Agotado") product and flavour ids at the working location. */
+export async function loadWorkingSoldOut(): Promise<{
+  location: AdminLocation | null;
+  products: string[];
+  flavors: string[];
+}> {
+  const location = await resolveWorkingLocation();
+  if (!location) return { location: null, products: [], flavors: [] };
+  const items = await getLocationAvailability(location.id);
+  return {
+    location,
+    products: items.products ?? [],
+    flavors: items.flavors ?? [],
+  };
 }

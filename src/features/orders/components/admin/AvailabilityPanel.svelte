@@ -11,14 +11,10 @@
   import {
     getLocationAvailability,
     listFlavors,
-    listLocations,
     setLocationAvailability,
     type AdminLocation,
   } from "@features/admin-management/lib/bff";
-  import {
-    ALL_LOCATIONS,
-    readSelectedLocation,
-  } from "@features/admin-management/lib/location-selection";
+  import { resolveWorkingLocation } from "@features/admin-management/lib/location-selection";
   import { undoableAction } from "@shared/toast/toast";
 
   interface Props {
@@ -49,16 +45,7 @@
   onMount(() => {
     void (async () => {
       try {
-        const { data } = await listLocations();
-        const all = data ?? [];
-        // Staff get exactly their own location; admins use the header choice.
-        const selected = readSelectedLocation();
-        location =
-          all.length === 1
-            ? all[0]
-            : selected === ALL_LOCATIONS
-              ? null
-              : (all.find((l) => l.id === selected) ?? null);
+        location = await resolveWorkingLocation();
         if (!location) return;
 
         const [items, flavorList] = await Promise.all([

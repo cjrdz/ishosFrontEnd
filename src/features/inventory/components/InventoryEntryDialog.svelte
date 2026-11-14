@@ -24,6 +24,8 @@
     }) => void;
     /** Absent for managers: only admins edit container types. */
     onOpenContainerTypes?: () => void;
+    /** Opened from a row's "+ Entrada": start with that item selected. */
+    preselect?: { type: "flavor" | "unit"; id: string } | null;
   }
 
   let {
@@ -34,6 +36,7 @@
     onClose,
     onSubmit,
     onOpenContainerTypes,
+    preselect = null,
   }: Props = $props();
 
   let dialogRef = $state<HTMLDialogElement | null>(null);
@@ -86,6 +89,11 @@
   $effect(() => {
     if (!dialogRef) return;
     if (open && !dialogRef.open) {
+      if (preselect) {
+        entryType = preselect.type;
+        if (preselect.type === "flavor") flavorForm.flavor_id = preselect.id;
+        else unitForm.inventory_item_id = preselect.id;
+      }
       dialogRef.showModal();
     } else if (!open && dialogRef.open) {
       dialogRef.close();

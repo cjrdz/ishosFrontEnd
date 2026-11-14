@@ -1,4 +1,5 @@
 <script lang="ts">
+  import StoreLocationsList from "./StoreLocationsList.svelte";
   import { onMount, tick } from "svelte";
   import { ApiError } from "@core/errors";
   import Icon from "@shared/components/AppIcon.svelte";
@@ -73,6 +74,8 @@
   let ordersEnabled = $state(true);
   // Why ordering is unavailable ("Abrimos mañana a las 2:00 pm."), if it is.
   let closedDetail = $state<string | null>(null);
+  /** No location takes online orders: point customers to the shops. */
+  let inStoreOnly = $state(false);
   let offers = $state<StoreOfferItem[]>([]);
   // Menu data is needed to re-price items and detect unavailable ones.
   let catalogLoaded = $state(false);
@@ -176,6 +179,7 @@
       const status = describeStoreStatus(settingsResult.value);
       ordersEnabled = status.canOrder;
       closedDetail = status.canOrder ? null : status.detail;
+      inStoreOnly = !!status.inStoreOnly;
       offers = settingsResult.value.offers ?? [];
     } else {
       // The backend still enforces a closed store.
@@ -590,10 +594,18 @@
           <p class="font-semibold">
             {closedDetail ?? "No estamos recibiendo pedidos en este momento."}
           </p>
-          <p class="text-sm text-base-content/70">
-            Tu carrito queda guardado en este dispositivo para que pidas más
-            tarde.
-          </p>
+          {#if inStoreOnly}
+            <p class="mb-3 text-sm text-base-content/70">
+              Tu carrito queda guardado: muéstralo en caja o pídelo por WhatsApp
+              a tu sucursal.
+            </p>
+            <StoreLocationsList variant="list" />
+          {:else}
+            <p class="text-sm text-base-content/70">
+              Tu carrito queda guardado en este dispositivo para que pidas más
+              tarde.
+            </p>
+          {/if}
         </div>
       </div>
     {/if}
