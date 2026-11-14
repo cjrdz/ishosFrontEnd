@@ -212,9 +212,9 @@
         <thead class="bg-base-200/60 text-base-content">
           <tr>
             <th class="font-bold">Nombre</th>
-            <th class="font-bold">Tipo</th>
-            <th class="font-bold">Teléfono</th>
-            <th class="font-bold">Correo</th>
+            <th class="hidden font-bold md:table-cell">Tipo</th>
+            <th class="hidden font-bold sm:table-cell">Teléfono</th>
+            <th class="hidden font-bold md:table-cell">Correo</th>
             <th class="text-center font-bold">Estado</th>
             <th class="text-center font-bold">Acciones</th>
           </tr>
@@ -229,10 +229,18 @@
           {:else}
             {#each visibleUsers as user (user.id)}
               <tr class="hover:bg-base-300/40 transition-colors">
-                <td>{user.name}</td>
-                <td>{user.user_type === "company" ? "empresa" : "usuario"}</td>
-                <td>{user.phone}</td>
-                <td>{user.email || "-"}</td>
+                <td>
+                  {user.name}
+                  <!-- Phones: phone number under the name instead of its own column. -->
+                  <span class="block text-xs text-base-content/60 sm:hidden"
+                    >{user.phone}</span
+                  >
+                </td>
+                <td class="hidden md:table-cell"
+                  >{user.user_type === "company" ? "Empresa" : "Cliente"}</td
+                >
+                <td class="hidden sm:table-cell">{user.phone}</td>
+                <td class="hidden md:table-cell">{user.email || "-"}</td>
                 <td class="text-center align-middle">
                   <input
                     class="toggle toggle-sm {user.status === 'active'

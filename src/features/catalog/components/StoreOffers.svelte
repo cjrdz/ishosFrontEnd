@@ -4,6 +4,7 @@
   import ProductSlider from "./shared/ProductSlider.svelte";
   import { toSafeImageUrl } from "@shared/utils/formatters";
   import { addCartItem } from "@features/catalog/lib/cart";
+  import { flyTo } from "@shared/motion/motion";
   import { resolveActiveOffers } from "@features/catalog/lib/offers";
   import { isProductConfigurable } from "@features/catalog/lib/customization";
   import type {
@@ -53,7 +54,11 @@
     return `${pad(Math.floor((s % 86400) / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
   }
 
-  function addOfferToCart(product: PublicProduct, offer: StoreOfferItem) {
+  function addOfferToCart(
+    product: PublicProduct,
+    offer: StoreOfferItem,
+    button?: HTMLElement,
+  ) {
     const initialDraft: ProductCustomizationDraft = {
       quantity: 1,
       flavor_id: offer.flavor_id || undefined,
@@ -78,23 +83,27 @@
       flavor_id: initialDraft.flavor_id,
       flavor_ids: initialDraft.flavor_ids,
     });
+    void flyTo(button, document.querySelector("[data-cart-target]"));
   }
 </script>
 
 {#if activeOffers.length > 0}
-  <div class="max-w-7xl mx-auto">
-    <div class="text-center mb-2">
-      <h2 class="text-2xl font-extrabold tracking-tight">
-        Productos Especiales
+  <section aria-labelledby="store-offers-title">
+    <div class="mb-2">
+      <h2
+        id="store-offers-title"
+        class="font-display font-bold text-4xl md:text-5xl"
+      >
+        Ofertas por tiempo limitado
       </h2>
-      <p class="text-sm text-base-content/60 mt-1">
-        Ofertas activas con precio especial por tiempo limitado.
+      <p class="mt-1 text-base-content/70">
+        Precio especial mientras dure el contador.
       </p>
     </div>
 
     <ProductSlider
       items={sliderItems}
-      ariaLabel="Productos Especiales"
+      ariaLabel="Ofertas por tiempo limitado"
       maxCards={4}
     >
       {#snippet card(item, index)}
@@ -109,9 +118,9 @@
           variant="featured"
           countdown={formatCountdown(offer.expiresMs)}
           note={offer.note}
-          onAdd={() => addOfferToCart(product, offer)}
+          onAdd={(button) => addOfferToCart(product, offer, button)}
         />
       {/snippet}
     </ProductSlider>
-  </div>
+  </section>
 {/if}

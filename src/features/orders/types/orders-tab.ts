@@ -1,3 +1,4 @@
+import type { CreatedOrder } from "@features/admin-management/lib/order-handlers";
 import type {
   Category,
   Employee,
@@ -95,10 +96,11 @@ export interface OrdersTabProps {
     payload: OrderUpdatePayload,
   ) => Promise<Order | null>;
   onDelete: (id: string) => void;
+  /** Resolves null when the order was not created. */
   onCreate: (
     payload: CreateOrderPayload,
     idempotencyKey?: string,
-  ) => Promise<boolean>;
+  ) => Promise<CreatedOrder | null>;
   onArchive: (id: string, archived: boolean) => Promise<Order | null>;
   saveUserFromOrder: (payload: {
     name: string;

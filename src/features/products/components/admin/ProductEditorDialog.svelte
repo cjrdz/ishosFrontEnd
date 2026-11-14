@@ -92,6 +92,12 @@
       dialogRef.close();
     }
   });
+
+  const categoryOptions = $derived(
+    categories.length === 0
+      ? [{ id: "", name: "Sin categorías", disabled: true }]
+      : categories.map((c) => ({ id: c.id, name: c.name, disabled: false })),
+  );
 </script>
 
 <AdminModalShell
@@ -150,13 +156,13 @@
                 required
                 aria-labelledby="product-category-label"
               >
-                {#if categories.length === 0}
-                  <option value="" disabled>Sin categorías</option>
-                {:else}
-                  {#each categories as category}
-                    <option value={category.id}>{category.name}</option>
-                  {/each}
-                {/if}
+                <!-- One {#each} only: an {#if} directly inside <select> leaves a
+                     text anchor that browsers flag as invalid select content. -->
+                {#each categoryOptions as option (option.id)}
+                  <option value={option.id} disabled={option.disabled}
+                    >{option.name}</option
+                  >
+                {/each}
               </select>
             </div>
           </div>

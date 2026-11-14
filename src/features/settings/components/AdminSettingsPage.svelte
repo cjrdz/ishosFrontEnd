@@ -41,8 +41,8 @@
   const SEARCH_ITEMS = [
     {
       id: "navegacion-panel",
-      title: "Navegacion del panel",
-      description: "Orden global de pestanas del equipo",
+      title: "Navegación del panel",
+      description: "Orden global de pestañas del equipo",
       icon: "lucide:panel-top",
       keywords: ["pestanas", "tabs", "orden", "navegacion", "global"],
     },
@@ -62,13 +62,6 @@
       ],
     },
     {
-      id: "proximas-personalizaciones",
-      title: "Proximas personalizaciones",
-      description: "Branding, widgets y atajos futuros",
-      icon: "lucide:sparkles",
-      keywords: ["branding", "widgets", "atajos", "personalizar", "proximo"],
-    },
-    {
       id: "filas-tablas",
       title: "Filas por tabla",
       description: "Cantidad default de filas por tabla en el panel",
@@ -78,7 +71,7 @@
     {
       id: "operacion-tienda",
       title: "Operacion de tienda",
-      description: "Pausar o reactivar pedidos publicos",
+      description: "Pausar o reactivar pedidos públicos",
       icon: "lucide:store",
       keywords: [
         "ofertas",
@@ -91,8 +84,8 @@
     },
     {
       id: "archivo-ordenes",
-      title: "Archivo de ordenes",
-      description: "Archivar automaticamente ordenes antiguas",
+      title: "Archivo de órdenes",
+      description: "Archivar automáticamente órdenes antiguas",
       icon: "lucide:archive",
       keywords: ["archivo", "archivar", "ordenes", "auto archive", "historial"],
     },
@@ -400,7 +393,7 @@
       storeOffers = response.offers ?? [];
       saveAdminStoreSettings(session.id, response);
       setNotice(
-        enabled ? "Pedidos publicos activados" : "Pedidos publicos pausados",
+        enabled ? "Pedidos públicos activados" : "Pedidos públicos pausados",
       );
       trackAction("admin_settings_store_orders_toggled", { enabled });
     } catch (requestError) {
@@ -567,7 +560,7 @@
       >
         <div>
           <h1
-            class="text-2xl font-bold tracking-tight text-base-content/90 sm:text-3xl"
+            class="font-display text-4xl font-bold leading-none text-base-content sm:text-5xl"
           >
             Configuraciones
           </h1>
@@ -624,53 +617,6 @@
         onSaveArchiveConfig={handleSaveArchiveConfig}
         onRunArchive={handleRunArchive}
       />
-
-      <section id="proximas-personalizaciones" class="card bg-base-100 shadow">
-        <div class="card-body space-y-4">
-          <div>
-            <h2 class="card-title">Proximas personalizaciones</h2>
-            <p class="text-sm text-base-content/70">
-              Esta página queda preparada para crecer nuevas opciones sin tocar
-              la operacion diaria.
-            </p>
-          </div>
-          <div class="grid gap-4 md:grid-cols-3">
-            <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
-              <div class="flex items-center gap-3">
-                <span class="rounded-xl bg-info/10 p-2 text-info">
-                  <Icon icon="lucide:palette" class="h-5 w-5" />
-                </span>
-                <h3 class="font-semibold">Branding del panel</h3>
-              </div>
-              <p class="mt-3 text-sm text-base-content/70">
-                Logo, colores y nombre visible para el equipo.
-              </p>
-            </article>
-            <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
-              <div class="flex items-center gap-3">
-                <span class="rounded-xl bg-success/10 p-2 text-success">
-                  <Icon icon="lucide:layout-dashboard" class="h-5 w-5" />
-                </span>
-                <h3 class="font-semibold">Widgets de inicio</h3>
-              </div>
-              <p class="mt-3 text-sm text-base-content/70">
-                Define que resumenes aparecen primero al entrar al panel.
-              </p>
-            </article>
-            <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
-              <div class="flex items-center gap-3">
-                <span class="rounded-xl bg-warning/10 p-2 text-warning">
-                  <Icon icon="lucide:rocket" class="h-5 w-5" />
-                </span>
-                <h3 class="font-semibold">Atajos de operacion</h3>
-              </div>
-              <p class="mt-3 text-sm text-base-content/70">
-                Accesos rapidos para procesos frecuentes del equipo.
-              </p>
-            </article>
-          </div>
-        </div>
-      </section>
     </div>
   </div>
 

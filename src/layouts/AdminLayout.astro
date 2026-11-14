@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 import { inlineScript } from "@shared/csp/inline-script";
+import Toaster from "@shared/toast/Toaster.svelte";
 import adminThemeSource from "./inline/admin-theme.js?raw";
 
 interface Props {
@@ -24,8 +25,30 @@ const adminThemeScript = await inlineScript(Astro, adminThemeSource);
     <script is:inline set:html={adminThemeScript} />
   </head>
   <body class="bg-base-200 text-base-content min-h-screen flex flex-col">
-    <main class="container mx-auto px-4 py-8 flex-1 w-full">
+    <main
+      class="admin-main container mx-auto px-3 py-5 sm:px-4 sm:py-8 flex-1 w-full"
+    >
       <slot />
     </main>
+    <Toaster client:load placement="end" />
   </body>
 </html>
+
+<style is:global>
+  /* Phones: nested card padding left ~300px for tables; give content the room. */
+  @media (max-width: 639px) {
+    .admin-main .card-body {
+      padding: 1rem;
+    }
+  }
+
+  /* Room for the phone bottom navigation (AdminHeader) under content and toasts. */
+  @media (max-width: 639px) {
+    body:has(.admin-bottom-nav) .admin-main {
+      padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    }
+    body:has(.admin-bottom-nav) .toaster.toaster--end {
+      bottom: calc(4.75rem + env(safe-area-inset-bottom));
+    }
+  }
+</style>

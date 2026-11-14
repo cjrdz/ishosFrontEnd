@@ -211,6 +211,16 @@
       },
     );
   }
+
+  const lockoutOptions = $derived(
+    lockoutCandidateEmployees.length === 0
+      ? [{ id: "", label: "No hay empleados", disabled: true }]
+      : lockoutCandidateEmployees.map((employee) => ({
+          id: employee.id,
+          label: `${employee.email} (${employee.role})`,
+          disabled: false,
+        })),
+  );
 </script>
 
 <section class="space-y-4">
@@ -353,15 +363,12 @@
         bind:value={lockoutResetForm.employeeID}
         required
       >
-        {#if lockoutCandidateEmployees.length === 0}
-          <option value="" disabled selected>No hay empleados</option>
-        {:else}
-          {#each lockoutCandidateEmployees as employee}
-            <option value={employee.id}>
-              {employee.email} ({employee.role})
-            </option>
-          {/each}
-        {/if}
+        <!-- One {#each} only: an {#if} inside <select> leaves an invalid text anchor. -->
+        {#each lockoutOptions as option (option.id)}
+          <option value={option.id} disabled={option.disabled}
+            >{option.label}</option
+          >
+        {/each}
       </select>
     </div>
 

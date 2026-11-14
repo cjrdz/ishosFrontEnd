@@ -20,6 +20,8 @@
     label?: string;
     required?: boolean;
     error?: string;
+    /** The caller shows its own heading; keep the label for assistive tech only. */
+    hideLabel?: boolean;
     onChange: (value: string | string[]) => void;
   }
 
@@ -32,6 +34,7 @@
     label = "Sabor",
     required = false,
     error = "",
+    hideLabel = false,
     onChange,
   }: Props = $props();
 
@@ -74,7 +77,7 @@
 </script>
 
 <div class="space-y-2">
-  <div class="flex items-center gap-1.5">
+  <div class="flex items-center gap-1.5" class:sr-only={hideLabel}>
     <span class="text-sm font-semibold text-base-content/90">
       {label}
     </span>

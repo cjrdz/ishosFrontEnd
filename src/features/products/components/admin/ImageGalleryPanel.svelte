@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ImageCropper from "./ImageCropper.svelte";
   import type { AdminImage } from "@features/admin-management";
   import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
   import ConfirmDialog from "@shared/components/ConfirmDialog.svelte";
@@ -53,16 +54,20 @@
 
   function handleUploadSelection(event: Event) {
     const target = event.target as HTMLInputElement;
+    // The cropper opens below; the photo is framed to 4:3 before upload.
     selectedUploadFile = target.files?.[0] ?? null;
   }
 
-  async function uploadSelectedImage() {
-    if (!selectedUploadFile) return;
+  function cancelCrop() {
+    selectedUploadFile = null;
+    if (uploadInput) uploadInput.value = "";
+  }
+
+  async function uploadCropped(file: File) {
     actionBusy = true;
     try {
-      await onUpload(selectedUploadFile);
-      selectedUploadFile = null;
-      if (uploadInput) uploadInput.value = "";
+      await onUpload(file);
+      cancelCrop();
     } catch {
       // Error handled by parent
     } finally {
@@ -129,15 +134,15 @@
         onchange={handleUploadSelection}
         disabled={busy || galleryBusy || actionBusy}
       />
-      <button
-        class="btn btn-sm btn-primary"
-        type="button"
-        onclick={uploadSelectedImage}
-        disabled={busy || galleryBusy || actionBusy || !selectedUploadFile}
-      >
-        Subir
-      </button>
     </div>
+    {#if selectedUploadFile}
+      <ImageCropper
+        file={selectedUploadFile}
+        busy={actionBusy}
+        onCancel={cancelCrop}
+        onConfirm={uploadCropped}
+      />
+    {/if}
   </div>
 
   <div>

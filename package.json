@@ -26,13 +26,16 @@
     "icons:subset": "node scripts/build-icon-subset.mjs"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.4.2",
-    "@astrojs/svelte": "^9.1.1",
+    "@astrojs/cloudflare": "^14.4.8",
+    "@astrojs/svelte": "^9.1.6",
+    "@fontsource/amatic-sc": "^5.3.0",
+    "@fontsource/roboto": "^5.3.0",
     "@iconify/svelte": "^5.2.3",
     "@tailwindcss/vite": "^4.3.3",
-    "astro": "^7.4.2",
+    "astro": "^7.4.12",
     "daisyui": "^5.7.50",
     "echarts": "^6.1.0",
+    "jspdf": "^4.2.1",
     "motion": "^12.43.0",
     "svelte": "^5.57.2",
     "svelte-echarts": "^1.0.0",
@@ -42,7 +45,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "@astrojs/vercel": "^11.0.16",
+    "@astrojs/vercel": "^11.0.22",
     "@iconify-json/line-md": "^1.2.16",
     "@iconify-json/lucide": "^1.2.147",
     "@iconify-json/proicons": "^1.2.20",
@@ -59,7 +62,7 @@
     "prettier-plugin-svelte": "^3.5.2",
     "vite": "^7.3.7",
     "vitest": "^4.1.12",
-    "wrangler": "^4.152.0"
+    "wrangler": "^4.161.0"
   },
   "lint-staged": {
     "*.{ts,js,svelte,astro,json}": [

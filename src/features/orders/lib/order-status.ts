@@ -1,11 +1,7 @@
 import type { Order } from "@features/admin-management";
 
 export type LinearOrderStatus =
-  | "pendiente_revision"
-  | "recibida"
-  | "en_proceso"
-  | "lista"
-  | "entregada";
+  "pendiente_revision" | "recibida" | "en_proceso" | "lista" | "entregada";
 type CanceledOrderStatus = "pendiente_revision" | "cancelada";
 
 export const linearStatuses: LinearOrderStatus[] = [
@@ -21,22 +17,26 @@ export const canceledFlow: CanceledOrderStatus[] = [
   "cancelada",
 ];
 
+// Staff-facing names. "Por revisar" (not "Recibida") makes clear an order
+// still needs someone to accept it; the customer's tracking page says
+// "Recibida" for the same state.
 export const statusLabels: Record<Order["status"], string> = {
-  pendiente_revision: "Recibida",
-  recibida: "aceptada",
-  en_proceso: "preparando",
-  lista: "lista",
-  entregada: "entregada",
-  cancelada: "rechazada",
+  pendiente_revision: "Por revisar",
+  recibida: "Aceptada",
+  en_proceso: "Preparando",
+  lista: "Lista",
+  entregada: "Entregada",
+  cancelada: "Rechazada",
 };
 
+// daisyUI's *-content colours keep each badge readable in both themes.
 export const statusBadgeClass: Record<Order["status"], string> = {
-  pendiente_revision: "badge-warning font-semibold text-warning-content",
-  recibida: "badge-success font-semibold !text-white",
-  en_proceso: "badge-info font-semibold !text-white",
-  lista: "badge-accent font-semibold !text-white",
-  entregada: "badge-primary font-semibold !text-white",
-  cancelada: "badge-error font-semibold !text-white",
+  pendiente_revision: "badge-warning font-semibold",
+  recibida: "badge-success font-semibold",
+  en_proceso: "badge-info font-semibold",
+  lista: "badge-accent font-semibold",
+  entregada: "badge-primary font-semibold",
+  cancelada: "badge-error font-semibold",
 };
 
 export const statusStepIconsActive: Record<LinearOrderStatus, string> = {

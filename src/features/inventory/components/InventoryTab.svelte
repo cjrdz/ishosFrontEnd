@@ -878,11 +878,15 @@
             <thead class="bg-base-200/60 text-base-content">
               <tr>
                 <th class="font-bold w-[34%] sm:w-[38%] lg:w-[40%]">Nombre</th>
-                <th class="font-bold w-[14%] sm:w-[12%] lg:w-[10%]">Tipo</th>
+                <th class="hidden font-bold sm:table-cell sm:w-[12%] lg:w-[10%]"
+                  >Tipo</th
+                >
                 <th class="text-right font-bold w-[20%] sm:w-[18%] lg:w-[16%]">
                   Stock actual
                 </th>
-                <th class="text-right font-bold w-[12%] sm:w-[10%]">Mínimo</th>
+                <th class="hidden text-right font-bold sm:table-cell sm:w-[10%]"
+                  >Mínimo</th
+                >
                 <th class="font-bold w-[14%] sm:w-[12%]">Estado</th>
                 <th class="text-right font-bold w-[16%] sm:w-[14%] lg:w-[12%]">
                   Acciones
@@ -914,7 +918,7 @@
                     <td class="truncate">
                       <div class="font-medium truncate">{item.name}</div>
                     </td>
-                    <td class="whitespace-nowrap">
+                    <td class="hidden whitespace-nowrap sm:table-cell">
                       <span
                         class="badge badge-sm {isFlavor
                           ? 'badge-info'
@@ -932,7 +936,7 @@
                       >
                     </td>
                     <td
-                      class="text-right text-xs text-base-content/60 whitespace-nowrap px-1 sm:px-2"
+                      class="hidden text-right text-xs text-base-content/60 whitespace-nowrap px-1 sm:table-cell sm:px-2"
                     >
                       {item.low_stock_threshold ?? 0}
                     </td>

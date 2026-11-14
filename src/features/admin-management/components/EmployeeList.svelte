@@ -229,8 +229,8 @@
         <thead class="bg-base-200/60 text-base-content">
           <tr>
             <th class="font-bold">Email</th>
-            <th class="font-bold">Nombre</th>
-            <th class="font-bold">Rol</th>
+            <th class="hidden font-bold sm:table-cell">Nombre</th>
+            <th class="hidden font-bold sm:table-cell">Rol</th>
             <th class="text-center font-bold">Estado</th>
             <th class="text-center font-bold">Acciones</th>
           </tr>
@@ -245,9 +245,15 @@
           {:else}
             {#each visibleEmployees as employee (employee.id)}
               <tr class="hover:bg-base-300/40 transition-colors">
-                <td>{employee.email}</td>
-                <td>{employee.name || "-"}</td>
-                <td>{employee.role}</td>
+                <td class="max-w-[11rem] break-words sm:max-w-none">
+                  {employee.email}
+                  <!-- Phones: name and role under the email instead of in columns. -->
+                  <span class="block text-xs text-base-content/60 sm:hidden"
+                    >{employee.name || "-"} · {employee.role}</span
+                  >
+                </td>
+                <td class="hidden sm:table-cell">{employee.name || "-"}</td>
+                <td class="hidden sm:table-cell">{employee.role}</td>
                 <td class="text-center align-middle">
                   <input
                     class="toggle toggle-sm {employee.state !== 'inactive'

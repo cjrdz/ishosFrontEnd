@@ -226,8 +226,8 @@
         <thead class="bg-base-200/60 text-base-content">
           <tr>
             <th class="font-bold">Nombre</th>
-            <th class="text-center font-bold">Slug</th>
-            <th class="text-center font-bold">Orden</th>
+            <th class="hidden text-center font-bold sm:table-cell">Slug</th>
+            <th class="hidden text-center font-bold sm:table-cell">Orden</th>
             <th class="text-center font-bold">Estado</th>
             <th class="text-center font-bold">Acciones</th>
           </tr>
@@ -256,8 +256,10 @@
                     </div>
                   {/if}
                 </td>
-                <td class="text-center align-middle">{category.slug}</td>
-                <td class="text-center align-middle"
+                <td class="hidden text-center align-middle sm:table-cell"
+                  >{category.slug}</td
+                >
+                <td class="hidden text-center align-middle sm:table-cell"
                   >{category.display_order + 1}</td
                 >
                 <td class="text-center align-middle">

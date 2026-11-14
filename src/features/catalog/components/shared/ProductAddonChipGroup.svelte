@@ -14,6 +14,10 @@
     helperText?: string;
     required?: boolean;
     error?: string;
+    /** The caller shows its own heading; keep the label for assistive tech only. */
+    hideLabel?: boolean;
+    /** The customer explicitly picked the "none" chip (vs. not answered yet). */
+    noneChosen?: boolean;
     chipClass: (selected: boolean, variant?: "base" | "required") => string;
     onChange: (includedIds: string[], extraIds: string[]) => void;
   }
@@ -28,6 +32,8 @@
     helperText = "",
     required = false,
     error = "",
+    hideLabel = false,
+    noneChosen,
     chipClass,
     onChange,
   }: Props = $props();
@@ -57,7 +63,8 @@
   }
 
   function isNoneSelected(): boolean {
-    return includedIds.length === 0 && selectedIds.length === 0;
+    if (includedIds.length > 0 || selectedIds.length > 0) return false;
+    return noneChosen ?? true;
   }
 
   const canClear = $derived(includedIds.length > 0 || selectedIds.length > 0);
@@ -67,8 +74,11 @@
 </script>
 
 <div class="space-y-2">
-  <div class="flex items-center justify-between gap-2">
-    <div class="flex items-center gap-1.5">
+  <div
+    class="flex items-center justify-between gap-2"
+    class:sr-only={hideLabel && !canClear}
+  >
+    <div class="flex items-center gap-1.5" class:sr-only={hideLabel}>
       <span class="font-bold">{label}</span>
       {#if required}
         <span class="badge badge-warning badge-sm">requerido</span>
@@ -87,10 +97,11 @@
     {/if}
   </div>
 
-  <div class="flex flex-wrap gap-2">
+  <div class="flex flex-wrap gap-2" role="group" aria-label={label}>
     <button
       type="button"
       class={chipClass(isNoneSelected(), "required")}
+      aria-pressed={isNoneSelected()}
       onclick={() => handleChipClick(NONE_ID)}
     >
       {noneLabel}
@@ -103,6 +114,7 @@
       <button
         type="button"
         class={chipClass(included || extra, "required")}
+        aria-pressed={included || extra}
         aria-label={`${addon.name}${isDouble ? ", doble porción" : included ? ", incluido" : extra ? ", extra " + formatCurrency(Number(addon.price ?? 0)) : ""}`}
         onclick={() => handleChipClick(addon.id)}
       >
@@ -110,7 +122,7 @@
         {#if isDouble}
           <span class="ml-1 text-xs opacity-80">x2</span>
           {#if Number(addon.price ?? 0) > 0}
-            <span class="ml-1 text-xs" style="color: var(--ishos-teal);">
+            <span class="ml-1 text-xs opacity-80">
               +{formatCurrency(Number(addon.price))}
             </span>
           {/if}
@@ -118,7 +130,7 @@
           <span class="ml-1 text-xs opacity-80">incluido</span>
         {:else if extra}
           {#if Number(addon.price ?? 0) > 0}
-            <span class="ml-1 text-xs" style="color: var(--ishos-teal);">
+            <span class="ml-1 text-xs opacity-80">
               +{formatCurrency(Number(addon.price))}
             </span>
           {/if}
@@ -133,10 +145,9 @@
 
   {#if remainingFree > 0 && items.length > 0}
     <p class="text-xs text-success">
-      {remainingFree} topping{remainingFree === 1 ? "" : "s"} gratis restante{remainingFree ===
-      1
-        ? ""
-        : "s"}
+      {remainingFree === 1
+        ? `1 ${label.toLowerCase()} gratis restante`
+        : `${remainingFree} ${label.toLowerCase()}s gratis restantes`}
     </p>
   {/if}
 

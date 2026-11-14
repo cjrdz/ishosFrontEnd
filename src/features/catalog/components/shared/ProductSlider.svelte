@@ -221,7 +221,7 @@
       <button
         class="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30
              btn btn-circle btn-sm bg-base-100/80 border-base-300/60
-             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-[var(--ishos-teal)]"
+             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-primary"
         aria-label="Anterior"
         onclick={prev}
       >
@@ -230,7 +230,7 @@
       <button
         class="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30
              btn btn-circle btn-sm bg-base-100/80 border-base-300/60
-             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-[var(--ishos-teal)]"
+             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-primary"
         aria-label="Siguiente"
         onclick={next}
       >
@@ -247,7 +247,7 @@
                {activeIndex === i
             ? 'w-[1.1rem]'
             : 'w-1.75 bg-base-content/20 hover:bg-base-content/40'}"
-          style={activeIndex === i ? "background: var(--ishos-teal);" : ""}
+          style={activeIndex === i ? "background: var(--color-primary);" : ""}
           role="tab"
           aria-selected={activeIndex === i}
           aria-label={`Página ${i + 1}`}

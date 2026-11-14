@@ -15,6 +15,7 @@
   import AddonChipGroup from "./AddonChipGroup.svelte";
   import AddedItemsList from "./AddedItemsList.svelte";
   import ProductSelector from "./ProductSelector.svelte";
+  import Icon from "@shared/components/AppIcon.svelte";
 
   interface AddonGroup {
     key: string;
@@ -120,6 +121,42 @@
   }: Props = $props();
 
   let recentProductIds = $state<string[]>([]);
+  /** The right panel shows the product being configured instead of the order. */
+  let configuring = $state(false);
+  /** Missing choices are only flagged after the first "Agregar" attempt. */
+  let attempted = $state(false);
+
+  const showConfig = $derived(
+    (configuring || draftItemEditIndex !== null) && !!orderForm.product_id,
+  );
+  const countsById = $derived(
+    manualItems.reduce<Record<string, number>>((acc, item) => {
+      acc[item.product_id] = (acc[item.product_id] ?? 0) + item.quantity;
+      return acc;
+    }, {}),
+  );
+  const itemUnits = $derived(
+    manualItems.reduce((sum, item) => sum + item.quantity, 0),
+  );
+
+  function pickProduct(productId: string) {
+    if (draftItemEditIndex !== null) onCancelDraftItemEdit();
+    attempted = false;
+    onProductChange(productId);
+    configuring = true;
+  }
+
+  function closeConfig() {
+    if (draftItemEditIndex !== null) onCancelDraftItemEdit();
+    attempted = false;
+    configuring = false;
+  }
+
+  function editItem(index: number) {
+    attempted = false;
+    onEditDraftItem(index);
+    configuring = true;
+  }
 
   const recentProducts = $derived(
     recentProductIds
@@ -242,15 +279,19 @@
     }
   }
 
-  function handleProductChange(productId: string) {
-    onProductChange(productId);
-  }
-
   function handleAddDraftItem() {
+    if (!canAddCurrentItem) {
+      attempted = true;
+      return;
+    }
     if (orderForm.product_id) {
       saveRecentProduct(orderForm.product_id);
     }
     onAddDraftItem();
+    if (!addItemError) {
+      attempted = false;
+      configuring = false;
+    }
   }
 
   function increaseQuantity() {
@@ -276,188 +317,280 @@
   }
 </script>
 
-<section
-  class="rounded-xl border border-base-300 bg-base-100 p-3 overflow-hidden"
->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 h-[55vh] max-h-[55vh]">
-    <!-- Left: product finder -->
-    <div class="h-full min-w-0 overflow-y-auto pr-1">
-      <ProductSelector
-        {products}
-        {categories}
-        selectedProductId={orderForm.product_id}
-        {recentProducts}
-        onProductChange={handleProductChange}
-      />
-    </div>
+<div class="builder" class:builder-configuring={showConfig}>
+  <!-- Left: catalog -->
+  <div class="builder-catalog">
+    <ProductSelector
+      {products}
+      {categories}
+      activeProductId={showConfig ? orderForm.product_id : ""}
+      {recentProducts}
+      {countsById}
+      onPick={pickProduct}
+    />
+  </div>
 
-    <!-- Right: configuration panel -->
-    <div class="space-y-3 min-w-0 flex flex-col h-full overflow-y-auto pr-1">
-      {#if !selectedProduct}
-        <div
-          class="rounded-lg border border-base-300 bg-base-200/40 px-3 py-6 text-center text-sm text-base-content/60 flex-1 flex items-center justify-center"
-        >
-          Selecciona un producto para configurarlo.
-        </div>
-      {:else}
-        <!-- Compact product header -->
-        <div class="flex items-center justify-between gap-2 px-1">
-          <div class="min-w-0">
-            <p class="text-sm font-semibold truncate">
-              {selectedProduct.name}
-            </p>
-            <p class="text-xs text-base-content/60">
-              {formatCurrency(selectedProduct.price)} / unidad
-            </p>
-          </div>
-          <p class="text-lg font-bold text-primary whitespace-nowrap">
-            {formatCurrency(totalPreview)}
+  <!-- Right: configure the tapped product, or review the order so far -->
+  <div class="builder-side">
+    {#if showConfig && selectedProduct}
+      <div
+        class="flex items-start justify-between gap-3 border-b border-base-300 p-4"
+      >
+        <div class="min-w-0">
+          <p
+            class="text-xs font-medium uppercase tracking-wide text-base-content/60"
+          >
+            {draftItemEditIndex !== null
+              ? `Editando producto ${draftItemEditIndex + 1}`
+              : "Configurar"}
+          </p>
+          <h4 class="text-lg font-bold leading-tight">
+            {selectedProduct.name}
+          </h4>
+          <p class="text-sm text-base-content/70 tabular-nums">
+            {formatCurrency(selectedProduct.price)} c/u
           </p>
         </div>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm btn-circle"
+          onclick={closeConfig}
+          aria-label="Volver a la orden"
+          title="Volver a la orden"
+        >
+          <Icon icon="lucide:x" class="size-4" aria-hidden="true" />
+        </button>
+      </div>
 
+      <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         {#if hasCustomizationOptions}
-          <div class="space-y-3">
-            {#if flavorMode !== "none"}
-              <FlavorSelector
-                flavors={selectedProductFlavors}
-                mode={flavorMode}
-                {ballQuantity}
-                selectedId={selectedFlavorId}
-                selectedIds={selectedFlavorIds}
-                label={flavorMode === "single" ? "Sabor" : "Sabores"}
-                required={true}
-                error={requiresFlavorSelection ? "Selecciona un sabor" : ""}
-                onChange={handleFlavorChange}
-              />
-            {/if}
+          {#if flavorMode !== "none"}
+            <FlavorSelector
+              flavors={selectedProductFlavors}
+              mode={flavorMode}
+              {ballQuantity}
+              selectedId={selectedFlavorId}
+              selectedIds={selectedFlavorIds}
+              label={flavorMode === "single" ? "Sabor" : "Sabores"}
+              required={true}
+              error={attempted && requiresFlavorSelection
+                ? "Elige el sabor"
+                : ""}
+              onChange={handleFlavorChange}
+            />
+          {/if}
 
-            {#if toppingAddons.length > 0}
-              <AddonChipGroup
-                items={toppingAddons}
-                includedIds={includedToppingIds}
-                selectedIds={isExtraInAddons(toppingAddons)}
-                noneId={NONE_CUSTOMIZATION}
-                noneLabel="Sin topping"
-                label="Topping"
-                allowance={toppingFreeAllowance}
-                required={true}
-                error={requiresToppingSelection
-                  ? "Selecciona un topping o 'Sin topping'"
-                  : ""}
-                onUnifiedChange={onToppingSelectionChange}
-                onToggleExtra={onToggleExtraAddonSelection}
-              />
-            {/if}
+          {#if toppingAddons.length > 0}
+            <AddonChipGroup
+              items={toppingAddons}
+              includedIds={includedToppingIds}
+              selectedIds={isExtraInAddons(toppingAddons)}
+              noneId={NONE_CUSTOMIZATION}
+              noneLabel="Sin topping"
+              noneSelected={toppingSelection === "none"}
+              label="Topping"
+              allowance={toppingFreeAllowance}
+              required={true}
+              error={attempted && requiresToppingSelection
+                ? "Elige un topping o “Sin topping”"
+                : ""}
+              onUnifiedChange={onToppingSelectionChange}
+              onToggleExtra={onToggleExtraAddonSelection}
+            />
+          {/if}
 
-            {#if jaleaAddons.length > 0}
-              <AddonChipGroup
-                items={jaleaAddons}
-                includedIds={includedJaleaIds}
-                selectedIds={isExtraInAddons(jaleaAddons)}
-                noneId={NONE_CUSTOMIZATION}
-                noneLabel="Sin jalea"
-                label="Jalea"
-                allowance={jaleaFreeAllowance}
-                required={true}
-                error={requiresJaleaSelection
-                  ? "Selecciona una jalea o 'Sin jalea'"
-                  : ""}
-                onUnifiedChange={onJaleaSelectionChange}
-                onToggleExtra={onToggleExtraAddonSelection}
-              />
-            {/if}
+          {#if jaleaAddons.length > 0}
+            <AddonChipGroup
+              items={jaleaAddons}
+              includedIds={includedJaleaIds}
+              selectedIds={isExtraInAddons(jaleaAddons)}
+              noneId={NONE_CUSTOMIZATION}
+              noneLabel="Sin jalea"
+              noneSelected={jaleaSelection === "none"}
+              label="Jalea"
+              allowance={jaleaFreeAllowance}
+              required={true}
+              error={attempted && requiresJaleaSelection
+                ? "Elige una jalea o “Sin jalea”"
+                : ""}
+              onUnifiedChange={onJaleaSelectionChange}
+              onToggleExtra={onToggleExtraAddonSelection}
+            />
+          {/if}
 
-            {#each paidAddonGroups as group}
-              <AddonChipGroup
-                items={group.items}
-                selectedIds={isExtraInGroup(group)}
-                label={group.label}
-                variant="multi"
-                onToggleExtra={onToggleExtraAddonSelection}
-              />
-            {/each}
-          </div>
+          {#each paidAddonGroups as group (group.key)}
+            <AddonChipGroup
+              items={group.items}
+              selectedIds={isExtraInGroup(group)}
+              label={group.label}
+              variant="multi"
+              onToggleExtra={onToggleExtraAddonSelection}
+            />
+          {/each}
+        {:else}
+          <p class="text-sm text-base-content/70">
+            Este producto no lleva opciones. Elige la cantidad y agrégalo.
+          </p>
         {/if}
+      </div>
 
-        <!-- Quantity + Add -->
-        <div class="flex items-center gap-2 px-1">
-          <div class="join">
+      <div class="space-y-2 border-t border-base-300 bg-base-100 p-4">
+        <p
+          class="truncate text-xs text-base-content/70"
+          title={configurationSummary}
+        >
+          {configurationSummary}
+        </p>
+        {#if addItemError}
+          <p class="text-xs text-error" role="alert">{addItemError}</p>
+        {/if}
+        <div class="flex items-center gap-2">
+          <div class="join" role="group" aria-label="Cantidad">
             <button
-              class="btn btn-sm join-item"
+              class="btn join-item btn-square"
               type="button"
               aria-label="Disminuir cantidad"
               onclick={decreaseQuantity}
               disabled={orderForm.quantity <= 1}
             >
-              −
+              <Icon icon="lucide:minus" class="size-4" aria-hidden="true" />
             </button>
             <span
-              class="btn btn-sm join-item no-animation min-w-9 text-sm"
-              aria-label={`Cantidad: ${orderForm.quantity}`}
+              class="btn join-item no-animation pointer-events-none min-w-11 tabular-nums"
+              aria-live="polite"
             >
               {orderForm.quantity}
             </span>
             <button
-              class="btn btn-sm join-item"
+              class="btn join-item btn-square"
               type="button"
               aria-label="Aumentar cantidad"
               onclick={increaseQuantity}
             >
-              +
+              <Icon icon="lucide:plus" class="size-4" aria-hidden="true" />
             </button>
           </div>
-
           <button
-            class="btn btn-primary btn-sm flex-1"
+            class="btn btn-primary flex-1 justify-between"
             type="button"
             onclick={handleAddDraftItem}
-            disabled={!canAddCurrentItem}
           >
-            {draftItemEditIndex !== null ? "Guardar cambios" : "Agregar"}
-            <span class="ml-1 text-xs opacity-90">
-              {formatCurrency(totalPreview)}
+            <span>
+              {#if draftItemEditIndex !== null}Guardar{:else}Agregar<span
+                  class="hidden sm:inline"
+                >
+                  a la orden</span
+                >{/if}
             </span>
+            <span class="tabular-nums">{formatCurrency(totalPreview)}</span>
           </button>
         </div>
-
-        {#if draftItemEditIndex !== null}
-          <button
-            class="btn btn-ghost btn-xs w-fit"
-            type="button"
-            onclick={onCancelDraftItemEdit}
+      </div>
+    {:else}
+      <div
+        class="flex items-center justify-between gap-2 border-b border-base-300 p-4"
+      >
+        <h4 class="flex items-center gap-2 font-bold">
+          <Icon
+            icon="lucide:shopping-bag"
+            class="size-4 text-primary"
+            aria-hidden="true"
+          />
+          Orden actual
+        </h4>
+        {#if itemUnits > 0}
+          <span class="badge badge-ghost tabular-nums"
+            >{itemUnits} {itemUnits === 1 ? "artículo" : "artículos"}</span
           >
-            Cancelar edición
-          </button>
         {/if}
-      {/if}
+      </div>
 
-      {#if addItemError}
-        <p class="text-xs text-error px-1">{addItemError}</p>
-      {/if}
+      <div class="min-h-0 flex-1 overflow-y-auto p-4">
+        {#if manualItems.length === 0}
+          <div
+            class="flex h-full flex-col items-center justify-center gap-2 py-8 text-center text-base-content/70"
+          >
+            <Icon
+              icon="lucide:pointer"
+              class="size-8 text-base-content/40"
+              aria-hidden="true"
+            />
+            <p class="text-sm font-medium">Toca un producto para empezar</p>
+            <p class="text-xs">Eliges sabor y toppings, y se agrega aquí.</p>
+          </div>
+        {:else}
+          <AddedItemsList
+            {manualItems}
+            {draftItemEditIndex}
+            onEdit={editItem}
+            onRemove={onRemoveDraftItem}
+            onUpdateQuantity={onUpdateDraftItemQuantity}
+            {onProductById}
+            {onResolveFlavorName}
+            {onResolveAddonNames}
+            {onManualItemSubtotal}
+            {onDraftItemKey}
+          />
+        {/if}
+      </div>
 
-      {#if draftItemEditIndex !== null}
-        <div
-          class="rounded-lg border border-warning/30 bg-warning/10 px-3 py-1.5"
+      <div
+        class="flex items-baseline justify-between gap-2 border-t border-base-300 p-4"
+      >
+        <span class="text-sm font-medium text-base-content/70">Total</span>
+        <span class="text-2xl font-bold tabular-nums text-primary"
+          >{formatCurrency(manualOrderTotal)}</span
         >
-          <p class="text-xs font-medium text-warning-content">
-            Editando el item #{draftItemEditIndex + 1}.
-          </p>
-        </div>
-      {/if}
-
-      <AddedItemsList
-        {manualItems}
-        {draftItemEditIndex}
-        {manualOrderTotal}
-        onEdit={onEditDraftItem}
-        onRemove={onRemoveDraftItem}
-        onUpdateQuantity={onUpdateDraftItemQuantity}
-        {onProductById}
-        {onResolveFlavorName}
-        {onResolveAddonNames}
-        {onManualItemSubtotal}
-        {onDraftItemKey}
-      />
-    </div>
+      </div>
+    {/if}
   </div>
-</section>
+</div>
+
+<style>
+  .builder {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .builder-catalog {
+    min-width: 0;
+  }
+
+  .builder-side {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    border-radius: var(--radius-box);
+    border: 1px solid var(--color-base-300);
+    background: var(--color-base-100);
+    overflow: hidden;
+  }
+
+  /* Phones/tablets: catalog first with its own scroll, the order panel below. */
+  .builder-catalog {
+    height: min(52dvh, 30rem);
+  }
+
+  /* Small screens: configuring takes the whole area; closing it brings the catalog back. */
+  @media (max-width: 1023.98px) {
+    .builder-configuring .builder-catalog {
+      display: none;
+    }
+    /* The panel fills the space so "Agregar" stays in view. */
+    .builder-configuring .builder-side {
+      height: max(18rem, calc(90dvh - 16.5rem));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .builder {
+      grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+      height: min(64dvh, 40rem);
+    }
+    .builder-catalog,
+    .builder-side {
+      height: 100%;
+      min-height: 0;
+    }
+  }
+</style>
