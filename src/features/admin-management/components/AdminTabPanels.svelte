@@ -213,7 +213,7 @@
   {/if}
 {/if}
 
-{#if shared.isAdmin && shared.activeTab === "inventario"}
+{#if shared.canManageStock && shared.activeTab === "inventario"}
   {#if shared.lazyTabState.inventario.loading && !shared.lazyTabState.inventario.hydrated}
     <section class="space-y-4" aria-busy="true" aria-live="polite">
       <div class="card bg-base-100 shadow" aria-hidden="true">
@@ -242,6 +242,7 @@
       <div class="skeleton h-64 w-full rounded-2xl" aria-busy="true"></div>
     {:then { default: InventoryTab }}
       <InventoryTab
+        canEditCatalog={shared.isAdmin}
         busy={shared.busy.inventario}
         moduleError={shared.moduleErrors.inventario}
         flavors={products.flavors}

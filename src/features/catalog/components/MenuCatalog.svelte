@@ -230,7 +230,14 @@
       <div>
         <p class="font-semibold">{status.detail}</p>
         <p class="text-sm text-base-content/70">
-          Puedes ver el menú mientras tanto.
+          {#if status.inStoreOnly}
+            Mira el menú y visítanos:
+            <a href="/about#sucursales" class="link text-primary"
+              >ver sucursales y horarios</a
+            >.
+          {:else}
+            Puedes ver el menú mientras tanto.
+          {/if}
         </p>
       </div>
     </div>

@@ -57,6 +57,7 @@
   } from "@core/stores/admin";
   import {
     DEFAULT_TAB_ORDER,
+    canSeeTab,
     normalizeTabOrder,
     toTabKey,
     type TabKey,
@@ -78,8 +79,11 @@
     email: string;
     name: string;
     phone: string;
-    role: "admin" | "employee";
+    role: "admin" | "manager" | "employee";
     active?: boolean;
+    /** Location the employee works at; null for admins. */
+    location_id?: string | null;
+    location_name?: string | null;
   };
   type LazyTabKey = Exclude<TabKey, "ordenes" | "analitica">;
 
@@ -187,6 +191,10 @@
   const busy = $derived($adminDashboardUi.busy);
 
   const isAdmin = $derived(session?.role === "admin");
+  // Admins and location managers handle stock; managers only their own.
+  const canManageStock = $derived(
+    session?.role === "admin" || session?.role === "manager",
+  );
 
   function setNotice(message: string) {
     notice = message;
@@ -409,7 +417,7 @@
   }
 
   async function ensureTabDataLoaded(tab: TabKey) {
-    if (!isAdmin) return;
+    if (!canSeeTab(session?.role, tab)) return;
 
     if (!isLazyTabKey(tab)) return;
     if (tabLazyState[tab].hydrated || tabLazyState[tab].loading) return;
@@ -556,7 +564,7 @@
 
     // Restore tab from URL query parameter
     const urlTab = getTabFromUrl();
-    if (urlTab && (session?.role === "admin" || urlTab === "ordenes")) {
+    if (urlTab && canSeeTab(session?.role, urlTab)) {
       activeTab = urlTab;
     }
 
@@ -875,7 +883,7 @@
   }
 
   async function loadFlavors() {
-    if (!isAdmin) return;
+    if (!canManageStock) return;
     try {
       const nextFlavors = await listFlavors(true);
       patchAdminData({ flavors: nextFlavors });
@@ -886,7 +894,7 @@
   }
 
   async function loadAddons() {
-    if (!isAdmin) return;
+    if (!canManageStock) return;
     try {
       const nextAddons = await listAddons(true);
       patchAdminData({ addons: nextAddons });
@@ -897,7 +905,7 @@
   }
 
   async function loadInventory() {
-    if (!isAdmin) return;
+    if (!canManageStock) return;
     setBusy("inventario", true);
     clearModuleError("inventario");
     try {
@@ -1133,7 +1141,7 @@
   }
 
   function handleTabChange(tab: TabKey) {
-    if (!isAdmin && tab !== "ordenes") {
+    if (!canSeeTab(session?.role, tab)) {
       activeTab = "ordenes";
       replaceUrlTab("ordenes");
       return;
@@ -1145,6 +1153,7 @@
 
   const sharedPanelProps = $derived({
     isAdmin,
+    canManageStock,
     activeTab,
     busy,
     moduleErrors,
@@ -1248,7 +1257,7 @@
   });
 
   function openSettingsPage() {
-    if (!isAdmin) return;
+    if (!isAdmin && session?.role !== "manager") return;
     window.location.href = "/admin/settings";
   }
 
@@ -1304,6 +1313,8 @@
   <div class="space-y-6">
     <AdminHeader
       userName={session.name}
+      role={session.role}
+      locationName={session.location_name ?? null}
       {activeTab}
       {isAdmin}
       {tabOrder}

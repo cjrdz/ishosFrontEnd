@@ -136,6 +136,20 @@ function responseErrorCode(body: ParsedResponseBody, fallback: string): string {
   return fallback;
 }
 
+/** Per-field messages a backend validation error carries ({"fields": {...}}). */
+function responseFieldErrors(
+  body: unknown,
+): Record<string, string[]> | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const fields = (body as { fields?: unknown }).fields;
+  if (!fields || typeof fields !== "object") return undefined;
+  const out: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value === "string") out[key] = [value];
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 async function bffRequest<T>(
   path: string,
   options: {
@@ -182,6 +196,7 @@ async function bffRequest<T>(
         responseErrorMessage(body, "Request failed"),
         response.status,
         responseErrorCode(body, "BFF_ERROR"),
+        responseFieldErrors(body),
       );
     }
 
@@ -963,14 +978,78 @@ export interface StoreOfferItem {
 export type WeekDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export type WeeklyHours = Record<WeekDay, { open: string; close: string }[]>;
 
-export async function getStoreHours() {
-  return bffRequest<{ days: WeeklyHours }>("/api/admin/settings/hours");
+// ── Locations (sucursales) ───────────────────────────────────────────
+
+export interface LocationOpenStatus {
+  configured: boolean;
+  is_open: boolean;
+  closes_at?: string;
+  opens_at?: string;
+  today: { open: string; close: string }[];
+  weekly: WeeklyHours;
 }
 
-export async function updateStoreHours(days: Partial<WeeklyHours>) {
-  return bffRequest<{ days: WeeklyHours }>("/api/admin/settings/hours", {
+export interface AdminLocation {
+  id: string;
+  slug: string;
+  name: string;
+  address: string;
+  maps_url: string;
+  maps_embed_url: string;
+  whatsapp: string;
+  phone: string;
+  hours: Partial<WeeklyHours>;
+  orders_enabled: boolean;
+  online_orders_enabled: boolean;
+  is_active: boolean;
+  sort_order: number;
+  status: LocationOpenStatus;
+}
+
+export type LocationPatch = Partial<
+  Omit<AdminLocation, "id" | "status" | "hours">
+> & { hours?: Partial<WeeklyHours> };
+
+export interface SoldOutItems {
+  location_id: string;
+  products: string[];
+  flavors: string[];
+}
+
+/** Locations the signed-in user works with (all for admins, own for staff). */
+export async function listLocations() {
+  return bffRequest<{ data: AdminLocation[] }>("/api/admin/locations");
+}
+
+export async function createLocation(payload: LocationPatch) {
+  return bffRequest<AdminLocation>("/api/admin/locations", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function updateLocation(id: string, payload: LocationPatch) {
+  return bffRequest<AdminLocation>(`/api/admin/locations/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function getLocationAvailability(id: string) {
+  return bffRequest<SoldOutItems>(`/api/admin/locations/${id}/availability`);
+}
+
+export async function setLocationAvailability(
+  id: string,
+  payload: {
+    item_type: "product" | "flavor";
+    item_id: string;
+    sold_out: boolean;
+  },
+) {
+  return bffRequest<SoldOutItems>(`/api/admin/locations/${id}/availability`, {
     method: "PUT",
-    body: { days },
+    body: payload,
   });
 }
 
@@ -1016,6 +1095,8 @@ export async function updateOrderArchiveConfig(payload: OrderArchiveConfig) {
 
 export interface InventoryItem {
   id: string;
+  /** Location (sucursal) whose stock this row is. */
+  location_id?: string;
   name: string;
   type: "ball_based" | "unit_based";
   current_stock: number;

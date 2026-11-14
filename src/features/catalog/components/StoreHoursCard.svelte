@@ -1,35 +1,57 @@
 <script lang="ts">
   /**
-   * Weekly opening hours from the schedule admins edit in Settings, so the
-   * home and About pages never disagree with what the store enforces.
+   * Opening hours of the locations, from the schedules admins edit in
+   * Settings, so the home and About pages never disagree with the shops.
+   * Locations sharing one schedule are shown as a single table.
    */
   import { onMount } from "svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import {
-    fetchStoreSettings,
-    type StorePublicSettings,
+    fetchStoreLocations,
+    type PublicLocation,
   } from "@features/catalog/lib/api";
+  import { scheduleRows } from "@features/catalog/lib/store-status";
   import {
-    describeStoreStatus,
-    scheduleRows,
-  } from "@features/catalog/lib/store-status";
+    DEFAULT_WHATSAPP,
+    describeLocations,
+    sharesOneSchedule,
+    whatsappLink,
+  } from "@features/catalog/lib/locations";
 
   interface Props {
     headingLevel?: "h2" | "h3";
   }
   let { headingLevel = "h2" }: Props = $props();
 
-  let settings = $state<StorePublicSettings | null>(null);
+  let locations = $state<PublicLocation[]>([]);
   let loaded = $state(false);
   let now = $state(new Date());
 
-  const schedule = $derived(scheduleRows(settings?.hours, now));
-  const status = $derived(describeStoreStatus(settings, now));
+  const status = $derived(describeLocations(locations, now));
+  // One table when every location has the same hours, one per location otherwise.
+  const tables = $derived.by(() => {
+    if (locations.length === 0) return [];
+    if (sharesOneSchedule(locations)) {
+      return [
+        {
+          id: "all",
+          title: locations.length > 1 ? "Todas las sucursales" : "",
+          rows: scheduleRows(locations[0].hours, now),
+        },
+      ];
+    }
+    return locations.map((l) => ({
+      id: l.id,
+      title: l.name,
+      rows: scheduleRows(l.hours, now),
+    }));
+  });
+  const hasSchedule = $derived(tables.some((t) => t.rows.length > 0));
 
   onMount(() => {
-    fetchStoreSettings()
-      .then((value) => (settings = value))
-      .catch(() => (settings = null))
+    fetchStoreLocations()
+      .then((value) => (locations = value))
+      .catch(() => (locations = []))
       .finally(() => (loaded = true));
     const timer = setInterval(() => (now = new Date()), 60_000);
     return () => clearInterval(timer);
@@ -48,9 +70,10 @@
         >Horario</svelte:element
       >
     </div>
-    {#if loaded && status.label}
+    {#if loaded && status?.label}
       <span
-        class={`badge border-0 ${status.tone === "open" ? "bg-success/15 text-success" : status.tone === "closing" ? "bg-warning/25 text-base-content" : "bg-base-200 text-base-content/80"}`}
+        class={`badge border-0 ${status.tone === "open" ? "bg-success/15 text-success" : "bg-base-200 text-base-content/80"}`}
+        title={status.detail ?? status.label}
       >
         {status.label}
       </span>
@@ -63,27 +86,40 @@
         <div class="skeleton h-5 w-full"></div>
       {/each}
     </div>
-  {:else if schedule.length > 0}
-    <dl class="divide-y divide-base-300">
-      {#each schedule as row (row.key)}
-        <div
-          class="flex justify-between gap-4 py-2 text-sm"
-          class:font-semibold={row.isToday}
-        >
-          <dt>{row.label}{row.isToday ? " (hoy)" : ""}</dt>
-          <dd
-            class={`text-right ${row.isToday ? "text-base-content" : "text-base-content/75"}`}
-          >
-            {row.hours}
-          </dd>
-        </div>
+  {:else if hasSchedule}
+    <div class="space-y-4">
+      {#each tables as table (table.id)}
+        {#if table.rows.length > 0}
+          <div>
+            {#if table.title}
+              <p class="mb-1 text-sm font-semibold text-base-content/70">
+                {table.title}
+              </p>
+            {/if}
+            <dl class="divide-y divide-base-300">
+              {#each table.rows as row (row.key)}
+                <div
+                  class="flex justify-between gap-4 py-2 text-sm"
+                  class:font-semibold={row.isToday}
+                >
+                  <dt>{row.label}{row.isToday ? " (hoy)" : ""}</dt>
+                  <dd
+                    class={`text-right ${row.isToday ? "text-base-content" : "text-base-content/75"}`}
+                  >
+                    {row.hours}
+                  </dd>
+                </div>
+              {/each}
+            </dl>
+          </div>
+        {/if}
       {/each}
-    </dl>
+    </div>
   {:else}
     <p class="text-base-content/75">
-      Atendemos pedidos en línea mientras la tienda esté abierta. Escríbenos por
+      Escríbenos por
       <a
-        href="https://wa.me/50376454347"
+        href={whatsappLink(locations[0]?.whatsapp ?? DEFAULT_WHATSAPP)}
         class="link text-primary"
         rel="noopener noreferrer"
         target="_blank">WhatsApp</a

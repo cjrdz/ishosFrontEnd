@@ -117,8 +117,18 @@ export function amountColumnLabel(status: Order["status"]): string {
   return status === "lista" || status === "entregada" ? "Total" : "Subtotal";
 }
 
-export function isOrderEditable(status: Order["status"]): boolean {
-  return !["recibida", "lista", "entregada", "cancelada"].includes(status);
+/**
+ * Whether staff may still edit an order. Accepted orders are locked, except
+ * counter orders (created by staff): they start accepted while the customer
+ * is still at the counter. Mirrors the backend rule.
+ */
+export function isOrderEditable(
+  order: Pick<Order, "status"> & { created_by_user_id?: string | null },
+): boolean {
+  if (order.status === "recibida" && order.created_by_user_id) return true;
+  return !["recibida", "lista", "entregada", "cancelada"].includes(
+    order.status,
+  );
 }
 
 export function orderTypeLabel(orderType: Order["order_type"]): string {

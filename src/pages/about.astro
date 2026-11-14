@@ -2,7 +2,7 @@
 import StoreLayout from "../layouts/StoreLayout.astro";
 import Icon from "@shared/components/AppIcon.svelte";
 import StoreHoursCard from "@features/catalog/components/StoreHoursCard.svelte";
-import { BRANCHES } from "@features/catalog/lib/branches";
+import StoreLocationsList from "@features/catalog/components/StoreLocationsList.svelte";
 
 const PHONE_DISPLAY = "7645-4347";
 const PHONE_TEL = "tel:+50376454347";
@@ -46,8 +46,6 @@ const socials = [
     href: "https://www.tiktok.com/@ishosfactory",
   },
 ];
-
-const branches = BRANCHES;
 ---
 
 <StoreLayout title="IshosFactory - Nosotros">
@@ -245,50 +243,10 @@ const branches = BRANCHES;
         Nuestras sucursales
       </h2>
       <p class="mb-5 text-base-content/75">
-        Encuéntranos en Ahuachapán, El Salvador.
+        Encuéntranos en Ahuachapán, El Salvador. Cada sucursal tiene su propio
+        WhatsApp para pedidos especiales y dudas.
       </p>
-      <div class="grid gap-4 md:grid-cols-2">
-        {
-          branches.map((branch) => (
-            <article class="overflow-hidden rounded-box border border-base-300 bg-base-100">
-              <div class="relative aspect-[16/10] bg-base-200">
-                <Icon
-                  icon="lucide:map-pin"
-                  class="absolute left-1/2 top-1/2 size-8 -translate-x-1/2 -translate-y-1/2 text-base-content/30"
-                  aria-hidden="true"
-                />
-                <iframe
-                  src={branch.embed}
-                  class="relative h-full w-full border-0"
-                  loading="lazy"
-                  referrerpolicy="no-referrer-when-downgrade"
-                  allowfullscreen
-                  title={`Mapa de ${branch.name}`}
-                />
-              </div>
-              <div class="flex flex-wrap items-center justify-between gap-3 p-4">
-                <div>
-                  <h3 class="font-bold">{branch.name}</h3>
-                  <p class="text-sm text-base-content/70">{branch.area}</p>
-                </div>
-                <a
-                  href={branch.maps}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="btn btn-outline btn-sm rounded-full"
-                >
-                  <Icon
-                    icon="lucide:navigation"
-                    class="size-4"
-                    aria-hidden="true"
-                  />
-                  Cómo llegar
-                </a>
-              </div>
-            </article>
-          ))
-        }
-      </div>
+      <StoreLocationsList client:idle variant="maps" />
     </section>
   </div>
 </StoreLayout>

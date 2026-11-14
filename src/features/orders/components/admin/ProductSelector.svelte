@@ -11,6 +11,8 @@
     recentProducts: Product[];
     /** Units of each product already in the order. */
     countsById: Record<string, number>;
+    /** Products sold out at this location: shown greyed out, not pickable. */
+    soldOutIds?: string[];
     onPick: (productId: string) => void;
   }
 
@@ -20,8 +22,11 @@
     activeProductId,
     recentProducts,
     countsById,
+    soldOutIds = [],
     onPick,
   }: Props = $props();
+
+  const soldOut = $derived(new Set(soldOutIds));
 
   let selectedCategoryId = $state<string>("all");
   let productSearch = $state("");
@@ -60,7 +65,8 @@
     // Enter picks the only (or first) match, so typing "cono" + Enter is enough.
     if (event.key === "Enter") {
       event.preventDefault();
-      if (filteredProducts[0]) onPick(filteredProducts[0].id);
+      const first = filteredProducts.find((p) => !soldOut.has(p.id));
+      if (first) onPick(first.id);
     } else if (event.key === "Escape" && productSearch) {
       event.stopPropagation();
       productSearch = "";
@@ -157,12 +163,16 @@
         {#each filteredProducts as product (product.id)}
           {@const active = activeProductId === product.id}
           {@const count = countsById[product.id] ?? 0}
+          {@const unavailable = soldOut.has(product.id)}
           <li>
             <button
               type="button"
               class="product-tile"
               class:product-tile-active={active}
+              class:product-tile-soldout={unavailable}
               aria-pressed={active}
+              disabled={unavailable}
+              title={unavailable ? `${product.name} · Agotado` : undefined}
               onclick={() => onPick(product.id)}
             >
               {#if product.image_url}
@@ -188,9 +198,15 @@
                   class="block text-sm font-semibold leading-tight line-clamp-2"
                   >{product.name}</span
                 >
-                <span class="text-sm tabular-nums text-base-content/70"
-                  >{formatCurrency(product.price)}</span
-                >
+                {#if unavailable}
+                  <span class="badge badge-sm border-0 bg-error/15 text-error"
+                    >Agotado</span
+                  >
+                {:else}
+                  <span class="text-sm tabular-nums text-base-content/70"
+                    >{formatCurrency(product.price)}</span
+                  >
+                {/if}
               </span>
               {#if count > 0}
                 <span
@@ -207,6 +223,10 @@
 </div>
 
 <style>
+  .product-tile-soldout {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   .product-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));

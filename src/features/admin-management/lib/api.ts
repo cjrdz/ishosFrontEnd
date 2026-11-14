@@ -13,6 +13,8 @@ export interface AdminImage {
 }
 
 export interface Order {
+  /** Location (sucursal) the order belongs to. */
+  location_id?: string;
   id: string;
   order_number: string;
   customer_id?: string | null;
@@ -71,6 +73,8 @@ export interface Employee {
   name?: string;
   phone?: string;
   role: UserRole;
+  /** Location (sucursal) of a manager or employee; empty for admins. */
+  location_id?: string;
   state?: "active" | "inactive";
 }
 

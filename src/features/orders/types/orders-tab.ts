@@ -110,3 +110,6 @@ export interface OrdersTabProps {
     status: "active" | "inactive";
   }) => Promise<boolean>;
 }
+
+/** What prints automatically when a counter order is created. */
+export type AutoPrintMode = "none" | "kitchen" | "both";

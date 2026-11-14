@@ -15,6 +15,8 @@ export interface StoreStatus {
   /** Longer sentence for banners (null when open and unremarkable). */
   detail: string | null;
   tone: "open" | "closing" | "closed";
+  /** Set when no location takes online orders: the shops may be open. */
+  inStoreOnly?: boolean;
 }
 
 const CLOSING_SOON_MS = 30 * 60 * 1000;
@@ -78,7 +80,16 @@ export function describeStoreStatus(
     );
   }
   if (!settings.orders_enabled) {
-    return closed("No estamos recibiendo pedidos en línea en este momento.");
+    // No location takes online orders right now: the shops may well be
+    // open, so don't call the store "closed".
+    return {
+      canOrder: false,
+      label: "Pedidos en sucursal",
+      inStoreOnly: true,
+      detail:
+        "Por ahora no tomamos pedidos en línea. ¡Visítanos en cualquiera de nuestras sucursales!",
+      tone: "closed",
+    };
   }
   if (hours?.configured && hours.closes_at) {
     const closesIn = new Date(hours.closes_at).getTime() - now.getTime();

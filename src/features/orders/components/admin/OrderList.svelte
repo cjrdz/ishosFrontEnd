@@ -283,7 +283,7 @@
                         <Icon icon="lucide:x" class="h-4 w-4" />
                       </button>
                     {/if}
-                    {#if isOrderEditable(order.status)}
+                    {#if isOrderEditable(order)}
                       <button
                         class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-info"
                         type="button"

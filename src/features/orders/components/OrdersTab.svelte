@@ -13,12 +13,16 @@
   import {
     getPaperWidth,
     printOrderReceipt,
+    registerReceiptLocations,
     setPaperWidth,
     type PaperWidth,
     type TicketKind,
   } from "../lib/receipt-renderer";
+  import type { AutoPrintMode } from "../types/orders-tab";
   import type { CreatedOrder } from "@features/admin-management/lib/order-handlers";
-  import { getOrder } from "@features/admin-management/lib/bff";
+  import { getOrder, listLocations } from "@features/admin-management/lib/bff";
+  import { onMount } from "svelte";
+  import { loadWorkingSoldOut } from "@features/admin-management/lib/location-selection";
   import {
     statusLabels,
     statusBadgeClass,
@@ -62,6 +66,28 @@
   } from "../types/orders-tab";
   import { normalizeIdList } from "../lib/list";
 
+  // How many products/flavours are sold out at this location (button badge).
+  let soldOutCount = $state(0);
+  function refreshSoldOutCount() {
+    void loadWorkingSoldOut()
+      .then(({ products, flavors }) => {
+        soldOutCount = products.length + flavors.length;
+      })
+      .catch(() => {
+        soldOutCount = 0;
+      });
+  }
+
+  // Tickets print the sucursal of each order (name, address, WhatsApp).
+  onMount(() => {
+    refreshSoldOutCount();
+    void listLocations()
+      .then(({ data }) => registerReceiptLocations(data ?? []))
+      .catch(() => {
+        // Tickets fall back to the store's general contact line.
+      });
+  });
+
   const MANUAL_ORDER_DRAFT_STORAGE_KEY = "ishos.manual-order-draft.v1";
   const ORDERS_VIEW_STORAGE_KEY = "ishos.orders-view";
 
@@ -85,26 +111,48 @@
 
   // After a counter order is created the editor shows its tickets and change.
   let createdOrder = $state<CreatedOrder | null>(null);
+  // What prints automatically when a counter order is created, per device:
+  // both tickets by default so the next person can follow the comanda.
   const AUTO_PRINT_KEY = "ishos.manual-order-auto-print";
-  let autoPrint = $state(readAutoPrint());
+  let autoPrint = $state<AutoPrintMode>(readAutoPrint());
 
-  function readAutoPrint(): boolean {
+  function readAutoPrint(): AutoPrintMode {
     try {
-      return (
-        typeof window !== "undefined" &&
-        localStorage.getItem(AUTO_PRINT_KEY) === "1"
-      );
+      const value =
+        typeof window !== "undefined"
+          ? localStorage.getItem(AUTO_PRINT_KEY)
+          : null;
+      // "1"/"0" are the older on/off values.
+      if (value === "none" || value === "0") return "none";
+      if (value === "kitchen") return "kitchen";
+      return "both";
     } catch {
-      return false;
+      return "both";
     }
   }
 
-  function setAutoPrint(value: boolean) {
+  function setAutoPrint(value: AutoPrintMode) {
     autoPrint = value;
     try {
-      localStorage.setItem(AUTO_PRINT_KEY, value ? "1" : "0");
+      localStorage.setItem(AUTO_PRINT_KEY, value);
     } catch {
       // Private mode: the choice lasts for this session only.
+    }
+  }
+
+  function autoPrintKinds(mode: AutoPrintMode): TicketKind[] {
+    if (mode === "kitchen") return ["kitchen"];
+    if (mode === "both") return ["customer", "kitchen"];
+    return [];
+  }
+
+  /** Hand the new order to preparation (deducts stock) from the created screen. */
+  async function startPreparingCreated() {
+    const order = createdOrder?.order;
+    if (!order) return;
+    const updated = await advanceFromBoard(order, "en_proceso");
+    if (updated && createdOrder) {
+      createdOrder = { ...createdOrder, order: { ...order, ...updated } };
     }
   }
 
@@ -1157,8 +1205,9 @@
       createOrderIdempotencyKey = null;
       resetOrderForm();
       createdOrder = created;
-      if (autoPrint && created.order) {
-        printOrderReceipt(created.order, paperWidth, ["customer", "kitchen"]);
+      const kinds = autoPrintKinds(autoPrint);
+      if (kinds.length > 0 && created.order) {
+        printOrderReceipt(created.order, paperWidth, kinds);
       }
     } else {
       editError = "No se pudo crear la orden";
@@ -1388,9 +1437,17 @@
       class="btn btn-sm btn-outline rounded-full"
       class:ml-auto={ordersView !== "board"}
       onclick={() => (availabilityOpen = true)}
+      title={soldOutCount > 0
+        ? `${soldOutCount} agotado${soldOutCount === 1 ? "" : "s"} en esta sucursal`
+        : "Marcar productos o sabores agotados"}
     >
       <Icon icon="lucide:package-x" class="size-4" aria-hidden="true" />
       Agotados
+      {#if soldOutCount > 0}
+        <span class="badge badge-error badge-sm tabular-nums"
+          >{soldOutCount}</span
+        >
+      {/if}
     </button>
     <label
       class="flex items-center gap-1.5 text-sm"
@@ -1478,7 +1535,10 @@
   <AvailabilityPanel
     products={allProducts}
     {categories}
-    onClose={() => (availabilityOpen = false)}
+    onClose={() => {
+      availabilityOpen = false;
+      refreshSoldOutCount();
+    }}
   />
 {/if}
 
@@ -1491,7 +1551,7 @@
     onClose={closeDetailDrawer}
   >
     {#snippet headerActions()}
-      {#if isOrderEditable(selectedOrder.status)}
+      {#if isOrderEditable(selectedOrder)}
         <button
           class="btn btn-ghost btn-sm btn-square text-base-content/70 hover:text-info"
           type="button"
@@ -1654,6 +1714,7 @@
   {autoPrint}
   onAutoPrintChange={setAutoPrint}
   onPrint={printCreated}
+  onStartPreparing={() => void startPreparingCreated()}
   onNewOrder={startNextOrder}
 />
 

@@ -22,6 +22,8 @@
     error?: string;
     /** The caller shows its own heading; keep the label for assistive tech only. */
     hideLabel?: boolean;
+    /** Flavours sold out where the order is placed: shown but not selectable. */
+    soldOutIds?: string[];
     onChange: (value: string | string[]) => void;
   }
 
@@ -35,8 +37,11 @@
     required = false,
     error = "",
     hideLabel = false,
+    soldOutIds = [],
     onChange,
   }: Props = $props();
+
+  const soldOut = $derived(new Set(soldOutIds));
 
   let activeSlotIndex = $state(0);
   let groupRef = $state<HTMLDivElement | null>(null);
@@ -130,6 +135,7 @@
         mode === "single"
           ? selectedId === flavor.id
           : selectedIds[activeSlotIndex] === flavor.id}
+      {@const unavailable = soldOut.has(flavor.id)}
       <button
         type="button"
         data-chip
@@ -137,11 +143,14 @@
           selected
             ? "btn-primary"
             : "btn-outline btn-ghost border-base-300 hover:border-base-300"
-        }`}
+        } ${unavailable ? "line-through opacity-50" : ""}`}
         role="option"
         aria-selected={selected}
-        title={flavor.name}
+        aria-disabled={unavailable}
+        disabled={unavailable && !selected}
+        title={unavailable ? `${flavor.name} · Agotado` : flavor.name}
         onclick={() => {
+          if (unavailable && !selected) return;
           if (mode === "single") {
             handleSingleClick(flavor.id);
           } else {
@@ -150,6 +159,12 @@
         }}
       >
         <span class="max-w-[8rem] truncate">{flavor.name}</span>
+        {#if unavailable}
+          <span
+            class="badge badge-xs border-0 bg-error/15 text-error no-underline"
+            >Agotado</span
+          >
+        {/if}
         {#if flavor.is_seasonal}
           <span class="ml-0.5 text-xs opacity-70">★</span>
         {/if}

@@ -5,7 +5,8 @@
 import { formatCurrency } from "@shared/utils/formatters";
 import {
   PAYMENT_LABELS,
-  STORE_CONTACT,
+  receiptContactLine,
+  receiptLocation,
   STORE_NAME,
   STORE_SOCIAL,
   STORE_TAGLINE,
@@ -88,7 +89,9 @@ function layout(doc: JsPDF, order: ReceiptOrder, statusLabel?: string): number {
   center(STORE_NAME, 17, true);
   y += 0.6;
   center(STORE_TAGLINE, 8);
-  center(STORE_CONTACT, 7.5);
+  const location = receiptLocation(order);
+  if (location) center(location.name, 8.5, true);
+  center(receiptContactLine(order), 7.5);
   rule();
 
   center(`#${shortOrderNumber(order.order_number)}`, 20, true);

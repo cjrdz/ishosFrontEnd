@@ -1,6 +1,6 @@
 <script lang="ts">
   import { TAB_LABELS as SHARED_TAB_LABELS } from "../lib/tabs";
-  import StoreHoursEditor from "@features/settings/components/StoreHoursEditor.svelte";
+  import LocationsSettings from "@features/settings/components/LocationsSettings.svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import AdminModalShell from "./shared/AdminModalShell.svelte";
   import AdminFormActions from "./shared/AdminFormActions.svelte";
@@ -11,14 +11,12 @@
   interface Props {
     tabOrder: string[];
     panelConfig: PanelConfigValues;
-    storeOrdersEnabled: boolean;
     rowsPerTable: RowsPerTableConfig;
     archiveConfig: OrderArchiveConfig;
     busy: boolean;
     moduleError: string;
     onSave: (tabOrder: string[]) => void;
     onSavePanelConfig: (config: PanelConfigValues) => void;
-    onToggleStoreOrders: (enabled: boolean) => void | Promise<void>;
     onSaveRowsPerTable: (rows: RowsPerTableConfig) => void;
     onSaveArchiveConfig: (config: OrderArchiveConfig) => void;
     onRunArchive: () => void;
@@ -30,14 +28,12 @@
   let {
     tabOrder,
     panelConfig,
-    storeOrdersEnabled,
     rowsPerTable,
     archiveConfig,
     busy,
     moduleError,
     onSave,
     onSavePanelConfig,
-    onToggleStoreOrders,
     onSaveRowsPerTable,
     onSaveArchiveConfig,
     onRunArchive,
@@ -49,7 +45,6 @@
     tracking_token_ttl_hours: 720,
     inactivity_logout_seconds: 900,
   });
-  let confirmPauseDialog = $state<HTMLDialogElement | null>(null);
   let confirmPauseArchiveDialog = $state<HTMLDialogElement | null>(null);
   const rowsPerTableOptions = [5, 10, 25, 50, 100] as const;
   let localRowsPerTable = $state<RowsPerTableConfig>({
@@ -157,23 +152,6 @@
     moveDown(currentIndex);
   }
 
-  function openPauseDialog() {
-    confirmPauseDialog?.showModal();
-  }
-
-  function confirmPauseOrders() {
-    confirmPauseDialog?.close();
-    void onToggleStoreOrders(false);
-  }
-
-  function handleStoreOrdersToggle(checked: boolean) {
-    if (checked) {
-      void onToggleStoreOrders(true);
-      return;
-    }
-    openPauseDialog();
-  }
-
   function handleSaveRowsPerTable() {
     onSaveRowsPerTable({ ...localRowsPerTable });
   }
@@ -226,6 +204,9 @@
   {#if moduleError}
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
+
+  <!-- Locations first: hours, switches and contact change most often -->
+  <LocationsSettings isAdmin={true} />
 
   <!-- Navigation -->
   <div id="navegacion-panel" class="card bg-base-100 shadow">
@@ -280,50 +261,6 @@
           disabled={busy}>Guardar orden</button
         >
       </div>
-    </div>
-  </div>
-
-  <!-- Store operation -->
-  <div id="operacion-tienda" class="card bg-base-100 shadow">
-    <div class="card-body gap-4">
-      <div>
-        <h2 class="card-title">Operación de tienda</h2>
-        <p class="text-sm text-base-content/70">
-          Controla cuándo los clientes pueden hacer pedidos en línea.
-        </p>
-      </div>
-
-      <div
-        class="flex flex-col gap-4 rounded-lg border border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div>
-          <p class="font-medium text-base-content">
-            {storeOrdersEnabled ? "Pedidos activos" : "Pedidos pausados"}
-          </p>
-          <p class="text-sm text-base-content/60">
-            {storeOrdersEnabled
-              ? "El catálogo es visible y los clientes pueden ordenar."
-              : "El catálogo es visible pero no se aceptan nuevos pedidos públicos."}
-          </p>
-        </div>
-        <input
-          class="toggle toggle-md {storeOrdersEnabled
-            ? 'toggle-success'
-            : 'toggle-error'}"
-          type="checkbox"
-          checked={storeOrdersEnabled}
-          onchange={(event) =>
-            handleStoreOrdersToggle(
-              (event.currentTarget as HTMLInputElement).checked,
-            )}
-          disabled={busy}
-          aria-label={storeOrdersEnabled
-            ? "Pedidos activos"
-            : "Pedidos pausados"}
-        />
-      </div>
-
-      <StoreHoursEditor />
     </div>
   </div>
 
@@ -628,27 +565,6 @@
     </div>
   </div>
 </section>
-
-<AdminModalShell
-  bind:dialogRef={confirmPauseDialog}
-  title="Pausar pedidos públicos"
-  icon="lucide:pause-circle"
-  widthClass="max-w-md"
-  onClose={() => {}}
->
-  <p>
-    Los clientes podrán seguir viendo el catálogo, pero no podrán crear pedidos
-    nuevos hasta reactivar la tienda.
-  </p>
-  <AdminFormActions
-    submitLabel="Pausar pedidos"
-    submitType="button"
-    submitVariant="error"
-    onSubmit={confirmPauseOrders}
-    onCancel={() => confirmPauseDialog?.close()}
-    {busy}
-  />
-</AdminModalShell>
 
 <AdminModalShell
   bind:dialogRef={confirmPauseArchiveDialog}
