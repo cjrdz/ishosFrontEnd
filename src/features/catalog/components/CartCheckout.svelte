@@ -1,8 +1,13 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { animate, stagger } from "motion";
   import { ApiError } from "@core/errors";
-  import "../../../styles/cart.css";
+  import Icon from "@shared/components/AppIcon.svelte";
+  import { enter, motionMs } from "@shared/motion/motion";
+  import { slide } from "svelte/transition";
+  import { flip } from "svelte/animate";
+  import { showToast } from "@shared/toast/toast";
+  import ProductArt from "./shared/ProductArt.svelte";
+  import { describeStoreStatus } from "@features/catalog/lib/store-status";
   import {
     createPublicOrder,
     listPublicProducts,
@@ -66,6 +71,8 @@
   // Mirrors the admin "orders enabled" switch. Defaults to open if settings
   // cannot be loaded; the backend still rejects orders when the store is closed.
   let ordersEnabled = $state(true);
+  // Why ordering is unavailable ("Abrimos mañana a las 2:00 pm."), if it is.
+  let closedDetail = $state<string | null>(null);
   let offers = $state<StoreOfferItem[]>([]);
   // Menu data is needed to re-price items and detect unavailable ones.
   let catalogLoaded = $state(false);
@@ -166,7 +173,9 @@
       fetchStoreSettings(),
     ]);
     if (settingsResult.status === "fulfilled") {
-      ordersEnabled = settingsResult.value.orders_enabled;
+      const status = describeStoreStatus(settingsResult.value);
+      ordersEnabled = status.canOrder;
+      closedDetail = status.canOrder ? null : status.detail;
       offers = settingsResult.value.offers ?? [];
     } else {
       // The backend still enforces a closed store.
@@ -264,6 +273,20 @@
     return summary;
   }
 
+  /** Stable identity for a cart line (same fields the cart merges on). */
+  function cartLineKey(item: StoreCartItem): string {
+    return JSON.stringify([
+      item.product_id,
+      item.flavor_id ?? null,
+      item.flavor_ids ?? [],
+      [...(item.included_addon_ids ?? [])].sort(),
+      [...(item.extra_addon_ids ?? [])].sort(),
+      item.topping_selection ?? "",
+      item.jalea_selection ?? "",
+      item.notes ?? "",
+    ]);
+  }
+
   function refreshItems() {
     items = getCartItems();
   }
@@ -297,6 +320,7 @@
   }
 
   function removeItem(item: StoreCartItem) {
+    const before = getCartItems();
     removeCartItem(
       item.product_id,
       item.flavor_id,
@@ -308,6 +332,28 @@
       item.jalea_selection,
     );
     refreshItems();
+    // Local-only change, so undo simply restores the previous cart.
+    showToast(`Quitaste ${item.name}`, {
+      actionLabel: "Deshacer",
+      onAction: () => {
+        setCartItems(before);
+        refreshItems();
+      },
+    });
+  }
+
+  function continueToCheckout() {
+    if (unavailableItems.length > 0) {
+      error = "Quita los productos que ya no están disponibles para continuar.";
+      return;
+    }
+    if (incompleteItems.length > 0) {
+      error = "Completa las personalizaciones pendientes antes de continuar.";
+      return;
+    }
+    error = "";
+    step = "checkout";
+    window.scrollTo({ top: 0 });
   }
 
   function handleEditConfirm(draft: ProductCustomizationDraft) {
@@ -505,115 +551,70 @@
     refreshItems();
     await loadCatalog();
 
-    void tick().then(() => {
-      if (!containerRef) return;
-      if (
-        typeof window !== "undefined" &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      )
-        return;
-      void animate(
-        containerRef,
-        { opacity: [0, 1], y: [20, 0] },
-        { duration: 0.45, ease: [0, 0, 0.2, 1] },
-      );
-      void tick().then(() => {
-        if (!containerRef) return;
-        const cards = containerRef.querySelectorAll("article.card");
-        if (cards.length > 0) {
-          void animate(
-            cards,
-            { opacity: [0, 1], y: [14, 0] },
-            {
-              duration: 0.35,
-              ease: [0.22, 1, 0.36, 1],
-              delay: stagger(0.08, { startDelay: 0.22 }),
-            },
-          );
-        }
-        if (summaryRef) {
-          void animate(
-            summaryRef,
-            { opacity: [0, 1], x: [20, 0] },
-            { duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.3 },
-          );
-        }
-      });
-    });
+    void tick().then(() => enter(containerRef));
   });
 </script>
 
-<div class="relative overflow-hidden" bind:this={containerRef}>
-  <div
-    class="stripe-bg absolute top-0 left-0 right-0 h-48 md:h-64 pointer-events-none"
-  ></div>
-  <div class="relative container mx-auto px-4 py-6 md:py-10 max-w-7xl">
-    <section
-      class="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-    >
+<div bind:this={containerRef}>
+  <div class="container mx-auto max-w-6xl px-4 pb-28 pt-6 md:pb-12 md:pt-8">
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <div class="section-pill mb-3">Tu Carrito</div>
-        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight">
-          <span
-            class="bg-clip-text text-transparent inline-block"
-            style="background-image: var(--brand-gradient);"
-          >
-            Tu carrito
-          </span>
+        <h1 class="font-display font-bold text-6xl leading-none md:text-7xl">
+          {step === "cart" ? "Tu pedido" : "Datos y pago"}
         </h1>
+        <p class="mt-1 text-base-content/70">
+          {step === "cart"
+            ? "Revisa tus productos antes de continuar."
+            : "Paso 2 de 2 · Solo te tomará un minuto."}
+        </p>
       </div>
-
       <div class="flex gap-2">
         <a href="/menu" class="btn btn-ghost rounded-full">Seguir comprando</a>
         <a href="/order/tracking" class="btn btn-outline rounded-full"
-          >Ir a seguimiento</a
+          >Mis pedidos</a
         >
       </div>
-    </section>
-
-    <div class="wave-divider -mt-2 mb-4" style="color: var(--ishos-teal);">
-      <svg
-        viewBox="0 0 1440 60"
-        xmlns="http://www.w3.org/2000/svg"
-        preserveAspectRatio="none"
-        style="height:32px; width:100%;"
-      >
-        <path
-          d="M0,30 C240,60 480,0 720,30 C960,60 1200,0 1440,30 L1440,60 L0,60 Z"
-          fill="color-mix(in srgb, var(--ishos-teal) 8%, transparent)"
-        ></path>
-      </svg>
-    </div>
-
-    <section class="mb-6">
-      <ul class="steps steps-horizontal w-full">
-        <li class={`step ${step === "cart" ? "step-brand" : ""}`}>Carrito</li>
-        <li class={`step ${step === "checkout" ? "step-brand" : ""}`}>
-          Datos y pago
-        </li>
-      </ul>
-    </section>
+    </header>
 
     {#if !ordersEnabled}
-      <div class="alert alert-warning rounded-2xl mb-6" role="status">
-        <span>
-          La tienda no está recibiendo pedidos en este momento. Tu carrito se
-          guarda en este dispositivo para que puedas pedir más tarde.
-        </span>
+      <div
+        class="mb-6 flex items-start gap-3 rounded-box border border-warning/50 bg-warning/15 p-4"
+        role="status"
+      >
+        <Icon
+          icon="lucide:clock"
+          class="mt-0.5 size-5 shrink-0"
+          aria-hidden="true"
+        />
+        <div>
+          <p class="font-semibold">
+            {closedDetail ?? "No estamos recibiendo pedidos en este momento."}
+          </p>
+          <p class="text-sm text-base-content/70">
+            Tu carrito queda guardado en este dispositivo para que pidas más
+            tarde.
+          </p>
+        </div>
       </div>
     {/if}
 
     {#if items.length === 0}
       <div
-        class="max-w-2xl mx-auto text-center py-20 px-6 bg-base-100/50 border border-base-200/50 rounded-3xl shadow-xl"
+        class="mx-auto max-w-lg rounded-box border border-base-300 bg-base-100 px-6 py-14 text-center"
       >
-        <div class="text-6xl mb-6">🛒</div>
-        <h2 class="text-2xl font-bold mb-3">Tu carrito está vacío</h2>
-        <p class="text-base-content/70 mb-8 max-w-md mx-auto">
-          Explora nuestro menú y agrega tus sabores favoritos.
+        <Icon
+          icon="lucide:shopping-cart"
+          class="mx-auto mb-4 size-12 text-base-content/40"
+          aria-hidden="true"
+        />
+        <h2 class="mb-2 font-display font-bold text-4xl">
+          Tu carrito está vacío
+        </h2>
+        <p class="mx-auto mb-6 max-w-sm text-base-content/70">
+          Explora el menú y agrega tus sabores favoritos.
         </p>
-        <a href="/menu" class="btn btn-brand btn-lg rounded-full px-10"
-          >Ir al menú</a
+        <a href="/menu" class="btn btn-primary btn-lg rounded-full px-10"
+          >Ver el menú</a
         >
       </div>
     {:else if step === "cart"}
@@ -659,41 +660,66 @@
             </div>
           {/if}
 
-          {#each items as item, index (index)}
+          {#each items as item (cartLineKey(item))}
             {@const summary = customizationSummary(item)}
+            {@const lineProduct = productById(item.product_id)}
             <article
-              class={`card bg-base-100 border rounded-3xl shadow-sm ${isItemUnavailable(item) ? "border-error/60 opacity-75" : "border-base-200"}`}
+              animate:flip={{ duration: motionMs(250) }}
+              transition:slide={{ duration: motionMs(220) }}
+              class={`card rounded-box border bg-base-100 ${isItemUnavailable(item) ? "border-error/60" : "border-base-300"}`}
             >
-              <div class="p-5 md:p-6">
-                <div
-                  class="flex flex-col sm:flex-row gap-4 sm:items-start sm:justify-between"
-                >
-                  <div class="space-y-2 min-w-0">
-                    <h3 class="text-xl font-extrabold leading-tight">
-                      {item.name}
-                    </h3>
-                    {#if isItemUnavailable(item)}
-                      <span class="badge badge-error badge-sm"
-                        >No disponible</span
-                      >
-                    {/if}
-                    <p class="text-sm text-base-content/65">
-                      {item.quantity} x {formatCurrency(item.unit_price)}
-                    </p>
-                    {#if summary.length > 0}
-                      <div class="flex flex-wrap gap-1.5">
-                        {#each summary as line (line)}
-                          <span class="badge badge-ghost badge-sm">{line}</span>
-                        {/each}
-                      </div>
+              <div class="p-4 md:p-5">
+                <div class="flex gap-4">
+                  <div
+                    class="size-20 shrink-0 overflow-hidden rounded-field bg-base-200 md:size-24"
+                    aria-hidden="true"
+                  >
+                    {#if item.image_url}
+                      <img
+                        src={item.image_url}
+                        alt=""
+                        class="h-full w-full object-cover"
+                      />
+                    {:else}
+                      <ProductArt
+                        name={item.name}
+                        category={lineProduct?.category_name}
+                        scoops={lineProduct?.ball_quantity ?? 1}
+                        seed={item.product_id}
+                      />
                     {/if}
                   </div>
-
                   <div
-                    class="text-2xl font-extrabold whitespace-nowrap"
-                    style="color: var(--ishos-teal);"
+                    class="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
                   >
-                    {formatCurrency(item.unit_price * item.quantity)}
+                    <div class="space-y-2 min-w-0">
+                      <h3 class="text-lg font-bold leading-tight">
+                        {item.name}
+                      </h3>
+                      {#if isItemUnavailable(item)}
+                        <span class="badge badge-error badge-sm"
+                          >No disponible</span
+                        >
+                      {/if}
+                      <p class="text-sm text-base-content/65">
+                        {item.quantity} x {formatCurrency(item.unit_price)}
+                      </p>
+                      {#if summary.length > 0}
+                        <div class="flex flex-wrap gap-1.5">
+                          {#each summary as line (line)}
+                            <span class="badge badge-ghost badge-sm"
+                              >{line}</span
+                            >
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
+
+                    <div
+                      class="whitespace-nowrap text-lg font-bold tabular-nums"
+                    >
+                      {formatCurrency(item.unit_price * item.quantity)}
+                    </div>
                   </div>
                 </div>
 
@@ -701,26 +727,43 @@
                   class="mt-4 flex flex-wrap items-center gap-3 justify-between"
                 >
                   <div
-                    class="inline-flex items-center gap-1 rounded-xl border border-base-300 bg-base-100 p-1"
+                    class="flex items-center rounded-full border border-base-300"
+                    role="group"
+                    aria-label={`Cantidad de ${item.name}`}
                   >
                     <button
-                      class="btn btn-sm btn-ghost h-9 w-9 rounded-lg"
+                      class="btn btn-ghost btn-circle btn-sm"
                       type="button"
-                      aria-label="Reducir cantidad"
-                      onclick={() => updateQty(item, item.quantity - 1)}
+                      aria-label={item.quantity <= 1
+                        ? `Quitar ${item.name}`
+                        : "Reducir cantidad"}
+                      onclick={() =>
+                        item.quantity <= 1
+                          ? removeItem(item)
+                          : updateQty(item, item.quantity - 1)}
                     >
-                      -
+                      <Icon
+                        icon={item.quantity <= 1
+                          ? "lucide:trash-2"
+                          : "lucide:minus"}
+                        class="size-4"
+                        aria-hidden="true"
+                      />
                     </button>
-                    <span class="w-10 text-center font-bold"
+                    <span class="w-8 text-center font-semibold tabular-nums"
                       >{item.quantity}</span
                     >
                     <button
-                      class="btn btn-sm btn-ghost h-9 w-9 rounded-lg"
+                      class="btn btn-ghost btn-circle btn-sm"
                       type="button"
                       aria-label="Aumentar cantidad"
                       onclick={() => updateQty(item, item.quantity + 1)}
                     >
-                      +
+                      <Icon
+                        icon="lucide:plus"
+                        class="size-4"
+                        aria-hidden="true"
+                      />
                     </button>
                   </div>
 
@@ -736,7 +779,7 @@
                     {/if}
                     <button
                       type="button"
-                      class="btn btn-ghost btn-sm rounded-full text-error"
+                      class="btn btn-ghost btn-sm rounded-full"
                       onclick={() => removeItem(item)}
                     >
                       Quitar
@@ -749,7 +792,7 @@
         </div>
 
         <aside
-          class="card bg-base-100 border border-base-200 rounded-3xl shadow-md h-fit"
+          class="card h-fit rounded-box border border-base-300 bg-base-100 xl:sticky xl:top-24"
           bind:this={summaryRef}
         >
           <div class="p-6 space-y-4">
@@ -765,9 +808,7 @@
                 class="flex items-center justify-between text-lg font-extrabold pt-2 border-t border-base-200"
               >
                 <span>Total</span>
-                <span style="color: var(--ishos-teal);"
-                  >{formatCurrency(total)}</span
-                >
+                <span class="tabular-nums">{formatCurrency(total)}</span>
               </div>
             </div>
 
@@ -779,36 +820,37 @@
 
             <button
               type="button"
-              class="btn btn-brand btn-lg w-full rounded-xl font-bold"
+              class="btn btn-primary btn-lg w-full rounded-full"
               disabled={!ordersEnabled}
-              onclick={() => {
-                if (unavailableItems.length > 0) {
-                  error =
-                    "Quita los productos que ya no están disponibles para continuar.";
-                  return;
-                }
-                if (incompleteItems.length > 0) {
-                  error =
-                    "Completa las personalizaciones pendientes antes de continuar.";
-                  return;
-                }
-                error = "";
-                step = "checkout";
-              }}
+              onclick={continueToCheckout}
             >
-              Continuar al checkout
+              Continuar
             </button>
           </div>
         </aside>
       </div>
+
+      <!-- Phones: keep the total and the next step within reach. -->
+      <div class="cart-bar">
+        <div class="min-w-0">
+          <p class="text-sm text-base-content/70">Total</p>
+          <p class="text-xl font-bold tabular-nums">{formatCurrency(total)}</p>
+        </div>
+        <button
+          type="button"
+          class="btn btn-primary btn-lg flex-1 rounded-full"
+          disabled={!ordersEnabled}
+          onclick={continueToCheckout}
+        >
+          Continuar
+        </button>
+      </div>
     {:else}
       <div class="grid grid-cols-1 xl:grid-cols-[1.15fr_1fr] gap-6 items-start">
-        <section
-          class="card bg-base-100 border border-base-200 rounded-3xl shadow-sm"
-        >
+        <section class="card rounded-box border border-base-300 bg-base-100">
           <div class="p-6 md:p-7 space-y-5">
             <div class="flex items-center justify-between">
-              <h2 class="text-2xl font-bold">Datos de orden</h2>
+              <h2 class="text-xl font-bold">Tus datos</h2>
               <button
                 type="button"
                 class="btn btn-ghost btn-sm rounded-full"
@@ -927,7 +969,7 @@
                 <div class="flex flex-wrap gap-2">
                   {#each ORDER_TYPE_OPTIONS as option (option.value)}
                     <label
-                      class={`btn rounded-full has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 ${form.order_type === option.value ? "btn-brand" : "btn-outline"}`}
+                      class={`btn rounded-full has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 ${form.order_type === option.value ? "btn-primary" : "btn-outline"}`}
                     >
                       <input
                         type="radio"
@@ -959,7 +1001,7 @@
                 <div class="flex flex-wrap gap-2">
                   {#each PAYMENT_METHOD_OPTIONS as option (option.value)}
                     <label
-                      class={`btn rounded-full has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 ${form.payment_method === option.value ? "btn-brand" : "btn-outline"}`}
+                      class={`btn rounded-full has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 ${form.payment_method === option.value ? "btn-primary" : "btn-outline"}`}
                     >
                       <input
                         type="radio"
@@ -996,7 +1038,7 @@
         </section>
 
         <aside
-          class="card bg-base-100 border border-base-200 rounded-3xl shadow-md xl:sticky xl:top-6"
+          class="card rounded-box border border-base-300 bg-base-100 xl:sticky xl:top-24"
         >
           <div class="p-6 space-y-5">
             <h3 class="text-xl font-bold">Resumen final</h3>
@@ -1019,9 +1061,7 @@
                 class="flex items-center justify-between text-xl font-extrabold"
               >
                 <span>Total</span>
-                <span style="color: var(--ishos-teal);"
-                  >{formatCurrency(total)}</span
-                >
+                <span class="tabular-nums">{formatCurrency(total)}</span>
               </div>
             </div>
 
@@ -1038,7 +1078,7 @@
             {/if}
 
             <button
-              class="btn btn-brand btn-lg w-full rounded-xl font-extrabold"
+              class="btn btn-primary btn-lg w-full rounded-full"
               type="submit"
               form="checkout-form"
               disabled={submitting || !ordersEnabled}
@@ -1064,6 +1104,28 @@
     ? toSafeImageUrl(editingProduct.image_url)
     : undefined}
   initialDraft={editingItem ? draftFromItem(editingItem) : null}
+  confirmLabel="Guardar cambios"
   onClose={closeEditModal}
   onConfirm={handleEditConfirm}
 />
+
+<style>
+  .cart-bar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-base-300);
+    background: var(--color-base-100);
+  }
+
+  @media (min-width: 1280px) {
+    .cart-bar {
+      display: none;
+    }
+  }
+</style>

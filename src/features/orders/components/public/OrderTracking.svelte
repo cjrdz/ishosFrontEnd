@@ -20,11 +20,16 @@
     TRACKING_STATUS_LABELS,
     TRACKING_STATUS_ICONS_ACTIVE,
     TRACKING_STATUS_ICONS_STATIC,
+    trackingHeadline,
   } from "@features/analytics/lib/tracking";
+  import { celebrate, motionMs } from "@shared/motion/motion";
+  import { fly } from "svelte/transition";
+  import { showToast } from "@shared/toast/toast";
   import type { RecentTrackingOrder } from "@features/analytics/lib/tracking";
   import { subscribeOrderStatusSync } from "@features/orders/lib/status-sync";
   import { copyToClipboard } from "@features/orders/lib/token-helpers";
-  import "../../../../styles/order-tracking.css";
+  import { printOrderReceipt } from "@features/orders/lib/receipt-renderer";
+  import { downloadReceiptPdf } from "@features/orders/lib/receipt-pdf";
 
   type RecentHistoryConfirmState =
     | { kind: "delete-one"; order: RecentTrackingOrder }
@@ -48,6 +53,7 @@
   let lastExternalRefreshAt = $state(0);
   let pendingRecentHistoryConfirm = $state<RecentHistoryConfirmState>(null);
   let shareMessage = $state("");
+  let headlineRef = $state<HTMLElement | null>(null);
 
   const TRACKING_RATE_LIMIT_COOLDOWN_MS = 60000;
   const RECENT_TRACKING_RETENTION_DAYS = 30;
@@ -76,6 +82,30 @@
   const statusIndex = $derived(
     trackedOrder ? stepIndex(trackedOrder.status) : -1,
   );
+  const headline = $derived(
+    trackedOrder
+      ? trackingHeadline(trackedOrder.status, trackedOrder.order_type)
+      : null,
+  );
+  // 0–100 along the flow; "Recibida" already shows some progress.
+  const progressPercent = $derived(
+    statusIndex < 0
+      ? 0
+      : Math.round(((statusIndex + 1) / TRACKING_STATUS_FLOW.length) * 100),
+  );
+
+  /** The order changed status while the customer watched this page. */
+  function onStatusChanged(order: PublicOrderTrackingResponse) {
+    if (order.status !== "lista") return;
+    showToast(trackingHeadline("lista", order.order_type).title, {
+      tone: "success",
+      durationMs: 6000,
+    });
+    // Let the new headline render before bursting from it.
+    requestAnimationFrame(() => celebrate(headlineRef));
+    navigator.vibrate?.([120, 60, 120]);
+  }
+
   const stepAnnouncement = $derived(
     trackedOrder
       ? `Estado actualizado a ${TRACKING_STATUS_LABELS[trackedOrder.status]}, paso ${statusIndex + 1} de ${TRACKING_STATUS_FLOW.length}`
@@ -233,8 +263,15 @@
         return;
       }
 
+      const previousStatus =
+        trackedOrder?.order_number === order.order_number
+          ? trackedOrder.status
+          : null;
       trackedOrder = order;
       loadedTracking = { orderNumber, token };
+      if (previousStatus && previousStatus !== order.status) {
+        onStatusChanged(order);
+      }
       trackingError = "";
       receiptActionMessage = "";
       clearTrackingCooldown();
@@ -394,71 +431,6 @@
     pendingRecentHistoryConfirm = null;
   }
 
-  function escapeHtml(value: string): string {
-    return value
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-  }
-
-  function buildReceiptText(order: PublicOrderTrackingResponse): string {
-    const items = order.items
-      .map((item) => {
-        const lines = [
-          `${item.quantity}x ${item.product_name}`,
-          `  Unitario: ${formatMoney(item.unit_price)}`,
-          `  Subtotal: ${formatMoney(item.subtotal)}`,
-        ];
-
-        if (
-          Array.isArray(item.customizations?.flavor_names) &&
-          item.customizations.flavor_names.length > 0
-        ) {
-          lines.push(
-            `  ${item.customizations.flavor_names.length === 1 ? "Sabor" : "Sabores"}: ${item.customizations.flavor_names.join(", ")}`,
-          );
-        } else if (item.customizations?.flavor_name) {
-          lines.push(`  Sabor: ${item.customizations.flavor_name}`);
-        }
-
-        const included = itemIncludedAddonSummary(item);
-        if (included.length > 0) {
-          lines.push(`  Incluidos: ${included.join(", ")}`);
-        }
-
-        const extras = itemExtraAddonSummary(item);
-        if (extras.length > 0) {
-          lines.push(`  Extras: ${extras.join(", ")}`);
-        }
-
-        if (item.customizations?.notes) {
-          lines.push(`  Nota: ${item.customizations.notes}`);
-        }
-
-        return lines.join("\n");
-      })
-      .join("\n\n");
-
-    return [
-      "ISHOS Factory - Comprobante de pedido",
-      "",
-      `Orden: ${order.order_number}`,
-      `Estado: ${TRACKING_STATUS_LABELS[order.status]}`,
-      `Tipo: ${order.order_type === "para_llevar" ? "Para llevar" : "En local"}`,
-      `Creado: ${formatDate(order.created_at)}`,
-      `Actualizado: ${formatDate(order.updated_at)}`,
-      "",
-      "Productos:",
-      items,
-      "",
-      `Total: ${formatMoney(order.total_amount)}`,
-      "",
-      "Gracias por la compra de tu producto en Ishos.",
-    ].join("\n");
-  }
-
   /**
    * Shares (or copies) a link that opens this order's tracking on any device.
    * Same format as the WhatsApp link the backend sends.
@@ -497,120 +469,41 @@
 
   function printTrackedOrderReceipt() {
     if (!trackedOrder) return;
-    const receiptText = buildReceiptText(trackedOrder);
-
-    // Print from a hidden iframe driven by this (CSP-hashed) bundle. A popup
-    // opened with "noopener" is always null, and a document.write'd inline
-    // <script> would be blocked by the page CSP it inherits.
-    const html = `<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <title>Comprobante ${escapeHtml(trackedOrder.order_number)}</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 24px; color: #1b1b1b; }
-    h1 { font-size: 20px; margin: 0 0 16px; }
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      line-height: 1.45;
-      background: #f4f4f5;
-      border-radius: 12px;
-      padding: 16px;
-    }
-  </style>
-</head>
-<body>
-  <h1>Comprobante de pedido</h1>
-  <pre>${escapeHtml(receiptText)}</pre>
-</body>
-</html>`;
-
-    const frame = document.createElement("iframe");
-    frame.setAttribute("aria-hidden", "true");
-    frame.setAttribute("tabindex", "-1");
-    frame.title = "Comprobante para imprimir";
-    Object.assign(frame.style, {
-      position: "fixed",
-      right: "0",
-      bottom: "0",
-      width: "0",
-      height: "0",
-      border: "0",
-    });
-    frame.addEventListener("load", () => {
-      const printWindow = frame.contentWindow;
-      if (!printWindow) {
-        receiptActionMessage =
-          "No se pudo preparar la impresión. Usa el botón “Comprobante” para descargarlo.";
-        frame.remove();
-        return;
-      }
-      printWindow.addEventListener("afterprint", () => frame.remove(), {
-        once: true,
-      });
-      printWindow.focus();
-      printWindow.print();
-      receiptActionMessage = "Comprobante listo para imprimir.";
-    });
-    frame.srcdoc = html;
-    document.body.appendChild(frame);
+    printOrderReceipt(trackedOrder, "80", ["customer"]);
+    receiptActionMessage = "Comprobante listo para imprimir.";
   }
 
-  function downloadTrackedOrderReceipt() {
-    if (!trackedOrder) return;
-    const receiptText = buildReceiptText(trackedOrder);
-    const blob = new Blob([receiptText], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `comprobante-${trackedOrder.order_number}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
-    receiptActionMessage = "Comprobante descargado.";
+  let receiptDownloading = $state(false);
+
+  async function downloadTrackedOrderReceipt() {
+    if (!trackedOrder || receiptDownloading) return;
+    receiptDownloading = true;
+    try {
+      await downloadReceiptPdf(
+        trackedOrder,
+        TRACKING_STATUS_LABELS[trackedOrder.status],
+      );
+      receiptActionMessage = "Comprobante descargado.";
+    } catch {
+      receiptActionMessage = "No se pudo generar el PDF. Intenta imprimirlo.";
+    } finally {
+      receiptDownloading = false;
+    }
   }
 </script>
 
 <div class="max-w-4xl mx-auto space-y-6 md:space-y-8 mb-12 md:mb-16">
-  <!-- ── Header ── -->
-  <section class="relative overflow-hidden text-center px-4 pt-2 pb-4">
-    <div class="relative z-10 fade-up fade-up-1">
-      <div class="section-pill mb-3">
-        <span
-          class="w-1.5 h-1.5 rounded-full inline-block mr-2 align-middle"
-          style="background: var(--ishos-teal);"
-        ></span>
-        Seguimiento
-      </div>
-      <h1
-        class="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight"
-      >
-        Sigue tu
-        <span
-          class="text-transparent bg-clip-text"
-          style="background-image: var(--brand-gradient);"
-        >
-          Pedido
-        </span>
-      </h1>
-      <p
-        class="text-sm md:text-base text-base-content/60 mt-2 max-w-md mx-auto"
-      >
-        Ingresa tu número de orden para conocer su estado en tiempo real.
-      </p>
-    </div>
-  </section>
+  <header>
+    <h1 class="font-display font-bold text-6xl leading-none md:text-7xl">
+      Sigue tu pedido
+    </h1>
+    <p class="mt-1 text-base-content/70">
+      Ingresa tu número de orden para ver su estado en tiempo real.
+    </p>
+  </header>
 
   <!-- ── Search form ── -->
-  <section
-    class="bg-base-100 border border-base-200 shadow-sm rounded-2xl md:rounded-3xl p-5 md:p-8 relative overflow-hidden fade-up fade-up-2"
-  >
-    <!-- Inner accent bar -->
-    <div
-      class="absolute top-0 left-0 right-0 h-1"
-      style="background: linear-gradient(90deg, var(--ishos-teal), var(--ishos-pink), var(--ishos-yellow));"
-    ></div>
-
+  <section class="rounded-box border border-base-300 bg-base-100 p-5 md:p-8">
     <div class="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4">
       <label class="form-control flex-1">
         <span class="label-text font-bold text-base-content/80 ml-1 mb-1 hidden"
@@ -618,24 +511,30 @@
         >
         <div class="relative">
           <div
-            class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-base-content/50"
+            class="absolute inset-y-0 left-0 z-10 pl-4 flex items-center pointer-events-none text-base-content/50"
           >
             <Icon icon="lucide:search" width="20" height="20" />
           </div>
           <input
             class="input input-bordered h-12 md:h-14 bg-base-100 focus:bg-base-200 w-full rounded-xl md:rounded-2xl pl-11 text-base md:text-lg font-medium transition-all"
             bind:value={trackingOrderNumber}
-            placeholder="Ej. ORD-2026..."
+            placeholder="Ej. ORD-20261026-1234"
+            aria-label="Número de orden"
+            aria-describedby="tracking-help"
+            autocomplete="off"
           />
         </div>
+        <span id="tracking-help" class="mt-2 ml-1 text-sm text-base-content/65">
+          Lo ves al confirmar tu pedido y en el enlace que te enviamos por
+          WhatsApp.
+        </span>
       </label>
 
       <button
-        class="btn btn-lg rounded-xl md:rounded-2xl min-w-32 shadow-sm hover:shadow-md transition-all text-white border-0"
+        class="btn btn-primary btn-lg min-w-32 rounded-full"
         type="button"
         onclick={() => runTrackingLookup()}
         disabled={trackingLookupActive || trackingCooldownActive}
-        style="background: var(--ishos-teal);"
       >
         {#if trackingCooldownActive}
           Espera {trackingCooldownSeconds}s
@@ -653,21 +552,20 @@
       <label class="label cursor-pointer justify-start gap-3 p-0">
         <input
           type="checkbox"
-          class="toggle toggle-sm"
+          class="toggle toggle-primary toggle-sm"
           checked={rememberTrackingOnDevice}
           onchange={(event) =>
             toggleRememberTrackingOnDevice(
               (event.currentTarget as HTMLInputElement).checked,
             )}
-          style="--tglbg: var(--ishos-teal);"
         />
         <span class="label-text font-medium text-sm">
           Recordar mis pedidos en este dispositivo
         </span>
       </label>
       <p class="text-xs text-base-content/60">
-        Historial local y opcional. Se elimina automaticamente en
-        {RECENT_TRACKING_RETENTION_DAYS} dias.
+        Historial local y opcional. Se elimina automáticamente en
+        {RECENT_TRACKING_RETENTION_DAYS} días.
       </p>
     </div>
 
@@ -675,11 +573,8 @@
       {#if trackingLookupActive}
         <p class="flex items-center gap-2 text-sm text-base-content/65">
           <span class="inline-grid *:[grid-area:1/1]" aria-hidden="true">
-            <span
-              class="status tracking-status-ping"
-              style="background: var(--ishos-teal);"
-            ></span>
-            <span class="status" style="background: var(--ishos-teal);"></span>
+            <span class="status status-primary tracking-status-ping"></span>
+            <span class="status status-primary"></span>
           </span>
           <span
             >{trackingBusy
@@ -701,16 +596,47 @@
   </section>
 
   {#if trackedOrder}
-    <div class="mt-6 md:mt-8 space-y-5 md:space-y-6 fade-up fade-up-3">
+    <div class="mt-6 md:mt-8 space-y-5 md:space-y-6">
       <!-- ── Order status card ── -->
       <article
-        class="rounded-2xl md:rounded-3xl border border-base-200 bg-base-100 shadow-sm p-5 md:p-8 relative overflow-hidden"
+        class="rounded-box border border-base-300 bg-base-100 p-5 md:p-8"
       >
-        <!-- Top accent -->
-        <div
-          class="absolute top-0 left-0 right-0 h-1"
-          style="background: linear-gradient(90deg, var(--ishos-teal), var(--ishos-pink), var(--ishos-yellow));"
-        ></div>
+        {#if headline}
+          <div class="mb-6 flex items-start gap-4" bind:this={headlineRef}>
+            <span
+              class={`grid size-14 shrink-0 place-items-center rounded-full ${trackedOrder.status === "cancelada" ? "bg-error/15 text-error" : trackedOrder.status === "lista" || trackedOrder.status === "entregada" ? "bg-success/15 text-success" : "bg-primary/10 text-primary"}`}
+              aria-hidden="true"
+            >
+              <Icon
+                icon={TRACKING_STATUS_ICONS_ACTIVE[trackedOrder.status]}
+                width="28"
+                height="28"
+              />
+            </span>
+            {#key trackedOrder.status}
+              <div class="min-w-0" in:fly={{ y: 10, duration: motionMs(350) }}>
+                <p
+                  class="font-display font-bold text-4xl leading-none md:text-5xl"
+                  aria-live="polite"
+                >
+                  {headline.title}
+                </p>
+                <p class="mt-1 text-base-content/70">{headline.body}</p>
+              </div>
+            {/key}
+          </div>
+          {#if trackedOrder.status !== "cancelada"}
+            <div
+              class="tracking-progress mb-6"
+              class:tracking-progress--done={trackedOrder.status === "lista" ||
+                trackedOrder.status === "entregada"}
+              aria-hidden="true"
+              style={`--progress: ${progressPercent}%`}
+            >
+              <span></span>
+            </div>
+          {/if}
+        {/if}
 
         <div
           class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5 md:mb-6"
@@ -741,10 +667,7 @@
             {/if}
           </div>
           <div
-            class={`badge badge-lg font-bold border-0 px-4 py-3 rounded-full ${trackedOrder.status === "entregada" ? "bg-success/15 text-success" : "text-white"}`}
-            style={trackedOrder.status === "entregada"
-              ? ""
-              : "background: var(--ishos-teal);"}
+            class={`badge badge-lg rounded-full border-0 px-4 py-3 font-semibold ${trackedOrder.status === "entregada" || trackedOrder.status === "lista" ? "bg-success/15 text-success" : "bg-primary text-primary-content"}`}
           >
             {TRACKING_STATUS_LABELS[trackedOrder.status]}
           </div>
@@ -760,7 +683,7 @@
               <span class="text-xs font-bold text-base-content/50 uppercase"
                 >Total</span
               >
-              <span class="font-bold text-lg" style="color: var(--ishos-teal);"
+              <span class="font-bold text-lg tabular-nums"
                 >{formatMoney(trackedOrder.total_amount)}</span
               >
             </div>
@@ -801,13 +724,9 @@
                     aria-hidden="true"
                   >
                     <span
-                      class="status status-sm tracking-status-ping"
-                      style="background: var(--ishos-teal);"
+                      class="status status-sm status-primary tracking-status-ping"
                     ></span>
-                    <span
-                      class="status status-sm"
-                      style="background: var(--ishos-teal);"
-                    ></span>
+                    <span class="status status-sm status-primary"></span>
                   </span>
                   <span>Actualizando</span>
                 </span>
@@ -844,7 +763,7 @@
               </div>
               <span
                 class="badge badge-outline rounded-full font-semibold"
-                style="border-color: color-mix(in srgb, var(--ishos-teal) 40%, transparent); color: var(--ishos-teal);"
+                style="border-color: color-mix(in srgb, var(--color-primary) 40%, transparent); color: var(--color-primary);"
               >
                 {formatMoney(trackedOrder.total_amount)}
               </span>
@@ -890,7 +809,7 @@
                       {/if}
                     </div>
                     <div class="text-right shrink-0">
-                      <p class="font-bold" style="color: var(--ishos-teal);">
+                      <p class="font-bold" style="color: var(--color-primary);">
                         {formatMoney(item.subtotal)}
                       </p>
                       <p class="text-xs text-base-content/50 mt-1">
@@ -904,42 +823,55 @@
           </details>
         {/if}
 
-        {#if trackedOrderDelivered}
+        {#if trackedOrder.status !== "cancelada"}
           <div
-            class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-success/8 border border-success/20 rounded-xl md:rounded-2xl px-4 py-3 mb-5 md:mb-6"
+            class={`mb-5 flex flex-col justify-between gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center md:mb-6 md:rounded-2xl ${
+              trackedOrderDelivered
+                ? "border-success/20 bg-success/8"
+                : "border-base-300 bg-base-200/50"
+            }`}
           >
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2.5">
               <Icon
-                icon="lucide:check-check"
-                width="16"
-                height="16"
-                class="text-success shrink-0"
+                icon={trackedOrderDelivered
+                  ? "lucide:check-check"
+                  : "lucide:receipt-text"}
+                width="18"
+                height="18"
+                class={`shrink-0 ${trackedOrderDelivered ? "text-success" : "text-primary"}`}
               />
-              <span class="text-sm font-semibold text-base-content"
-                >Pedido entregado</span
-              >
+              <div>
+                <p class="text-sm font-semibold text-base-content">
+                  {trackedOrderDelivered
+                    ? "Pedido entregado"
+                    : "Comprobante de tu pedido"}
+                </p>
+                <p class="text-xs text-base-content/70" aria-live="polite">
+                  {receiptActionMessage || "Descárgalo en PDF o imprímelo."}
+                </p>
+              </div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              {#if receiptActionMessage}
-                <span class="text-xs text-success hidden sm:inline"
-                  >{receiptActionMessage}</span
-                >
-              {/if}
+            <div class="flex shrink-0 items-center gap-2">
               <button
-                class="btn btn-ghost btn-xs rounded-full gap-1.5 hidden sm:inline-flex"
+                class="btn btn-ghost btn-sm hidden gap-1.5 rounded-full sm:inline-flex"
                 type="button"
                 onclick={printTrackedOrderReceipt}
               >
-                <Icon icon="lucide:printer" width="12" height="12" />
+                <Icon icon="lucide:printer" width="14" height="14" />
                 Imprimir
               </button>
               <button
-                class="btn btn-success btn-xs rounded-full gap-1.5"
+                class={`btn btn-sm flex-1 gap-1.5 rounded-full sm:flex-none ${trackedOrderDelivered ? "btn-success" : "btn-primary"}`}
                 type="button"
-                onclick={downloadTrackedOrderReceipt}
+                onclick={() => void downloadTrackedOrderReceipt()}
+                disabled={receiptDownloading}
               >
-                <Icon icon="lucide:download" width="12" height="12" />
-                Comprobante
+                {#if receiptDownloading}
+                  <span class="loading loading-spinner loading-xs"></span>
+                {:else}
+                  <Icon icon="lucide:file-down" width="14" height="14" />
+                {/if}
+                Descargar PDF
               </button>
             </div>
           </div>
@@ -980,9 +912,6 @@
                   >
                     <span
                       class={`order-step-node ${current ? "order-step-node--current" : completed ? "order-step-node--complete" : "order-step-node--pending"}`}
-                      style={current || completed
-                        ? "--color-primary: var(--ishos-teal);"
-                        : ""}
                     >
                       <Icon
                         icon={current
@@ -994,7 +923,6 @@
                     </span>
                     <span
                       class={`text-sm font-semibold ${current ? "text-primary" : completed ? "text-base-content" : "text-base-content/45"}`}
-                      style={current ? "color: var(--ishos-teal);" : ""}
                       >{TRACKING_STATUS_LABELS[step]}</span
                     >
                     {#if stepTimestamp(step)}
@@ -1017,7 +945,7 @@
 
       <!-- ── Recent history ── -->
       {#if recentTrackingOrders.length > 0}
-        <div class="space-y-3 fade-up fade-up-4">
+        <div class="space-y-3">
           <div class="flex items-center justify-between gap-3 px-1">
             <h2
               class="text-xs font-bold uppercase tracking-wider text-base-content/50"
@@ -1053,7 +981,7 @@
                     onclick={() => loadRecentOrder(recentOrder)}
                     disabled={trackingLookupActive || trackingCooldownActive}
                     title="Cargar pedido"
-                    style="color: var(--ishos-teal);"
+                    style="color: var(--color-primary);"
                   >
                     {recentOrder.orderNumber}
                   </button>
@@ -1135,7 +1063,7 @@
     <button
       class="modal-backdrop"
       type="button"
-      aria-label="Cerrar confirmacion"
+      aria-label="Cerrar confirmación"
       onclick={cancelRecentHistoryConfirm}
     ></button>
   </div>
@@ -1158,9 +1086,32 @@
     }
   }
 
+  .tracking-progress {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--color-base-300);
+    overflow: hidden;
+  }
+
+  .tracking-progress span {
+    display: block;
+    height: 100%;
+    width: var(--progress);
+    border-radius: inherit;
+    background: var(--color-primary);
+    transition: width 700ms var(--ease-out);
+  }
+
+  .tracking-progress--done span {
+    background: var(--color-success);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .tracking-status-ping {
       animation: none;
+    }
+    .tracking-progress span {
+      transition: none;
     }
   }
 </style>

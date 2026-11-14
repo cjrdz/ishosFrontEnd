@@ -12,6 +12,13 @@ import {
 import type { Order } from "./api";
 import type { RunModuleAction } from "./module-action";
 
+export interface CreatedOrder {
+  orderNumber: string;
+  total: number;
+  change: number | null;
+  order: Order | null;
+}
+
 interface OrderHandlerDeps {
   runModuleAction: RunModuleAction;
   loadOrders: () => Promise<void>;
@@ -85,15 +92,31 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
     payload: Parameters<typeof createOrder>[0],
     idempotencyKey?: string,
   ) {
-    return runModuleAction<boolean>({
+    return runModuleAction<CreatedOrder | null>({
       module: "ordenes",
       analyticsAction: "admin_order_create",
       errorMessage: "No se pudo crear la orden",
       action: async () => {
-        await createOrder(payload, idempotencyKey);
-        return true;
+        const created = await createOrder(payload, idempotencyKey);
+        // The full order (items, names) is what the tickets print from. If
+        // that fetch fails the order still exists; it just can't print here.
+        let order: Order | null = null;
+        if (created.id) {
+          try {
+            order = await getOrder(created.id);
+            setCachedOrder(order);
+          } catch {
+            order = null;
+          }
+        }
+        return {
+          orderNumber: created.order_number,
+          total: created.total,
+          change: created.change ?? null,
+          order,
+        };
       },
-      defaultValue: false,
+      defaultValue: null,
       onSuccess: async () => {
         setNotice("Orden creada");
         await loadOrders();

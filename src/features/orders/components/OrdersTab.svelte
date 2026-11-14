@@ -10,7 +10,15 @@
     groupAddonsByGroup,
     normalizeAddonGroupName,
   } from "@features/products";
-  import { printOrderReceipt } from "../lib/receipt-renderer";
+  import {
+    getPaperWidth,
+    printOrderReceipt,
+    setPaperWidth,
+    type PaperWidth,
+    type TicketKind,
+  } from "../lib/receipt-renderer";
+  import type { CreatedOrder } from "@features/admin-management/lib/order-handlers";
+  import { getOrder } from "@features/admin-management/lib/bff";
   import {
     statusLabels,
     statusBadgeClass,
@@ -31,6 +39,8 @@
   } from "../lib/idempotency";
   import OrderDetailView from "./admin/OrderDetailView.svelte";
   import OrderList from "./admin/OrderList.svelte";
+  import OrdersBoard from "./admin/OrdersBoard.svelte";
+  import AvailabilityPanel from "./admin/AvailabilityPanel.svelte";
   import OrderEditor from "./admin/OrderEditor.svelte";
   import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
   import SaveUserFromOrderDialog from "./admin/SaveUserFromOrderDialog.svelte";
@@ -53,6 +63,83 @@
   import { normalizeIdList } from "../lib/list";
 
   const MANUAL_ORDER_DRAFT_STORAGE_KEY = "ishos.manual-order-draft.v1";
+  const ORDERS_VIEW_STORAGE_KEY = "ishos.orders-view";
+
+  type OrdersView = "board" | "list";
+
+  function readOrdersView(): OrdersView {
+    try {
+      return localStorage.getItem(ORDERS_VIEW_STORAGE_KEY) === "list"
+        ? "list"
+        : "board";
+    } catch {
+      return "board";
+    }
+  }
+
+  let availabilityOpen = $state(false);
+  // Ticket roll width for this device's printer (80 mm default, 58 mm common too).
+  let paperWidth = $state<PaperWidth>(
+    typeof window === "undefined" ? "80" : getPaperWidth(),
+  );
+
+  // After a counter order is created the editor shows its tickets and change.
+  let createdOrder = $state<CreatedOrder | null>(null);
+  const AUTO_PRINT_KEY = "ishos.manual-order-auto-print";
+  let autoPrint = $state(readAutoPrint());
+
+  function readAutoPrint(): boolean {
+    try {
+      return (
+        typeof window !== "undefined" &&
+        localStorage.getItem(AUTO_PRINT_KEY) === "1"
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function setAutoPrint(value: boolean) {
+    autoPrint = value;
+    try {
+      localStorage.setItem(AUTO_PRINT_KEY, value ? "1" : "0");
+    } catch {
+      // Private mode: the choice lasts for this session only.
+    }
+  }
+
+  function printCreated(kinds: TicketKind[]) {
+    if (createdOrder?.order)
+      printOrderReceipt(createdOrder.order, paperWidth, kinds);
+  }
+
+  async function printKitchenFromBoard(order: Order) {
+    // Board cards already carry items; fetch only if they're missing.
+    const full = order.items?.length
+      ? order
+      : await getOrder(order.id).catch(() => null);
+    if (full) printOrderReceipt(full, paperWidth, ["kitchen"]);
+  }
+
+  function startNextOrder() {
+    createdOrder = null;
+    createOrderIdempotencyKey = generateIdempotencyKey();
+    resetOrderForm();
+  }
+
+  // The board is the day-to-day view; the list keeps search, filters and history.
+  let ordersView = $state<OrdersView>(
+    typeof window === "undefined" ? "board" : readOrdersView(),
+  );
+
+  function setOrdersView(view: OrdersView) {
+    ordersView = view;
+    try {
+      localStorage.setItem(ORDERS_VIEW_STORAGE_KEY, view);
+    } catch {
+      // Private mode: the choice just isn't remembered.
+    }
+  }
 
   interface ManualOrderDraftSnapshot {
     orderForm: OrderFormState;
@@ -793,28 +880,16 @@
   });
 
   const orderStatusFilterLabel = $derived(
-    orderStatusFilter === ""
-      ? "Todos"
-      : orderStatusFilter === "pendiente_revision"
-        ? "pendiente_revision"
-        : orderStatusFilter === "recibida"
-          ? "recibida"
-          : orderStatusFilter === "en_proceso"
-            ? "preparando"
-            : orderStatusFilter === "lista"
-              ? "lista"
-              : orderStatusFilter === "entregada"
-                ? "entregada"
-                : orderStatusFilter === "cancelada"
-                  ? "cancelada"
-                  : "Todos",
+    orderStatusFilter && orderStatusFilter in statusLabels
+      ? statusLabels[orderStatusFilter as Order["status"]]
+      : "Todos",
   );
 
   function requestApprove(order: Order) {
     openConfirmDialog(
       confirmDialog,
-      "Aprobar orden",
-      `Confirmar aprobacion de ${order.order_number}?`,
+      "Aceptar orden",
+      `¿Aceptar la orden ${order.order_number}?`,
       () => {
         void approveAndSync(order.id);
       },
@@ -852,10 +927,13 @@
     );
   }
 
-  async function printFromList(orderId: string) {
+  async function printFromList(
+    orderId: string,
+    kinds: TicketKind[] = ["customer"],
+  ) {
     const detail = await onOpenOrder(orderId);
     if (detail) {
-      printOrderReceipt(detail);
+      printOrderReceipt(detail, paperWidth, kinds);
     }
   }
 
@@ -943,6 +1021,7 @@
   }
 
   function closeOrderEditor() {
+    createdOrder = null;
     saveUserOpen = false;
     orderEditorOpen = false;
     editingDraftIndex = null;
@@ -1076,7 +1155,11 @@
       clearManualDraftStorage();
       clearIdempotencyKey();
       createOrderIdempotencyKey = null;
-      closeOrderEditor();
+      resetOrderForm();
+      createdOrder = created;
+      if (autoPrint && created.order) {
+        printOrderReceipt(created.order, paperWidth, ["customer", "kitchen"]);
+      }
     } else {
       editError = "No se pudo crear la orden";
     }
@@ -1210,6 +1293,25 @@
     printPromptState = DialogState.openPrintPrompt(order);
   }
 
+  /** Board one-tap step: accept uses the approve endpoint, the rest a status change. */
+  async function advanceFromBoard(
+    order: Order,
+    next: "recibida" | "en_proceso" | "entregada",
+  ): Promise<Order | null> {
+    const updated =
+      order.status === "pendiente_revision" && next === "recibida"
+        ? await onApprove(order.id)
+        : await onStatusChange(order.id, next);
+    if (updated) {
+      emitOrderStatusSync({
+        orderId: updated.id,
+        orderNumber: updated.order_number,
+        status: updated.status,
+      });
+    }
+    return updated;
+  }
+
   async function handleStatusChangeFromList(
     orderId: string,
     status: "recibida" | "en_proceso" | "lista" | "entregada",
@@ -1260,42 +1362,125 @@
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
 
-  <OrderList
-    {orders}
-    {filteredOrders}
-    {busy}
-    {isAdmin}
-    {orderSearch}
-    {orderStatusFilterLabel}
-    {statusLabels}
-    {statusBadgeClass}
-    {showArchived}
-    {pagination}
-    onSearchChange={(value) => {
-      orderSearch = value;
-    }}
-    {onFilterChange}
-    {onToggleArchivedView}
-    {onReload}
-    {onPageChange}
-    {onPerPageChange}
-    onCreateOrder={openCreateOrderModal}
-    onOpenOrder={(orderId) => {
-      void onOpenOrder(orderId);
-    }}
-    onPrintOrder={(orderId) => {
-      void printFromList(orderId);
-    }}
-    onStartEdit={(orderId) => {
-      void startEdit(orderId);
-    }}
-    onRequestApprove={requestApprove}
-    onOpenReject={openReject}
-    onRequestArchive={requestArchive}
-    onRequestUnarchive={requestUnarchive}
-    onRequestDelete={requestDelete}
-  />
+  <div class="flex flex-wrap items-center gap-2">
+    <div class="join" role="group" aria-label="Vista de órdenes">
+      <button
+        type="button"
+        class={`btn btn-sm join-item ${ordersView === "board" ? "btn-primary" : "btn-outline"}`}
+        aria-pressed={ordersView === "board"}
+        onclick={() => setOrdersView("board")}
+      >
+        <Icon icon="lucide:columns-3" class="size-4" aria-hidden="true" />
+        Tablero
+      </button>
+      <button
+        type="button"
+        class={`btn btn-sm join-item ${ordersView === "list" ? "btn-primary" : "btn-outline"}`}
+        aria-pressed={ordersView === "list"}
+        onclick={() => setOrdersView("list")}
+      >
+        <Icon icon="lucide:list" class="size-4" aria-hidden="true" />
+        Lista
+      </button>
+    </div>
+    <button
+      type="button"
+      class="btn btn-sm btn-outline rounded-full"
+      class:ml-auto={ordersView !== "board"}
+      onclick={() => (availabilityOpen = true)}
+    >
+      <Icon icon="lucide:package-x" class="size-4" aria-hidden="true" />
+      Agotados
+    </button>
+    <label
+      class="flex items-center gap-1.5 text-sm"
+      title="Ancho del papel de la impresora de tickets"
+    >
+      <Icon
+        icon="lucide:printer"
+        class="size-4 text-base-content/70"
+        aria-hidden="true"
+      />
+      <span class="sr-only">Papel de ticket</span>
+      <select
+        class="select select-sm w-auto rounded-full"
+        bind:value={paperWidth}
+        onchange={() => setPaperWidth(paperWidth)}
+      >
+        <option value="80">80 mm</option>
+        <option value="58">58 mm</option>
+      </select>
+    </label>
+    {#if ordersView === "board"}
+      <button
+        class="btn btn-sm btn-primary ml-auto rounded-full"
+        type="button"
+        onclick={openCreateOrderModal}
+        disabled={busy}
+      >
+        <Icon icon="lucide:plus" class="size-4" aria-hidden="true" />
+        Nueva orden
+      </button>
+    {/if}
+  </div>
+
+  {#if ordersView === "board"}
+    <OrdersBoard
+      refreshKey={orders}
+      onOpenOrder={(orderId) => {
+        void onOpenOrder(orderId);
+      }}
+      onAdvance={advanceFromBoard}
+      onRequestReady={openPrintPrompt}
+      onRequestReject={openReject}
+      onPrintKitchen={(order) => void printKitchenFromBoard(order)}
+    />
+  {:else}
+    <OrderList
+      {orders}
+      {filteredOrders}
+      {busy}
+      {isAdmin}
+      {orderSearch}
+      {orderStatusFilterLabel}
+      {statusLabels}
+      {statusBadgeClass}
+      {showArchived}
+      {pagination}
+      onSearchChange={(value) => {
+        orderSearch = value;
+      }}
+      {onFilterChange}
+      {onToggleArchivedView}
+      {onReload}
+      {onPageChange}
+      {onPerPageChange}
+      onCreateOrder={openCreateOrderModal}
+      onOpenOrder={(orderId) => {
+        void onOpenOrder(orderId);
+      }}
+      onPrintOrder={(orderId) => {
+        void printFromList(orderId);
+      }}
+      onStartEdit={(orderId) => {
+        void startEdit(orderId);
+      }}
+      onRequestApprove={requestApprove}
+      onOpenReject={openReject}
+      onRequestArchive={requestArchive}
+      onRequestUnarchive={requestUnarchive}
+      onRequestDelete={requestDelete}
+    />
+  {/if}
 </section>
+
+{#if availabilityOpen}
+  <AvailabilityPanel
+    products={allProducts}
+    {categories}
+    onClose={() => (availabilityOpen = false)}
+  />
+{/if}
 
 {#if selectedOrder}
   <AdminModalShell
@@ -1320,18 +1505,58 @@
           <Icon icon="lucide:pencil" class="h-4 w-4" />
         </button>
       {/if}
-      <button
-        class="btn btn-ghost btn-sm btn-square text-base-content/70 hover:text-info"
-        type="button"
-        onclick={() => {
-          void printFromList(selectedOrder.id);
-        }}
-        disabled={busy}
-        aria-label="Imprimir orden"
-        title="Imprimir"
-      >
-        <Icon icon="lucide:printer" class="h-4 w-4" />
-      </button>
+      <div class="dropdown dropdown-end">
+        <button
+          class="btn btn-ghost btn-sm gap-1.5 text-base-content/80"
+          type="button"
+          disabled={busy}
+          aria-haspopup="menu"
+        >
+          <Icon icon="lucide:printer" class="h-4 w-4" aria-hidden="true" />
+          <span class="hidden sm:inline">Imprimir</span>
+        </button>
+        <ul
+          class="dropdown-content menu z-20 mt-1 w-56 rounded-box border border-base-300 bg-base-100 p-1.5 shadow-lg"
+          role="menu"
+        >
+          <li role="none">
+            <button
+              type="button"
+              role="menuitem"
+              onclick={() => void printFromList(selectedOrder.id, ["customer"])}
+            >
+              <Icon
+                icon="lucide:receipt-text"
+                class="size-4"
+                aria-hidden="true"
+              />Ticket cliente
+            </button>
+          </li>
+          <li role="none">
+            <button
+              type="button"
+              role="menuitem"
+              onclick={() => void printFromList(selectedOrder.id, ["kitchen"])}
+            >
+              <Icon
+                icon="lucide:chef-hat"
+                class="size-4"
+                aria-hidden="true"
+              />Comanda cocina
+            </button>
+          </li>
+          <li role="none">
+            <button
+              type="button"
+              role="menuitem"
+              onclick={() =>
+                void printFromList(selectedOrder.id, ["customer", "kitchen"])}
+            >
+              <Icon icon="lucide:copy" class="size-4" aria-hidden="true" />Ambos
+            </button>
+          </li>
+        </ul>
+      </div>
       {#if isAdmin}
         <button
           class="btn btn-ghost btn-sm btn-square text-base-content/70 hover:text-secondary"
@@ -1425,6 +1650,11 @@
   onResolveAddonNames={resolveAddonNames}
   onManualItemSubtotal={manualItemSubtotal}
   onDraftItemKey={draftItemKey}
+  {createdOrder}
+  {autoPrint}
+  onAutoPrintChange={setAutoPrint}
+  onPrint={printCreated}
+  onNewOrder={startNextOrder}
 />
 
 <SaveUserFromOrderDialog

@@ -303,11 +303,54 @@ export interface StoreOfferItem {
   expires_at: string;
 }
 
-interface StorePublicSettings {
-  orders_enabled: boolean;
-  offers: StoreOfferItem[];
+export interface StoreTimeRange {
+  open: string; // "HH:MM", store-local
+  close: string;
 }
 
-export async function fetchStoreSettings(): Promise<StorePublicSettings> {
-  return bffRequest<StorePublicSettings>("/api/store/settings");
+/** Schedule-derived status computed by the backend in the store's time zone. */
+export interface StoreHoursStatus {
+  configured: boolean;
+  is_open: boolean;
+  closes_at?: string; // RFC 3339, when open
+  opens_at?: string; // RFC 3339, when closed
+  today: StoreTimeRange[];
+  weekly: Record<string, StoreTimeRange[]>;
+}
+
+export interface StorePublicSettings {
+  orders_enabled: boolean;
+  offers: StoreOfferItem[];
+  /** Absent from older backends: treat as "no schedule, always open". */
+  hours?: StoreHoursStatus;
+}
+
+// Several islands on one page need the store status (navbar chip, cart icon,
+// menu, cart). Share one request among them for a short window.
+const SETTINGS_SHARE_MS = 10_000;
+let sharedSettings: {
+  at: number;
+  promise: Promise<StorePublicSettings>;
+} | null = null;
+
+export async function fetchStoreSettings(
+  options: { fresh?: boolean } = {},
+): Promise<StorePublicSettings> {
+  const now = Date.now();
+  if (
+    !options.fresh &&
+    sharedSettings &&
+    now - sharedSettings.at < SETTINGS_SHARE_MS
+  ) {
+    return sharedSettings.promise;
+  }
+  const promise = bffRequest<StorePublicSettings>(
+    "/api/store/settings",
+    options.fresh ? { cache: "no-cache" } : undefined,
+  );
+  sharedSettings = { at: now, promise };
+  promise.catch(() => {
+    if (sharedSettings?.promise === promise) sharedSettings = null;
+  });
+  return promise;
 }

@@ -1,9 +1,8 @@
 /* CSS Variables for theming */
 
 :root {
-  --color-primary: hsl(210, 100%, 50%);
-  --color-secondary: hsl(280, 100%, 50%);
-  --color-accent: hsl(30, 100%, 50%);
+  /* Colours come from the daisyUI themes in global.css; don't redefine
+     --color-* here or they override the brand palette. */
 
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
@@ -26,8 +25,10 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
 
   /* ── IshosFactory brand tokens ──────────────────────── */
-  --ishos-teal: #00b2a9;
-  --ishos-teal-deep: #009990;
+  /* Teal follows the theme primary so text and buttons keep WCAG contrast
+     (the original #00b2a9 with white text was ~2.6:1) in light and dark. */
+  --ishos-teal: var(--color-primary);
+  --ishos-teal-deep: color-mix(in oklab, var(--color-primary) 85%, black);
   --ishos-maroon: #63001f;
   --ishos-mint: #91e2d6;
   --ishos-pink: #f9b4da;

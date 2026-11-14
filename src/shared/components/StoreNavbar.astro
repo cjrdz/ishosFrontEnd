@@ -5,6 +5,7 @@ import ThemeToggle from "@shared/components/ThemeToggle.svelte";
 // Island entries import the component file directly, not a feature barrel:
 // Astro bundles the imported module, so a barrel would ship every export.
 import StoreCartIcon from "@features/catalog/components/StoreCartIcon.svelte";
+import StoreStatusChip from "@features/catalog/components/StoreStatusChip.svelte";
 import StoreLogo from "./StoreLogo.astro";
 
 const currentPath = Astro.url.pathname;
@@ -41,7 +42,32 @@ const links = [
   </div>
 
   <div class="navbar-end flex items-center gap-2">
+    <div class="hidden sm:block">
+      <StoreStatusChip client:idle transition:persist="store-status-wide" />
+    </div>
     <StoreCartIcon client:load transition:persist="store-cart-icon" />
     <ThemeToggle client:load />
   </div>
 </header>
+<div class="store-status-strip sm:hidden">
+  <StoreStatusChip client:idle transition:persist="store-status-narrow" />
+</div>
+
+<style>
+  .store-status-strip {
+    display: flex;
+    justify-content: center;
+    padding: 6px 16px;
+    background: var(--color-base-100);
+    border-bottom: 1px solid var(--color-base-300);
+  }
+  .store-status-strip:empty {
+    display: none;
+  }
+  /* Scoped styles outrank Tailwind's sm:hidden, so hide it here too. */
+  @media (min-width: 640px) {
+    .store-status-strip {
+      display: none;
+    }
+  }
+</style>

@@ -139,7 +139,7 @@ function responseErrorCode(body: ParsedResponseBody, fallback: string): string {
 async function bffRequest<T>(
   path: string,
   options: {
-    method?: "GET" | "POST" | "PATCH" | "DELETE";
+    method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
     body?: unknown;
     query?: Record<string, string | number | boolean>;
     headers?: Record<string, string>;
@@ -211,8 +211,12 @@ export async function listOrders(
   archived = false,
   page = 1,
   perPage = 20,
+  options: { withItems?: boolean } = {},
 ) {
-  const query: Record<string, string> = { lite: "true" };
+  // Lite responses skip line items; the kitchen board needs them.
+  const query: Record<string, string> = options.withItems
+    ? {}
+    : { lite: "true" };
   if (status) query.status = status;
   if (archived) query.archived = "true";
   query.page = String(page);
@@ -380,6 +384,15 @@ export async function getOrder(id: string) {
   return bffRequest<LocalOrder>(`/api/admin/orders/${id}`);
 }
 
+/** What POST /orders returns; `id` is only sent to staff. */
+export interface CreatedOrderResponse {
+  id?: string;
+  order_number: string;
+  total: number;
+  amount_received?: number;
+  change?: number;
+}
+
 export async function createOrder(
   payload: CreateOrderRequest,
   idempotencyKey?: string,
@@ -388,7 +401,7 @@ export async function createOrder(
   if (idempotencyKey) {
     headers["Idempotency-Key"] = idempotencyKey;
   }
-  return bffRequest<LocalOrder>("/api/admin/orders", {
+  return bffRequest<CreatedOrderResponse>("/api/admin/orders", {
     method: "POST",
     headers,
     body: payload,
@@ -534,6 +547,22 @@ export async function updateProduct(id: string, payload: ProductUpdatePayload) {
     method: "PATCH",
     body: payload,
   });
+}
+
+/**
+ * Sets availability (staff may do this too). The backend endpoint flips the
+ * flag, so if someone else changed it meanwhile, flip once more to land on
+ * the requested state.
+ */
+export async function setProductAvailability(id: string, available: boolean) {
+  const path = `/api/admin/products/${id}/availability`;
+  // Empty body: the admin middleware requires a Content-Length on writes.
+  const flip = () => bffRequest<Product>(path, { method: "PATCH", body: {} });
+  let product = await flip();
+  if (product.is_available !== available) {
+    product = await flip();
+  }
+  return product;
 }
 
 export async function deleteProduct(id: string) {
@@ -929,6 +958,20 @@ export interface StoreOfferItem {
   flavor_id?: string;
   flavor_ids?: string[];
   expires_at: string;
+}
+
+export type WeekDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+export type WeeklyHours = Record<WeekDay, { open: string; close: string }[]>;
+
+export async function getStoreHours() {
+  return bffRequest<{ days: WeeklyHours }>("/api/admin/settings/hours");
+}
+
+export async function updateStoreHours(days: Partial<WeeklyHours>) {
+  return bffRequest<{ days: WeeklyHours }>("/api/admin/settings/hours", {
+    method: "PUT",
+    body: { days },
+  });
 }
 
 export async function getAdminStoreSettings() {

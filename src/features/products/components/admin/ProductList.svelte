@@ -276,13 +276,93 @@
         disabled={busy}
       >
         <Icon icon="lucide:plus" class="h-4 w-4" />
-        Producto
+        Nuevo producto
       </button>
     </div>
 
-    <!-- Table -->
+    <!-- Phones: one card per product, so the switch and actions stay in reach. -->
+    <ul class="space-y-2 md:hidden" aria-label="Productos">
+      {#if filteredProducts.length === 0}
+        <li
+          class="rounded-box border border-base-300 p-6 text-center text-base-content/60"
+        >
+          No hay productos
+        </li>
+      {/if}
+      {#each visibleProducts as product (product.id)}
+        {@const offer = offerByProductId.get(product.id)}
+        <li class="rounded-box border border-base-300 bg-base-100 p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="font-semibold leading-tight">{product.name}</p>
+              <p class="text-sm text-base-content/65">
+                {product.category_name || "Sin categoría"} · {formatCurrency(
+                  product.price,
+                )}
+              </p>
+              {#if offer}
+                <span
+                  class="badge badge-sm mt-1 border-0 bg-primary/10 text-primary"
+                  >Oferta activa</span
+                >
+              {/if}
+            </div>
+            <label class="flex shrink-0 items-center gap-2 text-sm">
+              <span class={product.is_available ? "" : "text-base-content/60"}>
+                {product.is_available ? "Disponible" : "Agotado"}
+              </span>
+              <input
+                class="toggle toggle-primary toggle-sm"
+                type="checkbox"
+                checked={product.is_available}
+                onchange={(event) =>
+                  onToggleAvailability(
+                    product,
+                    (event.currentTarget as HTMLInputElement).checked,
+                  )}
+                disabled={busy}
+                aria-label={`${product.name} disponible`}
+              />
+            </label>
+          </div>
+          <div
+            class="mt-2 flex justify-end gap-1 border-t border-base-300 pt-2"
+          >
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              onclick={() => onOpenOfferPanel(product)}
+              disabled={busy}
+            >
+              <Icon icon="lucide:tag" class="h-4 w-4" aria-hidden="true" />
+              Oferta
+            </button>
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              onclick={() => onEdit(product)}
+              disabled={busy}
+            >
+              <Icon icon="lucide:pencil" class="h-4 w-4" aria-hidden="true" />
+              Editar
+            </button>
+            <button
+              class="btn btn-ghost btn-sm btn-square text-error"
+              type="button"
+              onclick={() => onRequestDelete(product)}
+              disabled={busy}
+              aria-label={`Eliminar ${product.name}`}
+            >
+              <Icon icon="lucide:trash-2" class="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </li>
+      {/each}
+    </ul>
+
+    <!-- Table (tablet and up) -->
     <div
-      class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
+      class="hidden overflow-x-auto rounded-box border border-base-content/5 bg-base-100 md:block"
     >
       <table class="table w-full">
         <thead class="bg-base-200/60 text-base-content">

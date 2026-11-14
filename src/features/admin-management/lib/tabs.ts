@@ -15,6 +15,16 @@ export const TAB_LABELS: Record<TabKey, string> = {
   analitica: "Analítica",
 };
 
+/** Icons for the phone bottom navigation. */
+export const TAB_ICONS: Record<TabKey, string> = {
+  ordenes: "lucide:receipt-text",
+  categorias: "lucide:layout-grid",
+  productos: "lucide:ice-cream-cone",
+  inventario: "lucide:package",
+  personas: "lucide:users",
+  analitica: "lucide:chart-line",
+};
+
 export const ADMIN_ONLY_TABS = new Set<TabKey>([
   "categorias",
   "productos",

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { TAB_LABELS as SHARED_TAB_LABELS } from "../lib/tabs";
+  import StoreHoursEditor from "@features/settings/components/StoreHoursEditor.svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import AdminModalShell from "./shared/AdminModalShell.svelte";
   import AdminFormActions from "./shared/AdminFormActions.svelte";
@@ -22,13 +24,8 @@
     onRunArchive: () => void;
   }
 
-  const TAB_LABELS: Record<string, string> = {
-    ordenes: "Órdenes",
-    categorias: "Categorías",
-    productos: "Productos",
-    personas: "Personas",
-    analitica: "Analítica",
-  };
+  // Shared with the panel header so names never drift.
+  const TAB_LABELS: Record<string, string> = SHARED_TAB_LABELS;
 
   let {
     tabOrder,
@@ -234,9 +231,9 @@
   <div id="navegacion-panel" class="card bg-base-100 shadow">
     <div class="card-body gap-4">
       <div>
-        <h2 class="card-title">Navegacion del panel</h2>
+        <h2 class="card-title">Navegación del panel</h2>
         <p class="text-sm text-base-content/70">
-          Reordena las pestanas globales del panel administrativo.
+          Reordena las pestañas globales del panel administrativo.
         </p>
       </div>
 
@@ -290,9 +287,9 @@
   <div id="operacion-tienda" class="card bg-base-100 shadow">
     <div class="card-body gap-4">
       <div>
-        <h2 class="card-title">Operacion de tienda</h2>
+        <h2 class="card-title">Operación de tienda</h2>
         <p class="text-sm text-base-content/70">
-          Controla si los clientes pueden crear pedidos publicos.
+          Controla cuándo los clientes pueden hacer pedidos en línea.
         </p>
       </div>
 
@@ -305,8 +302,8 @@
           </p>
           <p class="text-sm text-base-content/60">
             {storeOrdersEnabled
-              ? "El catalogo es visible y los clientes pueden ordenar."
-              : "El catalogo es visible pero no se aceptan nuevos pedidos publicos."}
+              ? "El catálogo es visible y los clientes pueden ordenar."
+              : "El catálogo es visible pero no se aceptan nuevos pedidos públicos."}
           </p>
         </div>
         <input
@@ -325,6 +322,8 @@
             : "Pedidos pausados"}
         />
       </div>
+
+      <StoreHoursEditor />
     </div>
   </div>
 
@@ -550,8 +549,8 @@
         <div>
           <p class="font-medium text-base-content">
             {localArchiveConfig.enabled
-              ? "Archivo automatico activo"
-              : "Archivo automatico pausado"}
+              ? "Archivo automático activo"
+              : "Archivo automático pausado"}
           </p>
           <p class="text-sm text-base-content/60">
             {localArchiveConfig.enabled
@@ -571,8 +570,8 @@
             )}
           disabled={busy}
           aria-label={localArchiveConfig.enabled
-            ? "Archivo automatico activo"
-            : "Archivo automatico pausado"}
+            ? "Archivo automático activo"
+            : "Archivo automático pausado"}
         />
       </div>
 
@@ -632,13 +631,13 @@
 
 <AdminModalShell
   bind:dialogRef={confirmPauseDialog}
-  title="Pausar pedidos publicos"
+  title="Pausar pedidos públicos"
   icon="lucide:pause-circle"
   widthClass="max-w-md"
   onClose={() => {}}
 >
   <p>
-    Los clientes podran seguir viendo el catalogo, pero no podran crear pedidos
+    Los clientes podrán seguir viendo el catálogo, pero no podrán crear pedidos
     nuevos hasta reactivar la tienda.
   </p>
   <AdminFormActions
@@ -653,7 +652,7 @@
 
 <AdminModalShell
   bind:dialogRef={confirmPauseArchiveDialog}
-  title="Pausar archivo automatico"
+  title="Pausar archivo automático"
   icon="lucide:archive-x"
   widthClass="max-w-md"
   onClose={() => {}}

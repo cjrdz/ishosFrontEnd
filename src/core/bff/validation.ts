@@ -156,6 +156,16 @@ export const storeSettingsUpdateSchema = z.object({
   offers: z.array(offerItemSchema).max(50),
 });
 
+// Weekly opening hours. Shape only; the backend checks order and overlaps.
+const clockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+const timeRangeSchema = z.object({ open: clockSchema, close: clockSchema });
+export const storeHoursUpdateSchema = z.object({
+  days: z.partialRecord(
+    z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
+    z.array(timeRangeSchema).max(3),
+  ),
+});
+
 export const archiveConfigUpdateSchema = z.object({
   enabled: z.boolean(),
   age_days: z.number().int().nonnegative(),

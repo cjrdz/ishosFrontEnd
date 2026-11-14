@@ -55,14 +55,15 @@ export default defineConfig({
         "default-src 'self'",
         // Product images are served from the R2 public bucket.
         "img-src 'self' data: blob: https://*.r2.dev",
-        "font-src 'self' https://fonts.gstatic.com",
+        // Fonts are self-hosted (@fontsource), bundled under /_astro.
+        "font-src 'self'",
         "connect-src 'self'",
         // Google Maps embed on /about.
         'frame-src https://www.google.com',
         "manifest-src 'self'",
       ],
       styleDirective: {
-        resources: ["'self'", 'https://fonts.googleapis.com'],
+        resources: ["'self'"],
       },
       scriptDirective: {
         resources: ["'self'"],

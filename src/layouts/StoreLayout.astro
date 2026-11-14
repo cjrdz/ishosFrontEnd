@@ -4,10 +4,9 @@ import "../styles/variables.css";
 import { ClientRouter } from "astro:transitions";
 import StoreNavbar from "@shared/components/StoreNavbar.astro";
 import StoreFooter from "@shared/components/StoreFooter.astro";
-import Icon from "@shared/components/AppIcon.svelte";
 import { inlineScript } from "@shared/csp/inline-script";
+import Toaster from "@shared/toast/Toaster.svelte";
 import storeThemeSource from "./inline/store-theme.js?raw";
-import storeCartToastSource from "./inline/store-cart-toast.js?raw";
 
 interface Props {
   title: string;
@@ -18,7 +17,6 @@ const { title } = Astro.props as Props;
 // Inline (not bundled) so the theme applies before first paint; their hashes
 // are registered with the page CSP.
 const storeThemeScript = await inlineScript(Astro, storeThemeSource);
-const storeCartToastScript = await inlineScript(Astro, storeCartToastSource);
 ---
 
 <!doctype html>
@@ -47,21 +45,11 @@ const storeCartToastScript = await inlineScript(Astro, storeCartToastSource);
       <slot />
     </main>
     <StoreFooter transition:animate="none" />
-
-    <div
-      id="store-cart-toast"
-      class="toast toast-end toast-top z-70 hidden"
-      aria-live="polite"
-    >
-      <div
-        class="alert store-cart-toast-alert bg-base-100 border border-base-300 shadow-xl rounded-2xl"
-      >
-        <Icon icon="lucide:shopping-bag" class="h-5 w-5 text-primary" />
-        <span id="store-cart-toast-text" class="font-medium text-sm"></span>
-      </div>
-    </div>
-
-    <script is:inline set:html={storeCartToastScript} />
+    <Toaster
+      client:load
+      placement="center"
+      transition:persist="store-toaster"
+    />
 
     <script>
       import { animate } from "motion";
@@ -107,27 +95,6 @@ const storeCartToastScript = await inlineScript(Astro, storeCartToastSource);
       }
     </script>
 
-    <style is:global>
-      #store-cart-toast .store-cart-toast-alert {
-        opacity: 0;
-        transform: translateY(-10px) scale(0.98);
-        transition:
-          opacity 220ms ease,
-          transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
-        will-change: opacity, transform;
-      }
-
-      #store-cart-toast.store-cart-toast-visible .store-cart-toast-alert {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        #store-cart-toast .store-cart-toast-alert {
-          transition: none;
-          transform: none;
-        }
-      }
-    </style>
+    <style is:global></style>
   </body>
 </html>

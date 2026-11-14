@@ -126,13 +126,13 @@
             <button
               type="button"
               onclick={() => setOrderStatusFilter("pendiente_revision")}
-              >Pendiente</button
+              >Por revisar</button
             >
           </li>
           <li>
             <button
               type="button"
-              onclick={() => setOrderStatusFilter("recibida")}>Recibida</button
+              onclick={() => setOrderStatusFilter("recibida")}>Aceptada</button
             >
           </li>
           <li>
@@ -158,7 +158,7 @@
             <button
               type="button"
               onclick={() => setOrderStatusFilter("cancelada")}
-              >Cancelada</button
+              >Rechazada</button
             >
           </li>
         </ul>
@@ -186,7 +186,7 @@
         disabled={busy}
       >
         <Icon icon="lucide:plus" class="h-4 w-4" />
-        Orden
+        Nueva orden
       </button>
     </div>
 

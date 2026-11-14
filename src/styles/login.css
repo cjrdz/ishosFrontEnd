@@ -248,7 +248,8 @@
     box-shadow 0.25s var(--motion-smooth),
     opacity 0.2s ease;
   background: var(--ishos-teal);
-  color: #fff;
+  /* Theme-aware: white on light-mode teal, dark ink on dark-mode teal. */
+  color: var(--color-primary-content);
   box-shadow:
     0 2px 0 0 rgb(255 255 255 / 0.08) inset,
     0 4px 16px rgb(0 0 0 / 0.22);

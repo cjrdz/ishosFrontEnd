@@ -4,6 +4,7 @@
   import Icon from "@shared/components/AppIcon.svelte";
   import {
     ADMIN_ONLY_TABS,
+    TAB_ICONS,
     TAB_LABELS,
     type TabKey,
   } from "@features/admin-management/lib/tabs";
@@ -71,7 +72,7 @@
 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <div>
     <h1
-      class="text-xl sm:text-2xl font-bold tracking-tight text-base-content/90"
+      class="font-display font-bold text-4xl sm:text-5xl leading-none text-base-content"
     >
       Panel administrativo
     </h1>
@@ -138,7 +139,10 @@
   </div>
 </div>
 
-<div class="overflow-x-auto pb-1">
+<div
+  class="admin-top-tabs overflow-x-auto pb-1"
+  class:admin-top-tabs--with-bottom-nav={visibleTabs.length > 1}
+>
   <div
     role="tablist"
     class="tabs tabs-box bg-base-100 border border-base-200 shadow-sm p-1 w-max min-w-full sm:w-fit sm:min-w-0"
@@ -155,3 +159,83 @@
     {/each}
   </div>
 </div>
+
+{#if visibleTabs.length > 1}
+  <!-- Phones: tabs within thumb reach. Tablets and up keep the top tabs. -->
+  <nav class="admin-bottom-nav" aria-label="Secciones del panel">
+    {#each visibleTabs as tab (tab)}
+      <button
+        type="button"
+        class="admin-bottom-nav__item"
+        aria-current={activeTab === tab ? "page" : undefined}
+        onclick={() => onTabChange(tab)}
+      >
+        <Icon icon={TAB_ICONS[tab]} class="size-5" aria-hidden="true" />
+        <span>{TAB_LABELS[tab]}</span>
+      </button>
+    {/each}
+  </nav>
+{/if}
+
+<style>
+  .admin-bottom-nav {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    padding: 0.35rem 0.25rem calc(0.35rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-base-300);
+    background: color-mix(in oklab, var(--color-base-100) 94%, transparent);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 -6px 20px rgb(0 0 0 / 0.08);
+  }
+
+  .admin-bottom-nav__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    min-height: 3rem;
+    padding: 0.25rem 0;
+    border-radius: 0.75rem;
+    color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+    font-size: 0.68rem;
+    font-weight: 600;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+  }
+
+  .admin-bottom-nav__item span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-bottom-nav__item[aria-current="page"] {
+    color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  }
+
+  .admin-bottom-nav__item:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* Phones use the bottom bar; scoped CSS here, since sm:hidden would lose to it. */
+  @media (max-width: 639px) {
+    .admin-top-tabs--with-bottom-nav {
+      display: none;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .admin-bottom-nav {
+      display: none;
+    }
+  }
+</style>

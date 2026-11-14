@@ -132,6 +132,35 @@
     onOpenContainerTypes();
     onClose();
   }
+
+  // Each <select> renders a single {#each} over a prepared list (placeholder
+  // included): extra blocks or nodes beside it trip the browser's
+  // select-content check.
+  type SelectOption = { key: string; value: string; label: string };
+  const flavorOptions = $derived<SelectOption[]>([
+    { key: "", value: "", label: "Seleccionar sabor..." },
+    ...flavorItems.map((item) => ({
+      key: item.id,
+      value: item.flavor_id ?? item.id,
+      label: item.name,
+    })),
+  ]);
+  const containerOptions = $derived<SelectOption[]>([
+    { key: "", value: "", label: "Seleccionar..." },
+    ...containerTypes.map((ct) => ({
+      key: ct.id,
+      value: ct.id,
+      label: `${ct.name} (${ct.is_custom ? "personalizado" : `${ct.balls_per_container} bolas`})`,
+    })),
+  ]);
+  const unitOptions = $derived<SelectOption[]>([
+    { key: "", value: "", label: "Seleccionar producto..." },
+    ...unitItems.map((item) => ({
+      key: item.id,
+      value: item.id,
+      label: item.name,
+    })),
+  ]);
 </script>
 
 <AdminModalShell
@@ -178,11 +207,8 @@
             bind:value={flavorForm.flavor_id}
             required
           >
-            <option value="">Seleccionar sabor...</option>
-            {#each flavorItems as item (item.id)}
-              <option value={item.flavor_id ?? item.id}>
-                {item.name}
-              </option>
+            {#each flavorOptions as option (option.key)}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
         </div>
@@ -204,16 +230,8 @@
             bind:value={flavorForm.container_type_id}
             required
           >
-            <option value="">Seleccionar...</option>
-            {#each containerTypes as ct (ct.id)}
-              <option value={ct.id}>
-                {ct.name}
-                {#if !ct.is_custom}
-                  ({ct.balls_per_container} bolas)
-                {:else}
-                  (custom)
-                {/if}
-              </option>
+            {#each containerOptions as option (option.key)}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
         </div>
@@ -271,9 +289,8 @@
             bind:value={unitForm.inventory_item_id}
             required
           >
-            <option value="">Seleccionar producto...</option>
-            {#each unitItems as item (item.id)}
-              <option value={item.id}>{item.name}</option>
+            {#each unitOptions as option (option.key)}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
         </div>

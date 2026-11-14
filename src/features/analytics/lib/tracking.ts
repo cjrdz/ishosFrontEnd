@@ -41,6 +41,45 @@ export const TRACKING_STATUS_LABELS: Record<PublicOrderStatus, string> = {
   cancelada: "Cancelada",
 };
 
+/** Customer-facing headline for each status; `lista` depends on the order type. */
+export function trackingHeadline(
+  status: PublicOrderStatus,
+  orderType?: string,
+): { title: string; body: string } {
+  switch (status) {
+    case "pendiente_revision":
+      return {
+        title: "Recibimos tu pedido",
+        body: "En un momento lo confirmamos.",
+      };
+    case "recibida":
+      return {
+        title: "Pedido confirmado",
+        body: "Pronto empezamos a prepararlo.",
+      };
+    case "en_proceso":
+      return { title: "Estamos preparando tu pedido", body: "Ya casi está." };
+    case "lista":
+      return {
+        title: "¡Tu pedido está listo!",
+        body:
+          orderType === "en_local"
+            ? "Te lo llevamos en un momento."
+            : "Pasa a recogerlo al mostrador.",
+      };
+    case "entregada":
+      return {
+        title: "¡Que lo disfrutes!",
+        body: "Gracias por pedir en Isho's Factory.",
+      };
+    case "cancelada":
+      return {
+        title: "Pedido cancelado",
+        body: "Contáctanos si tienes alguna duda.",
+      };
+  }
+}
+
 export const TRACKING_STATUS_ICONS_ACTIVE: Record<PublicOrderStatus, string> = {
   pendiente_revision: "line-md:watch-loop",
   recibida: "line-md:confirm-circle",
