@@ -10,6 +10,14 @@
     openConfirmDialog,
   } from "@shared/utils/confirm-dialog";
   import EmployeeList from "./EmployeeList.svelte";
+  import { onMount } from "svelte";
+  import {
+    listLocations,
+    type AdminLocation,
+  } from "@features/admin-management/lib/bff";
+  import { ROLE_LABELS } from "@features/admin-management/lib/roles";
+
+  type Role = "admin" | "manager" | "employee";
 
   interface Props {
     employees: Employee[];
@@ -20,7 +28,8 @@
       password: string;
       name?: string;
       phone?: string;
-      role: "admin" | "employee";
+      role: Role;
+      location_id?: string;
       state: "active" | "inactive";
     }) => void;
     onUpdate: (
@@ -30,7 +39,8 @@
         password?: string;
         name?: string;
         phone?: string;
-        role: "admin" | "employee";
+        role: Role;
+        location_id?: string;
         state: "active" | "inactive";
       },
     ) => void;
@@ -61,8 +71,27 @@
     password: "",
     name: "",
     phone: "",
-    role: "employee" as "admin" | "employee",
+    role: "employee" as Role,
+    location_id: "",
     state: "active" as "active" | "inactive",
+  });
+
+  let locations = $state<AdminLocation[]>([]);
+  const locationNames = $derived(
+    Object.fromEntries(locations.map((l) => [l.id, l.name])),
+  );
+  // Managers and employees work at exactly one location; admins see all.
+  const needsLocation = $derived(form.role !== "admin");
+  const locationMissing = $derived(needsLocation && !form.location_id);
+
+  onMount(() => {
+    void listLocations()
+      .then(({ data }) => {
+        locations = (data ?? []).filter((l) => l.is_active);
+      })
+      .catch(() => {
+        locations = [];
+      });
   });
 
   const isEditing = $derived(!!editingEmployeeId);
@@ -88,6 +117,7 @@
       name: "",
       phone: "",
       role: "employee",
+      location_id: locations.length === 1 ? locations[0].id : "",
       state: "active",
     };
   }
@@ -109,7 +139,10 @@
       password: "",
       name: employee.name || "",
       phone: employee.phone || "",
-      role: employee.role,
+      role: (["admin", "manager", "employee"].includes(employee.role)
+        ? employee.role
+        : "employee") as Role,
+      location_id: employee.location_id || "",
       state: employee.state === "inactive" ? "inactive" : "active",
     };
     employeeEditorDialog?.showModal();
@@ -117,6 +150,8 @@
 
   function submit(event: SubmitEvent) {
     event.preventDefault();
+    if (locationMissing) return;
+    const location_id = needsLocation ? form.location_id : "";
 
     if (editingEmployeeId) {
       onUpdate(editingEmployeeId, {
@@ -125,6 +160,7 @@
         name: form.name.trim() || undefined,
         phone: form.phone.trim() || undefined,
         role: form.role,
+        location_id,
         state: form.state,
       });
       closeEmployeeEditor();
@@ -137,6 +173,7 @@
       name: form.name.trim() || undefined,
       phone: form.phone.trim() || undefined,
       role: form.role,
+      location_id,
       state: form.state,
     });
     closeEmployeeEditor();
@@ -176,7 +213,7 @@
   function requestDelete(employee: Employee) {
     openConfirm(
       "Eliminar empleado",
-      `Eliminar permanentemente ${employee.email}? Esta accion no se puede deshacer.`,
+      `Eliminar permanentemente ${employee.email}? Esta acción no se puede deshacer.`,
       () => onDelete(employee.id),
     );
   }
@@ -211,6 +248,16 @@
       },
     );
   }
+
+  const lockoutOptions = $derived(
+    lockoutCandidateEmployees.length === 0
+      ? [{ id: "", label: "No hay empleados", disabled: true }]
+      : lockoutCandidateEmployees.map((employee) => ({
+          id: employee.id,
+          label: `${employee.email} (${employee.role})`,
+          disabled: false,
+        })),
+  );
 </script>
 
 <section class="space-y-4">
@@ -221,6 +268,7 @@
   <EmployeeList
     {employees}
     {busy}
+    {locationNames}
     onCreateEmployee={openCreateEmployeeModal}
     onToggleState={toggleEmployeeState}
     onEdit={editEmployee}
@@ -253,7 +301,7 @@
 
     <div class="form-control">
       <span id="employee-password-label" class="label-text text-xs mb-1"
-        >Contrasena {isEditing ? "(opcional)" : ""}</span
+        >Contraseña {isEditing ? "(opcional)" : ""}</span
       >
       <input
         id="employee-password"
@@ -280,7 +328,7 @@
 
     <div class="form-control">
       <span id="employee-phone-label" class="label-text text-xs mb-1"
-        >Telefono</span
+        >Teléfono</span
       >
       <input
         id="employee-phone"
@@ -298,10 +346,41 @@
         bind:value={form.role}
         aria-labelledby="employee-role-label"
       >
-        <option value="employee">employee</option>
-        <option value="admin">admin</option>
+        <option value="employee">{ROLE_LABELS.employee}</option>
+        <option value="manager">{ROLE_LABELS.manager}</option>
+        <option value="admin">{ROLE_LABELS.admin}</option>
       </select>
+      <span class="mt-1 text-xs text-ink-muted">
+        {#if form.role === "admin"}
+          Ve y administra todas las sucursales.
+        {:else if form.role === "manager"}
+          Órdenes, inventario y horario de su sucursal.
+        {:else}
+          Órdenes y agotados de su sucursal.
+        {/if}
+      </span>
     </div>
+
+    {#if needsLocation}
+      <div class="form-control">
+        <span id="employee-location-label" class="label-text text-xs mb-1"
+          >Sucursal</span
+        >
+        <select
+          id="employee-location"
+          class="select select-bordered select-sm w-full"
+          bind:value={form.location_id}
+          aria-labelledby="employee-location-label"
+          aria-invalid={locationMissing}
+          required
+        >
+          <option value="" disabled>Elige dónde trabaja</option>
+          {#each locations as location (location.id)}
+            <option value={location.id}>{location.name}</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
 
     <div class="form-control">
       <span class="label-text text-xs mb-1">Estado</span>
@@ -353,19 +432,16 @@
         bind:value={lockoutResetForm.employeeID}
         required
       >
-        {#if lockoutCandidateEmployees.length === 0}
-          <option value="" disabled selected>No hay empleados</option>
-        {:else}
-          {#each lockoutCandidateEmployees as employee}
-            <option value={employee.id}>
-              {employee.email} ({employee.role})
-            </option>
-          {/each}
-        {/if}
+        <!-- One {#each} only: an {#if} inside <select> leaves an invalid text anchor. -->
+        {#each lockoutOptions as option (option.id)}
+          <option value={option.id} disabled={option.disabled}
+            >{option.label}</option
+          >
+        {/each}
       </select>
     </div>
 
-    <p class="text-xs text-base-content/60">
+    <p class="text-xs text-ink-muted">
       Por seguridad, los identificadores sensibles del empleado no se muestran
       aqui.
     </p>

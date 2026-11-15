@@ -8,8 +8,10 @@
   } from "@features/admin-management";
   import {
     getAdminStoreSettings,
+    setProductAvailability,
     updateAdminStoreSettings,
   } from "@features/admin-management/lib/bff";
+  import { undoableAction } from "@shared/toast/toast";
   import ProductList from "./ProductList.svelte";
   import ProductEditorDialog from "./ProductEditorDialog.svelte";
   import ImageGalleryPanel from "./ImageGalleryPanel.svelte";
@@ -69,8 +71,15 @@
   let offerError = $state("");
   let offerNotice = $state("");
 
-  let pendingToggleProduct = $state<Product | null>(null);
-  let pendingToggleValue = $state(false);
+  /** Availability shown while a change is pending or after it was saved. */
+  let availabilityOverrides = $state<Record<string, boolean>>({});
+  const listedProducts = $derived(
+    products.map((product) =>
+      product.id in availabilityOverrides
+        ? { ...product, is_available: availabilityOverrides[product.id] }
+        : product,
+    ),
+  );
 
   const now = $state(Date.now());
   const activeOfferByProductId = $derived(
@@ -249,42 +258,28 @@
     checked: boolean,
   ) {
     if (checked === product.is_available) return;
-    pendingToggleProduct = product;
-    pendingToggleValue = checked;
-    openConfirmDialog(
-      confirmDialog,
-      checked ? "Activar producto" : "Desactivar producto",
-      checked
-        ? `¿Seguro que deseas activar ${product.name}?`
-        : `¿Seguro que deseas desactivar ${product.name}?`,
-      confirmToggleProductAvailability,
-    );
-  }
-
-  function confirmToggleProductAvailability() {
-    if (!pendingToggleProduct) return;
-    const product = pendingToggleProduct;
-    const nextAvailability = pendingToggleValue;
-    pendingToggleProduct = null;
-    pendingToggleValue = false;
-
-    onUpdate(product.id, {
-      name: product.name,
-      description: product.description,
-      price: product.price,
-      category_id: product.category_id || "",
-      image_path: product.image_path || undefined,
-      is_available: nextAvailability,
-      ball_based: product.ball_based,
-      ball_quantity: product.ball_quantity,
-      allows_mixed_flavors: product.allows_mixed_flavors,
-      free_toppings: product.free_toppings,
+    const previous = product.is_available;
+    availabilityOverrides = { ...availabilityOverrides, [product.id]: checked };
+    undoableAction({
+      message: checked
+        ? `${product.name} activado`
+        : `${product.name} desactivado`,
+      undo: () => {
+        availabilityOverrides = {
+          ...availabilityOverrides,
+          [product.id]: previous,
+        };
+      },
+      commit: async () => {
+        const saved = await setProductAvailability(product.id, checked);
+        availabilityOverrides = {
+          ...availabilityOverrides,
+          [product.id]: saved.is_available,
+        };
+        trackAction("admin_product_availability_toggled", { id: product.id });
+      },
+      failureMessage: `No se pudo actualizar ${product.name}. Se revirtió.`,
     });
-  }
-
-  function clearPendingToggle() {
-    pendingToggleProduct = null;
-    pendingToggleValue = false;
   }
 
   function setOfferNotice(message: string) {
@@ -305,7 +300,7 @@
       offerError =
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo cargar la configuracion de ofertas";
+          : "No se pudo cargar la configuración de ofertas";
     } finally {
       offerBusy = false;
     }
@@ -371,7 +366,7 @@
   {/if}
 
   <ProductList
-    {products}
+    products={listedProducts}
     {categories}
     {busy}
     offerByProductId={activeOfferByProductId}
@@ -436,8 +431,5 @@
   {busy}
   variant="error"
   onConfirm={() => confirmDialogNow(confirmDialog)}
-  onCancel={() => {
-    clearPendingToggle();
-    closeConfirmDialog(confirmDialog);
-  }}
+  onCancel={() => closeConfirmDialog(confirmDialog)}
 />

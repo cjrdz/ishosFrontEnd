@@ -1,9 +1,204 @@
-@import url("https://fonts.googleapis.com/css2?family=Amatic+SC:wght@400;700&family=Roboto:wght@400;500;700&display=swap");
+/* Self-hosted fonts (bundled by Vite): no third-party request on first paint. */
+@import "@fontsource/roboto/latin-400.css";
+@import "@fontsource/roboto/latin-500.css";
+@import "@fontsource/roboto/latin-700.css";
+@import "@fontsource/amatic-sc/latin-400.css";
+@import "@fontsource/amatic-sc/latin-700.css";
 @import "tailwindcss";
 @import "./variables.css";
-@import "./order-steps.css";
+@import "./brand.css";
+
+/* Brand type: hand-lettered Amatic SC for headings (as in the prototype and
+   the login), Roboto for everything people read or tap. */
+@theme {
+  --font-display: "Amatic SC", "Comic Sans MS", cursive;
+  --font-sans: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
 @plugin "daisyui" {
-  themes: all;
+  /* Only the themes the app uses (src/shared/theme/constants.ts). */
+  themes:
+    fantasy --default,
+    night;
+}
+
+/*
+ * Isho's brand (Manual de Marca) applied to daisyUI's tokens, so every
+ * component uses the same palette. Theme names stay "fantasy" and "night" so
+ * preferences saved in visitors' browsers keep working.
+ *
+ * Día = menu paper: cream page (base-200), white cards (base-100), wine ink.
+ * Noche = wine-cacao, not grey: cream text, mint primary with wine text.
+ * Brand teal #00b2a9 is a colour field and always carries wine text (5.1:1),
+ * never white (2.6:1). Small teal text uses --color-price (#00756f, 5.6:1).
+ */
+@plugin "daisyui/theme" {
+  name: "fantasy";
+  default: true;
+  color-scheme: light;
+  --color-base-100: #ffffff;
+  --color-base-200: #fff8ec;
+  --color-base-300: #e8d9c4;
+  --color-base-content: #2a1418;
+  --color-primary: #63001f;
+  --color-primary-content: #fff8ec;
+  --color-secondary: #00b2a9;
+  --color-secondary-content: #3a0012;
+  --color-accent: #f9e9a9;
+  --color-accent-content: #63001f;
+  --color-neutral: #2a1418;
+  --color-neutral-content: #fff8ec;
+  --color-info: #00756f;
+  --color-info-content: #ffffff;
+  --color-success: #1f6b3a;
+  --color-success-content: #ffffff;
+  --color-warning: #f5c26b;
+  --color-warning-content: #3d2400;
+  --color-error: #a3122e;
+  --color-error-content: #ffffff;
+  --radius-selector: 999px;
+  --radius-field: 0.875rem;
+  --radius-box: 1.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "night";
+  prefersdark: true;
+  color-scheme: dark;
+  /* Wine-cacao night; page (200) < surface (100) < raised/borders (300). */
+  --color-base-100: #281319;
+  --color-base-200: #1b0b10;
+  --color-base-300: #4a2a31;
+  --color-base-content: #fbf0d5;
+  --color-primary: #91e2d6;
+  --color-primary-content: #3a0012;
+  --color-secondary: #f9b4da;
+  --color-secondary-content: #3a0012;
+  --color-accent: #f9e9a9;
+  --color-accent-content: #3a0012;
+  --color-neutral: #35191f;
+  --color-neutral-content: #fbf0d5;
+  --color-info: #2cc9be;
+  --color-info-content: #0f1f1d;
+  --color-success: #7fd69a;
+  --color-success-content: #0f2418;
+  --color-warning: #f5c26b;
+  --color-warning-content: #2e1d00;
+  --color-error: #ff8a9b;
+  --color-error-content: #3a0012;
+  --radius-selector: 999px;
+  --radius-field: 0.875rem;
+  --radius-box: 1.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/*
+ * Brand tokens beyond daisyUI's set (measured against their backgrounds,
+ * all WCAG AA). Exposed as Tailwind colours below: text-price, bg-pink-tint,
+ * text-ink-muted, bg-st-review, text-st-review-ink, ...
+ */
+:root,
+[data-theme="fantasy"] {
+  --brand-ink-muted: #6e4f55; /* 6.8:1 on paper */
+  --brand-price: #00756f; /* 5.6:1 on paper */
+  --brand-head: #63001f;
+  --brand-highlight: #f9e9a9;
+  --brand-menu-bar: #63001f;
+  --brand-menu-bar-ink: #fff8ec;
+  --brand-pink-tint: #fce4f0;
+  --brand-cream-tint: #fbf0c9;
+  --brand-mint-tint: #ddf4ef;
+  --brand-rays-a: #00b2a9;
+  --brand-rays-b: #0fbab0;
+  --brand-hero-ink: #3a0012;
+  --brand-foot-bg: #00b2a9;
+  --brand-foot-ink: #3a0012;
+  --brand-foot-chip: rgb(255 248 236 / 0.8);
+  --brand-scallop-a: #00b2a9;
+  --brand-scallop-b: #f9b4da;
+  --brand-scoop-line: #63001f;
+  --brand-shadow: 42 20 24;
+  /* Order states: colour + symbol + text. */
+  --st-review: #fff1d6;
+  --st-review-ink: #8a4b00;
+  --st-accepted: #ddf4ef;
+  --st-accepted-ink: #00756f;
+  --st-preparing: #fce4f0;
+  --st-preparing-ink: #63001f;
+  --st-ready: #e3f4e8;
+  --st-ready-ink: #1f6b3a;
+  --st-done: #efe6da;
+  --st-done-ink: #4e3a3e;
+  --st-late: #fde8ec;
+  --st-late-ink: #a3122e;
+}
+
+[data-theme="night"] {
+  --brand-ink-muted: #c9b3a9;
+  --brand-price: #2cc9be;
+  --brand-head: #fbf0d5;
+  --brand-highlight: #63001f;
+  --brand-menu-bar: #63001f;
+  --brand-menu-bar-ink: #fbf0d5;
+  --brand-pink-tint: #3b1726;
+  --brand-cream-tint: #3a3015;
+  --brand-mint-tint: #12332f;
+  --brand-rays-a: #0e4743;
+  --brand-rays-b: #114f4a;
+  --brand-hero-ink: #fbf0d5;
+  --brand-foot-bg: #0e4743;
+  --brand-foot-ink: #fbf0d5;
+  --brand-foot-chip: rgb(27 11 16 / 0.6);
+  --brand-scallop-a: #0e4743;
+  --brand-scallop-b: #63001f;
+  --brand-scoop-line: #fbf0d5;
+  --brand-shadow: 0 0 0;
+  --st-review: #3a3015;
+  --st-review-ink: #f5c26b;
+  --st-accepted: #12332f;
+  --st-accepted-ink: #91e2d6;
+  --st-preparing: #3b1726;
+  --st-preparing-ink: #f9b4da;
+  --st-ready: #173322;
+  --st-ready-ink: #7fd69a;
+  --st-done: #35191f;
+  --st-done-ink: #d9c6bc;
+  --st-late: #3d141d;
+  --st-late-ink: #ff8a9b;
+}
+
+@theme inline {
+  --color-ink-muted: var(--brand-ink-muted);
+  --color-price: var(--brand-price);
+  --color-head: var(--brand-head);
+  --color-highlight: var(--brand-highlight);
+  --color-pink-tint: var(--brand-pink-tint);
+  --color-cream-tint: var(--brand-cream-tint);
+  --color-mint-tint: var(--brand-mint-tint);
+  --color-st-review: var(--st-review);
+  --color-st-review-ink: var(--st-review-ink);
+  --color-st-accepted: var(--st-accepted);
+  --color-st-accepted-ink: var(--st-accepted-ink);
+  --color-st-preparing: var(--st-preparing);
+  --color-st-preparing-ink: var(--st-preparing-ink);
+  --color-st-ready: var(--st-ready);
+  --color-st-ready-ink: var(--st-ready-ink);
+  --color-st-done: var(--st-done);
+  --color-st-done-ink: var(--st-done-ink);
+  --color-st-late: var(--st-late);
+  --color-st-late-ink: var(--st-late-ink);
+}
+
+/* Motion tokens: feedback, panels, entrances — one easing curve. */
+:root {
+  --dur-fast: 150ms;
+  --dur-panel: 250ms;
+  --dur-enter: 400ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
@@ -15,4 +210,79 @@ body {
   margin: 0;
   min-height: 100%;
   font-family: "Roboto", sans-serif;
+}
+
+/* ── Depth ──────────────────────────────────────────────────────────
+   Bordered surfaces (cards, panels, list items) get a soft elevation so
+   they separate from the page in both themes; dark mode adds a faint top
+   highlight, since shadows alone barely show on dark backgrounds. */
+.bg-base-100.border,
+.card.bg-base-100 {
+  box-shadow:
+    0 1px 2px rgb(var(--brand-shadow) / 0.05),
+    0 4px 14px rgb(var(--brand-shadow) / 0.06);
+}
+
+[data-theme="night"] .bg-base-100.border,
+[data-theme="night"] .card.bg-base-100 {
+  box-shadow:
+    inset 0 1px 0 rgb(251 240 213 / 0.05),
+    0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+/* Dark mode: fields sit slightly below their card instead of blending in. */
+[data-theme="night"] :is(.input, .select, .textarea) {
+  background-color: var(--color-base-200);
+}
+
+/* Press feedback on buttons (daisyUI handles colours; this adds the "give"). */
+.btn {
+  transition-property:
+    color, background-color, border-color, box-shadow, transform;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* Theme switch: the toggle reveals the new theme with a circular clip on the
+   view-transition snapshot (animated from ThemeToggle). Turn off the default
+   crossfade and every colour transition so the snapshot is clean, but keep
+   the toggle's own icon swap. */
+:root.theme-switching::view-transition-old(root),
+:root.theme-switching::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+:root.theme-switching::view-transition-old(root) {
+  z-index: 1;
+  opacity: 1;
+}
+:root.theme-switching::view-transition-new(root) {
+  z-index: 2;
+  /* Disc with a feathered rim; ThemeToggle grows it from the button. */
+  mask-image: radial-gradient(closest-side, #000 78%, transparent 100%);
+  mask-repeat: no-repeat;
+  mask-size: 0 0;
+}
+/* The store's page router (Astro ClientRouter) names <html> and the navbar
+   and hides their old snapshots; during a theme switch the page is captured
+   as one plain "root" snapshot instead, like the admin. */
+:root.theme-switching {
+  view-transition-name: root !important;
+}
+:root.theme-switching [data-astro-transition-scope] {
+  view-transition-name: none !important;
+}
+:root.theme-switching *:not(.theme-icon, .theme-icons),
+:root.theme-switching *::before,
+:root.theme-switching *::after {
+  transition: none !important;
 }

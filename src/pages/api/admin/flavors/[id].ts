@@ -22,6 +22,9 @@ export const GET: APIRoute = async (context) => {
 };
 
 export const PATCH: APIRoute = async (context) => {
+  // Catalog changes are admin-only (the backend enforces it too).
+  const adminError = requireAdmin(context);
+  if (adminError) return adminError;
   const id = requireUuidParam(context, "id");
   if (id instanceof Response) return id;
 

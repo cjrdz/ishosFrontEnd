@@ -7,6 +7,7 @@
 
 import type { APIRoute } from "astro";
 import { logout } from "@features/auth";
+import { SESSION_CACHE_COOKIE } from "@core/security/session-cache";
 
 export const prerender = false;
 
@@ -39,6 +40,7 @@ export const POST: APIRoute = async (context) => {
     context.cookies.delete("auth_token", {
       path: "/",
     });
+    context.cookies.delete(SESSION_CACHE_COOKIE, { path: "/" });
 
     // Call backend logout
     const response = await logout(token);
@@ -57,6 +59,7 @@ export const POST: APIRoute = async (context) => {
     context.cookies.delete("auth_token", {
       path: "/",
     });
+    context.cookies.delete(SESSION_CACHE_COOKIE, { path: "/" });
 
     return new Response(
       JSON.stringify({

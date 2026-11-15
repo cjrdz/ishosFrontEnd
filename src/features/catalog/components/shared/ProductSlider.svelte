@@ -220,43 +220,75 @@
     {#if showArrows && maxIndex > 0}
       <button
         class="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-30
-             btn btn-circle btn-sm bg-base-100/80 border-base-300/60
-             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-[var(--ishos-teal)]"
+             btn btn-circle btn-sm size-11 bg-base-100/80 border-base-300/60
+             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-primary"
         aria-label="Anterior"
         onclick={prev}
       >
-        <Icon icon="lucide:chevron-left" class="size-4" />
+        <Icon icon="lucide:chevron-left" class="size-4" aria-hidden="true" />
       </button>
       <button
         class="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-30
-             btn btn-circle btn-sm bg-base-100/80 border-base-300/60
-             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-[var(--ishos-teal)]"
+             btn btn-circle btn-sm size-11 bg-base-100/80 border-base-300/60
+             backdrop-blur-sm shadow-md hover:bg-base-100 hover:border-primary"
         aria-label="Siguiente"
         onclick={next}
       >
-        <Icon icon="lucide:chevron-right" class="size-4" />
+        <Icon icon="lucide:chevron-right" class="size-4" aria-hidden="true" />
       </button>
     {/if}
   </div>
 
   {#if showDots && maxIndex > 0}
-    <div class="flex items-center justify-center gap-2 mt-3" role="tablist">
+    <div class="slider-dots" role="group" aria-label="Páginas de ofertas">
       {#each { length: maxIndex + 1 } as _, i}
         <button
-          class="h-1.75 rounded-full border-none p-0 cursor-pointer transition-all duration-200
-               {activeIndex === i
-            ? 'w-[1.1rem]'
-            : 'w-1.75 bg-base-content/20 hover:bg-base-content/40'}"
-          style={activeIndex === i ? "background: var(--ishos-teal);" : ""}
-          role="tab"
-          aria-selected={activeIndex === i}
-          aria-label={`Página ${i + 1}`}
+          type="button"
+          class="slider-dot"
+          aria-current={activeIndex === i ? "true" : undefined}
+          aria-label={`Ir a la página ${i + 1} de ${maxIndex + 1}`}
           onclick={() => {
             goTo(i);
             startAutoSlide();
-          }}
-        ></button>
+          }}><span aria-hidden="true"></span></button
+        >
       {/each}
     </div>
   {/if}
 </section>
+
+<style>
+  .slider-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.125rem;
+    margin-top: 0.5rem;
+  }
+  .slider-dot {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  .slider-dot span {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+    transition: width var(--dur-fast) var(--ease-out);
+  }
+  .slider-dot[aria-current="true"] span {
+    width: 1.25rem;
+    background: var(--color-primary);
+  }
+  .slider-dot:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 1px;
+    border-radius: 999px;
+  }
+</style>

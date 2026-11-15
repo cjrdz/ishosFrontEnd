@@ -20,6 +20,10 @@
     label?: string;
     required?: boolean;
     error?: string;
+    /** The caller shows its own heading; keep the label for assistive tech only. */
+    hideLabel?: boolean;
+    /** Flavours sold out where the order is placed: shown but not selectable. */
+    soldOutIds?: string[];
     onChange: (value: string | string[]) => void;
   }
 
@@ -32,8 +36,12 @@
     label = "Sabor",
     required = false,
     error = "",
+    hideLabel = false,
+    soldOutIds = [],
     onChange,
   }: Props = $props();
+
+  const soldOut = $derived(new Set(soldOutIds));
 
   let activeSlotIndex = $state(0);
   let groupRef = $state<HTMLDivElement | null>(null);
@@ -74,7 +82,7 @@
 </script>
 
 <div class="space-y-2">
-  <div class="flex items-center gap-1.5">
+  <div class="flex items-center gap-1.5" class:sr-only={hideLabel}>
     <span class="text-sm font-semibold text-base-content/90">
       {label}
     </span>
@@ -106,7 +114,7 @@
               {flavor.name}
             </span>
           {:else}
-            <span class="text-base-content/40">—</span>
+            <span class="text-ink-muted">—</span>
           {/if}
         </button>
       {/each}
@@ -127,18 +135,22 @@
         mode === "single"
           ? selectedId === flavor.id
           : selectedIds[activeSlotIndex] === flavor.id}
+      {@const unavailable = soldOut.has(flavor.id)}
       <button
         type="button"
         data-chip
-        class={`btn btn-sm min-h-10 ${
+        class={`btn btn-sm min-h-11 ${
           selected
             ? "btn-primary"
             : "btn-outline btn-ghost border-base-300 hover:border-base-300"
-        }`}
+        } ${unavailable ? "line-through opacity-50" : ""}`}
         role="option"
         aria-selected={selected}
-        title={flavor.name}
+        aria-disabled={unavailable}
+        disabled={unavailable && !selected}
+        title={unavailable ? `${flavor.name} · Agotado` : flavor.name}
         onclick={() => {
+          if (unavailable && !selected) return;
           if (mode === "single") {
             handleSingleClick(flavor.id);
           } else {
@@ -147,6 +159,12 @@
         }}
       >
         <span class="max-w-[8rem] truncate">{flavor.name}</span>
+        {#if unavailable}
+          <span
+            class="badge badge-xs border-0 bg-error/15 text-error no-underline"
+            >Agotado</span
+          >
+        {/if}
         {#if flavor.is_seasonal}
           <span class="ml-0.5 text-xs opacity-70">★</span>
         {/if}
@@ -156,10 +174,14 @@
 
   {#if mode === "fill"}
     <div class="flex items-center justify-between gap-2">
-      <p class="text-xs text-base-content/60">
+      <p class="text-xs text-ink-muted">
         Toca un sabor para llenar la bola activa (B{activeSlotIndex + 1}).
       </p>
-      <button type="button" class="btn btn-ghost btn-xs" onclick={clearSlots}>
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm min-h-11"
+        onclick={clearSlots}
+      >
         Limpiar
       </button>
     </div>

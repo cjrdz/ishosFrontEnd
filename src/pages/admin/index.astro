@@ -2,7 +2,9 @@
 export const prerender = false;
 
 import AdminLayout from "../../layouts/AdminLayout.astro";
-import { AdminDashboard } from "@features/admin-management";
+// Island entries import the component file directly, not a feature barrel:
+// Astro bundles the imported module, so a barrel would ship every export.
+import AdminDashboard from "@features/admin-management/components/AdminDashboard.svelte";
 ---
 
 <AdminLayout title="Admin Panel - IshosFactory">

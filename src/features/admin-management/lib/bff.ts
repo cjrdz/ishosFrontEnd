@@ -5,6 +5,7 @@
  * All requests automatically use HttpOnly cookies for auth.
  */
 
+import { prepareImageForUpload } from "./image-prep";
 import { ApiError } from "@core/errors";
 import { getAdminImageUploadMaxMB } from "@core/config";
 import type {
@@ -135,10 +136,24 @@ function responseErrorCode(body: ParsedResponseBody, fallback: string): string {
   return fallback;
 }
 
+/** Per-field messages a backend validation error carries ({"fields": {...}}). */
+function responseFieldErrors(
+  body: unknown,
+): Record<string, string[]> | undefined {
+  if (!body || typeof body !== "object") return undefined;
+  const fields = (body as { fields?: unknown }).fields;
+  if (!fields || typeof fields !== "object") return undefined;
+  const out: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value === "string") out[key] = [value];
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 async function bffRequest<T>(
   path: string,
   options: {
-    method?: "GET" | "POST" | "PATCH" | "DELETE";
+    method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
     body?: unknown;
     query?: Record<string, string | number | boolean>;
     headers?: Record<string, string>;
@@ -181,6 +196,7 @@ async function bffRequest<T>(
         responseErrorMessage(body, "Request failed"),
         response.status,
         responseErrorCode(body, "BFF_ERROR"),
+        responseFieldErrors(body),
       );
     }
 
@@ -210,8 +226,12 @@ export async function listOrders(
   archived = false,
   page = 1,
   perPage = 20,
+  options: { withItems?: boolean } = {},
 ) {
-  const query: Record<string, string> = { lite: "true" };
+  // Lite responses skip line items; the kitchen board needs them.
+  const query: Record<string, string> = options.withItems
+    ? {}
+    : { lite: "true" };
   if (status) query.status = status;
   if (archived) query.archived = "true";
   query.page = String(page);
@@ -379,6 +399,15 @@ export async function getOrder(id: string) {
   return bffRequest<LocalOrder>(`/api/admin/orders/${id}`);
 }
 
+/** What POST /orders returns; `id` is only sent to staff. */
+export interface CreatedOrderResponse {
+  id?: string;
+  order_number: string;
+  total: number;
+  amount_received?: number;
+  change?: number;
+}
+
 export async function createOrder(
   payload: CreateOrderRequest,
   idempotencyKey?: string,
@@ -387,7 +416,7 @@ export async function createOrder(
   if (idempotencyKey) {
     headers["Idempotency-Key"] = idempotencyKey;
   }
-  return bffRequest<LocalOrder>("/api/admin/orders", {
+  return bffRequest<CreatedOrderResponse>("/api/admin/orders", {
     method: "POST",
     headers,
     body: payload,
@@ -409,12 +438,33 @@ export async function approveOrder(id: string) {
   });
 }
 
-export async function rejectOrder(id: string, reason: string) {
+export async function rejectOrder(
+  id: string,
+  reason: string,
+  restock?: { inventory_item_id: string; quantity: number }[],
+) {
+  const body: RejectOrderRequest & { restock?: typeof restock } = { reason };
+  if (restock) body.restock = restock;
   return bffRequest<LocalOrder>(`/api/admin/orders/${id}`, {
     method: "POST",
-    body: { reason } satisfies RejectOrderRequest,
+    body,
     query: { action: "reject" },
   });
+}
+
+/** What an order took from inventory and still holds (admins, managers). */
+export interface OrderStockLine {
+  inventory_item_id: string;
+  name: string;
+  type: "ball_based" | "unit_based";
+  quantity: number;
+}
+
+export async function getOrderStock(id: string) {
+  const res = await bffRequest<{ data?: OrderStockLine[] }>(
+    `/api/admin/orders/${id}/stock`,
+  );
+  return res.data ?? [];
 }
 
 export async function updateOrderStatus(id: string, status: string) {
@@ -535,6 +585,22 @@ export async function updateProduct(id: string, payload: ProductUpdatePayload) {
   });
 }
 
+/**
+ * Sets availability (staff may do this too). The backend endpoint flips the
+ * flag, so if someone else changed it meanwhile, flip once more to land on
+ * the requested state.
+ */
+export async function setProductAvailability(id: string, available: boolean) {
+  const path = `/api/admin/products/${id}/availability`;
+  // Empty body: the admin middleware requires a Content-Length on writes.
+  const flip = () => bffRequest<Product>(path, { method: "PATCH", body: {} });
+  let product = await flip();
+  if (product.is_available !== available) {
+    product = await flip();
+  }
+  return product;
+}
+
 export async function deleteProduct(id: string) {
   return bffRequest<MessageResponse>(`/api/admin/products/${id}`, {
     method: "DELETE",
@@ -587,12 +653,14 @@ export async function listAdminImages() {
 }
 
 export async function uploadAdminImage(
-  file: File,
+  originalFile: File,
   folder = "",
 ): Promise<{ path: string; message: string }> {
+  // Resize/re-encode first so large phone photos fit the limit and load fast.
+  const file = await prepareImageForUpload(originalFile);
   if (file.size > ADMIN_IMAGE_UPLOAD_MAX_BYTES) {
     throw new ApiError(
-      `La imagen es demasiado grande. Tamano maximo: ${ADMIN_IMAGE_UPLOAD_MAX_MB} MB.`,
+      `La imagen es demasiado grande. Tamaño máximo: ${ADMIN_IMAGE_UPLOAD_MAX_MB} MB.`,
       413,
       "UPLOAD_TOO_LARGE",
     );
@@ -928,23 +996,114 @@ export interface StoreOfferItem {
   expires_at: string;
 }
 
-export async function getAdminStoreSettings() {
-  return bffRequest<{ orders_enabled: boolean; offers: StoreOfferItem[] }>(
-    "/api/admin/settings/store",
-  );
+export type WeekDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+export type WeeklyHours = Record<WeekDay, { open: string; close: string }[]>;
+
+// ── Locations (sucursales) ───────────────────────────────────────────
+
+export interface LocationOpenStatus {
+  configured: boolean;
+  is_open: boolean;
+  closes_at?: string;
+  opens_at?: string;
+  today: { open: string; close: string }[];
+  weekly: WeeklyHours;
 }
 
-export async function updateAdminStoreSettings(payload: {
+export interface AdminLocation {
+  id: string;
+  slug: string;
+  name: string;
+  address: string;
+  maps_url: string;
+  maps_embed_url: string;
+  whatsapp: string;
+  phone: string;
+  hours: Partial<WeeklyHours>;
+  orders_enabled: boolean;
+  online_orders_enabled: boolean;
+  is_active: boolean;
+  sort_order: number;
+  status: LocationOpenStatus;
+}
+
+export type LocationPatch = Partial<
+  Omit<AdminLocation, "id" | "status" | "hours">
+> & { hours?: Partial<WeeklyHours> };
+
+export interface SoldOutItems {
+  location_id: string;
+  /** Marked "Agotado" by staff. */
+  products: string[];
+  flavors: string[];
+  /** Tracked in inventory with no stock left (clears on the next entry). */
+  out_of_stock_products?: string[];
+  out_of_stock_flavors?: string[];
+}
+
+/** Locations the signed-in user works with (all for admins, own for staff). */
+export async function listLocations() {
+  return bffRequest<{ data: AdminLocation[] }>("/api/admin/locations");
+}
+
+export async function createLocation(payload: LocationPatch) {
+  return bffRequest<AdminLocation>("/api/admin/locations", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function updateLocation(id: string, payload: LocationPatch) {
+  return bffRequest<AdminLocation>(`/api/admin/locations/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function getLocationAvailability(id: string) {
+  return bffRequest<SoldOutItems>(`/api/admin/locations/${id}/availability`);
+}
+
+export async function setLocationAvailability(
+  id: string,
+  payload: {
+    item_type: "product" | "flavor";
+    item_id: string;
+    sold_out: boolean;
+  },
+) {
+  return bffRequest<SoldOutItems>(`/api/admin/locations/${id}/availability`, {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export interface AdminStoreSettings {
   orders_enabled: boolean;
   offers: StoreOfferItem[];
-}) {
-  return bffRequest<{ orders_enabled: boolean; offers: StoreOfferItem[] }>(
-    "/api/admin/settings/store",
-    {
-      method: "PATCH",
-      body: payload,
-    },
-  );
+  /** Public "Seguir mi orden" page and links. */
+  tracking_enabled?: boolean;
+}
+
+export async function getAdminStoreSettings() {
+  return bffRequest<AdminStoreSettings>("/api/admin/settings/store");
+}
+
+export async function updateAdminStoreSettings(payload: AdminStoreSettings) {
+  return bffRequest<AdminStoreSettings>("/api/admin/settings/store", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+/** Turns public order tracking on or off, keeping the other store settings. */
+export async function setPublicTracking(enabled: boolean) {
+  const current = await getAdminStoreSettings();
+  return updateAdminStoreSettings({
+    orders_enabled: current.orders_enabled,
+    offers: current.offers ?? [],
+    tracking_enabled: enabled,
+  });
 }
 
 // ── Order Archive Settings ───────────────────────────────────────────
@@ -970,10 +1129,14 @@ export async function updateOrderArchiveConfig(payload: OrderArchiveConfig) {
 
 export interface InventoryItem {
   id: string;
+  /** Location (sucursal) whose stock this row is. */
+  location_id?: string;
   name: string;
   type: "ball_based" | "unit_based";
   current_stock: number;
   low_stock_threshold: number;
+  /** Held by accepted orders not yet in preparation (dashboard only). */
+  reserved?: number;
   product_id?: string;
   product?: { id: string; name: string };
   flavor_id?: string;
@@ -985,7 +1148,7 @@ export interface InventoryItem {
 export interface StockMovement {
   id: string;
   inventory_item_id: string;
-  type: "entry" | "sale" | "adjustment";
+  type: "entry" | "sale" | "adjustment" | "waste";
   quantity: number;
   quantity_containers?: number;
   container_type_id?: string;
@@ -1101,6 +1264,29 @@ export async function getInventoryMovements(
 
 export async function getInventoryStats() {
   return bffRequest<InventoryStats>("/api/admin/inventory/stats");
+}
+
+/** Sets the minimum below which an item shows as "Stock bajo". */
+export async function updateInventoryThreshold(
+  inventoryId: string,
+  lowStockThreshold: number,
+) {
+  return bffRequest<InventoryItem>(`/api/admin/inventory/${inventoryId}`, {
+    method: "PATCH",
+    body: { low_stock_threshold: lowStockThreshold },
+  });
+}
+
+/** Starts tracking a unit product at every location (admin). */
+export async function trackUnitProduct(payload: {
+  name: string;
+  product_id: string;
+  low_stock_threshold: number;
+}) {
+  return bffRequest<InventoryItem>("/api/admin/inventory/unit-products", {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export async function recordUnitInventoryEntry(

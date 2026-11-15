@@ -1,22 +1,27 @@
 ---
 import "../styles/global.css";
-import "../styles/variables.css";
 import { ClientRouter } from "astro:transitions";
 import StoreNavbar from "@shared/components/StoreNavbar.astro";
 import StoreFooter from "@shared/components/StoreFooter.astro";
-import Icon from "@shared/components/AppIcon.svelte";
+import { inlineScript } from "@shared/csp/inline-script";
+import Toaster from "@shared/toast/Toaster.svelte";
+import storeThemeSource from "./inline/store-theme.js?raw";
 
 interface Props {
   title: string;
 }
 
 const { title } = Astro.props as Props;
+
+// Inline (not bundled) so the theme applies before first paint; their hashes
+// are registered with the page CSP.
+const storeThemeScript = await inlineScript(Astro, storeThemeSource);
 ---
 
 <!doctype html>
 <html
   lang="es"
-  data-theme="night"
+  data-theme="fantasy"
   class="bg-base-200"
   transition:name="store-root"
   transition:animate="none"
@@ -25,59 +30,29 @@ const { title } = Astro.props as Props;
     <meta charset="UTF-8" />
     <meta
       name="description"
-      content="Isho's Gelatos & Sorbetes - Tienda en línea"
+      content="Isho's · Gelatos artesanales y sorbetes naturales con la receta de la familia, en Ahuachapán, El Salvador."
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="theme-color"
+      content="#fff8ec"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#1b0b10"
+      media="(prefers-color-scheme: dark)"
+    />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="preload"
+      as="image"
+      href="/images/brand/logo-wine.webp"
+      type="image/webp"
+    />
     <title>{title}</title>
     <ClientRouter />
-    <script is:inline>
-      (() => {
-        const themeWindow = window;
-        if (themeWindow.__ishosThemeSyncBound) return;
-        themeWindow.__ishosThemeSyncBound = true;
-
-        const resolveTheme = () => {
-          const savedTheme =
-            localStorage.getItem("ishos_theme_store") ??
-            localStorage.getItem("theme");
-          const prefersDark = window.matchMedia(
-            "(prefers-color-scheme: dark)",
-          ).matches;
-
-          return savedTheme === "fantasy" || savedTheme === "night"
-            ? savedTheme
-            : prefersDark
-              ? "night"
-              : "fantasy";
-        };
-
-        const applyTheme = (targetDocument) => {
-          if (!targetDocument?.documentElement) return;
-          targetDocument.documentElement.setAttribute(
-            "data-theme",
-            resolveTheme(),
-          );
-        };
-
-        // Initial page load
-        applyTheme(document);
-
-        // Apply theme to incoming document before it swaps in to avoid flash.
-        document.addEventListener("astro:before-swap", (event) => {
-          applyTheme(event.newDocument);
-        });
-
-        // Re-assert after swap/page load as safety for script/theme toggles.
-        document.addEventListener("astro:after-swap", () => {
-          applyTheme(document);
-        });
-
-        document.addEventListener("astro:page-load", () => {
-          applyTheme(document);
-        });
-      })();
-    </script>
+    <script is:inline set:html={storeThemeScript} />
   </head>
   <body class="bg-base-200 text-base-content min-h-screen flex flex-col">
     <StoreNavbar transition:animate="none" />
@@ -85,61 +60,11 @@ const { title } = Astro.props as Props;
       <slot />
     </main>
     <StoreFooter transition:animate="none" />
-
-    <div
-      id="store-cart-toast"
-      class="toast toast-end toast-top z-70 hidden"
-      aria-live="polite"
-    >
-      <div
-        class="alert store-cart-toast-alert bg-base-100 border border-base-300 shadow-xl rounded-2xl"
-      >
-        <Icon icon="lucide:shopping-bag" class="h-5 w-5 text-primary" />
-        <span id="store-cart-toast-text" class="font-medium text-sm"></span>
-      </div>
-    </div>
-
-    <script is:inline>
-      (() => {
-        const toastEl = document.getElementById("store-cart-toast");
-        const textEl = document.getElementById("store-cart-toast-text");
-        if (!toastEl || !textEl) return;
-
-        let hideTimeout;
-
-        const onCartAdded = (event) => {
-          const customEvent = event;
-          const detail = customEvent?.detail || {};
-          const name =
-            typeof detail.name === "string" ? detail.name : "Producto";
-          const quantity = Number(detail.quantity || 1);
-          const qtyLabel = quantity > 1 ? `${quantity}x ` : "";
-
-          textEl.textContent = `${qtyLabel}${name} agregado al carrito`;
-
-          toastEl.classList.remove("hidden");
-          toastEl.classList.remove("store-cart-toast-visible");
-          void toastEl.offsetWidth;
-          toastEl.classList.add("store-cart-toast-visible");
-
-          clearTimeout(hideTimeout);
-          hideTimeout = setTimeout(() => {
-            toastEl.classList.remove("store-cart-toast-visible");
-            setTimeout(() => {
-              toastEl.classList.add("hidden");
-            }, 220);
-          }, 2100);
-        };
-
-        document.addEventListener("astro:page-load", () => {
-          window.removeEventListener("storefront-cart-added", onCartAdded);
-          window.addEventListener("storefront-cart-added", onCartAdded);
-        });
-
-        window.removeEventListener("storefront-cart-added", onCartAdded);
-        window.addEventListener("storefront-cart-added", onCartAdded);
-      })();
-    </script>
+    <Toaster
+      client:load
+      placement="center"
+      transition:persist="store-toaster"
+    />
 
     <script>
       import { animate } from "motion";
@@ -184,28 +109,5 @@ const { title } = Astro.props as Props;
         });
       }
     </script>
-
-    <style is:global>
-      #store-cart-toast .store-cart-toast-alert {
-        opacity: 0;
-        transform: translateY(-10px) scale(0.98);
-        transition:
-          opacity 220ms ease,
-          transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
-        will-change: opacity, transform;
-      }
-
-      #store-cart-toast.store-cart-toast-visible .store-cart-toast-alert {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        #store-cart-toast .store-cart-toast-alert {
-          transition: none;
-          transform: none;
-        }
-      }
-    </style>
   </body>
 </html>

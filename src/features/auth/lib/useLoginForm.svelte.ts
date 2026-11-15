@@ -1,7 +1,7 @@
-import { z } from "zod";
+import { z } from "@core/zod";
 
 const schema = z.object({
-  email: z.string().email("Correo inválido"),
+  email: z.email("Correo inválido"),
   password: z.string().min(8, "Mínimo 8 caracteres"),
 });
 

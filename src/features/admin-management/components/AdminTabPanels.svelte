@@ -4,8 +4,16 @@
   import { CategoriesTab, ProductsTab } from "@features/products";
   import EmployeesTab from "@features/admin-management/components/EmployeesTab.svelte";
   import UsersTab from "@features/admin-management/components/UsersTab.svelte";
-  import { Analytics, ExportTool } from "@features/analytics";
-  import { InventoryTab } from "@features/inventory";
+  // Import ExportTool directly (not via the @features/analytics barrel, which
+  // re-exports Analytics) so ECharts stays out of the main admin bundle.
+  import ExportTool from "@features/analytics/components/ExportTool.svelte";
+
+  // Admin-only tabs that use ECharts load on demand, so the orders dashboard
+  // (e.g. a staff tablet) never downloads the chart library.
+  const loadInventoryTab = () =>
+    import("@features/inventory/components/InventoryTab.svelte");
+  const loadAnalytics = () =>
+    import("@features/analytics/components/Analytics.svelte");
 
   let {
     shared,
@@ -23,6 +31,7 @@
 {#if shared.activeTab === "ordenes"}
   <OrdersTab
     isAdmin={orders.isAdmin}
+    canCancelOrders={orders.canCancelOrders}
     orders={orders.orders}
     products={orders.products}
     allProducts={orders.allProducts}
@@ -205,7 +214,7 @@
   {/if}
 {/if}
 
-{#if shared.isAdmin && shared.activeTab === "inventario"}
+{#if shared.canManageStock && shared.activeTab === "inventario"}
   {#if shared.lazyTabState.inventario.loading && !shared.lazyTabState.inventario.hydrated}
     <section class="space-y-4" aria-busy="true" aria-live="polite">
       <div class="card bg-base-100 shadow" aria-hidden="true">
@@ -230,28 +239,50 @@
       </div>
     </section>
   {:else}
-    <InventoryTab
-      busy={shared.busy.inventario}
-      moduleError={shared.moduleErrors.inventario}
-      flavors={products.flavors}
-      addons={products.addons}
-      flavorBusy={products.flavorBusy}
-      addonBusy={products.addonBusy}
-      flavorError={products.flavorError}
-      addonError={products.addonError}
-      onCreateFlavor={products.onCreateFlavor}
-      onUpdateFlavor={products.onUpdateFlavor}
-      onDeleteFlavor={products.onDeleteFlavor}
-      onCreateAddon={products.onCreateAddon}
-      onUpdateAddon={products.onUpdateAddon}
-      onDeleteAddon={products.onDeleteAddon}
-    />
+    {#await loadInventoryTab()}
+      <div class="skeleton h-64 w-full rounded-2xl" aria-busy="true"></div>
+    {:then { default: InventoryTab }}
+      <InventoryTab
+        canEditCatalog={shared.isAdmin}
+        busy={shared.busy.inventario}
+        moduleError={shared.moduleErrors.inventario}
+        flavors={products.flavors}
+        addons={products.addons}
+        flavorBusy={products.flavorBusy}
+        addonBusy={products.addonBusy}
+        flavorError={products.flavorError}
+        addonError={products.addonError}
+        onCreateFlavor={products.onCreateFlavor}
+        onUpdateFlavor={products.onUpdateFlavor}
+        onDeleteFlavor={products.onDeleteFlavor}
+        onCreateAddon={products.onCreateAddon}
+        onUpdateAddon={products.onUpdateAddon}
+        onDeleteAddon={products.onDeleteAddon}
+      />
+    {:catch}
+      {@render lazyTabError()}
+    {/await}
   {/if}
 {/if}
 
 {#if shared.isAdmin && shared.activeTab === "analitica"}
   <section class="space-y-5 md:space-y-6">
-    <Analytics />
+    {#await loadAnalytics()}
+      <div class="skeleton h-80 w-full rounded-2xl" aria-busy="true"></div>
+    {:then { default: Analytics }}
+      <Analytics />
+    {:catch}
+      {@render lazyTabError()}
+    {/await}
     <ExportTool />
   </section>
 {/if}
+
+{#snippet lazyTabError()}
+  <div class="alert alert-error rounded-2xl" role="alert">
+    <span>No se pudo cargar esta sección. Revisa tu conexión.</span>
+    <button type="button" class="btn btn-sm" onclick={() => location.reload()}
+      >Recargar</button
+    >
+  </div>
+{/snippet}

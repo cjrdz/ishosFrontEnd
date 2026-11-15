@@ -2,6 +2,8 @@
  * API Error handling
  */
 
+import { toSpanishMessage } from "./messages";
+
 /**
  * Custom API error class
  */
@@ -16,7 +18,8 @@ export class ApiError extends Error {
     code: string = "API_ERROR",
     details?: Record<string, string[]>,
   ) {
-    super(message);
+    // Shown to staff and customers as is, so always Spanish.
+    super(toSpanishMessage(message, status));
     this.name = "ApiError";
     this.status = status;
     this.code = code;

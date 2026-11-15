@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildActiveOfferMap,
   isOfferActive,
+  offerBasePrice,
   resolveActiveOffers,
 } from "./offers";
 import type { PublicProduct, StoreOfferItem } from "./api";
@@ -74,5 +75,40 @@ describe("resolveActiveOffers", () => {
 
     expect(resolved).toHaveLength(1);
     expect(resolved[0].product.id).toBe("p-1");
+  });
+});
+
+describe("offerBasePrice", () => {
+  const now = Date.parse("2026-10-26T12:00:00Z");
+  const future = "2026-10-26T13:00:00Z";
+  const past = "2026-10-26T11:00:00Z";
+  const offer = (
+    product_id: string,
+    discount_price: number | undefined,
+    expires_at: string,
+  ) =>
+    ({
+      product_id,
+      label: "Oferta",
+      discount_price,
+      expires_at,
+    }) as StoreOfferItem;
+
+  it("returns the lowest active positive discount for the product", () => {
+    const offers = [
+      offer("p1", 0.75, future),
+      offer("p1", 0.6, future),
+      offer("p2", 0.1, future),
+    ];
+    expect(offerBasePrice("p1", offers, now)).toBe(0.6);
+  });
+
+  it("ignores expired, label-only and invalid-expiry offers", () => {
+    const offers = [
+      offer("p1", 0.5, past),
+      offer("p1", 0, future),
+      offer("p1", 0.4, ""),
+    ];
+    expect(offerBasePrice("p1", offers, now)).toBeUndefined();
   });
 });

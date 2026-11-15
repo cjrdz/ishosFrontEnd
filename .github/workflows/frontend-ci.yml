@@ -5,9 +5,12 @@ on:
     paths:
       - "src/**"
       - "public/**"
+      - "scripts/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - "astro.config.mjs"
+      - "svelte.config.js"
+      - "wrangler.jsonc"
       - "tsconfig.json"
       - "vitest.config.ts"
       - ".github/workflows/frontend-ci.yml"
@@ -15,12 +18,19 @@ on:
     paths:
       - "src/**"
       - "public/**"
+      - "scripts/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - "astro.config.mjs"
+      - "svelte.config.js"
+      - "wrangler.jsonc"
       - "tsconfig.json"
       - "vitest.config.ts"
       - ".github/workflows/frontend-ci.yml"
+
+# Read-only token: this workflow only checks out and builds.
+permissions:
+  contents: read
 
 jobs:
   validate:
@@ -45,8 +55,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Formatting
+        run: pnpm format:check
+
       - name: Typecheck and Astro validation
         run: pnpm lint
+
+      - name: Store bundle boundary
+        run: pnpm check:store-boundary
 
       - name: Unit tests
         run: pnpm test

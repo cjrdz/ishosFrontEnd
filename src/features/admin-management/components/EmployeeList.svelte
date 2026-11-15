@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ROLE_LABELS } from "@features/admin-management/lib/roles";
   import {
     getCurrentRowsPerTable,
     getCurrentAdminId,
@@ -12,6 +13,8 @@
   interface Props {
     employees: Employee[];
     busy: boolean;
+    /** Location names by id, to show where each employee works. */
+    locationNames?: Record<string, string>;
     onCreateEmployee: () => void;
     onToggleState: (employee: Employee, checked: boolean) => void;
     onEdit: (employee: Employee) => void;
@@ -22,12 +25,22 @@
   let {
     employees,
     busy,
+    locationNames = {},
     onCreateEmployee,
     onToggleState,
     onEdit,
     onRequestDelete,
     onOpenLockoutReset,
   }: Props = $props();
+
+  function roleText(employee: Employee): string {
+    const label =
+      ROLE_LABELS[employee.role as keyof typeof ROLE_LABELS] ?? employee.role;
+    const location = employee.location_id
+      ? locationNames[employee.location_id]
+      : "";
+    return location ? `${label} · ${location}` : label;
+  }
 
   const rowLimitOptions = [5, 10, 25, 50, 100] as const;
   let employeeRowLimit = $state<number>(5);
@@ -229,8 +242,8 @@
         <thead class="bg-base-200/60 text-base-content">
           <tr>
             <th class="font-bold">Email</th>
-            <th class="font-bold">Nombre</th>
-            <th class="font-bold">Rol</th>
+            <th class="hidden font-bold sm:table-cell">Nombre</th>
+            <th class="hidden font-bold sm:table-cell">Rol y sucursal</th>
             <th class="text-center font-bold">Estado</th>
             <th class="text-center font-bold">Acciones</th>
           </tr>
@@ -238,16 +251,22 @@
         <tbody>
           {#if filteredEmployees.length === 0}
             <tr
-              ><td colspan="5" class="text-center py-6 text-base-content/50"
+              ><td colspan="5" class="text-center py-6 text-ink-muted"
                 >No hay empleados</td
               ></tr
             >
           {:else}
             {#each visibleEmployees as employee (employee.id)}
               <tr class="hover:bg-base-300/40 transition-colors">
-                <td>{employee.email}</td>
-                <td>{employee.name || "-"}</td>
-                <td>{employee.role}</td>
+                <td class="max-w-[11rem] break-words sm:max-w-none">
+                  {employee.email}
+                  <!-- Phones: name and role under the email instead of in columns. -->
+                  <span class="block text-xs text-ink-muted sm:hidden"
+                    >{employee.name || "-"} · {roleText(employee)}</span
+                  >
+                </td>
+                <td class="hidden sm:table-cell">{employee.name || "-"}</td>
+                <td class="hidden sm:table-cell">{roleText(employee)}</td>
                 <td class="text-center align-middle">
                   <input
                     class="toggle toggle-sm {employee.state !== 'inactive'
@@ -301,7 +320,7 @@
     <div
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
-      <span class="text-sm text-base-content/60">
+      <span class="text-sm text-ink-muted">
         {filteredEmployees.length === 0
           ? "0 resultados"
           : `${startItem}-${endItem} de ${filteredEmployees.length}`}
@@ -318,7 +337,7 @@
           <Icon icon="lucide:chevron-left" class="h-4 w-4" />
         </button>
 
-        <span class="text-sm text-base-content/60">
+        <span class="text-sm text-ink-muted">
           Página {currentPage} de {totalPages}
         </span>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from "@shared/components/AppIcon.svelte";
   import { formatCurrency } from "@shared/utils/formatters";
+  import ProductArt from "./ProductArt.svelte";
   import "../../../../styles/product-card.css";
   import type {
     PublicProduct,
@@ -17,11 +18,12 @@
     clickable?: boolean;
     showSeasonalBadge?: boolean;
     seasonalLabel?: string;
+    /** Product needs choices (flavours, toppings) before it can be added. */
     showSelectButton?: boolean;
     countdown?: string;
     note?: string;
     onOpen?: () => void;
-    onAdd?: () => void;
+    onAdd?: (button: HTMLElement) => void;
     onSelect?: () => void;
   }
 
@@ -34,7 +36,7 @@
     variant = "menu",
     clickable = false,
     showSeasonalBadge = false,
-    seasonalLabel = "Temporada",
+    seasonalLabel = "★ Con sabores de temporada",
     showSelectButton = false,
     countdown,
     note,
@@ -44,429 +46,328 @@
   }: Props = $props();
 
   const hasDiscount = $derived(
-    typeof offer?.discount_price === "number" && offer.discount_price > 0,
+    typeof offer?.discount_price === "number" &&
+      offer.discount_price > 0 &&
+      offer.discount_price < product.price,
+  );
+  const soldOut = $derived(
+    !product.is_available || product.stock_status === "out_of_stock",
+  );
+  const lowStock = $derived(!soldOut && product.stock_status === "low_stock");
+  const canOrder = $derived(ordersEnabled && !soldOut);
+  const actionLabel = $derived(
+    showSelectButton
+      ? `Elegir opciones de ${product.name}`
+      : `Agregar ${product.name}`,
   );
 
-  function handleOpen() {
-    if (clickable) onOpen();
-  }
-
-  function handleAdd(event: MouseEvent) {
-    event.stopPropagation();
-    if (href) event.preventDefault();
-    onAdd();
-  }
-
-  function handleSelect(event: MouseEvent) {
-    event.stopPropagation();
-    onSelect();
-  }
-
   let imgFailed = $state(false);
-  function handleImgError() {
-    imgFailed = true;
-  }
   $effect(() => {
     imageUrl;
     imgFailed = false;
   });
+
+  function handleAction(event: MouseEvent) {
+    event.stopPropagation();
+    if (href) event.preventDefault();
+    if (showSelectButton) onSelect();
+    else onAdd(event.currentTarget as HTMLElement);
+  }
 </script>
 
-<!--
-  Single unified wrapper pattern:
-  - href   → <a>
-  - clickable → <div> + invisible overlay <button>
-  - default → <div>
-  All three share the same inner <article> markup — no duplication.
--->
-<div class="pc-root h-full group">
+<div class="pc-root group" class:pc-root--sold-out={soldOut}>
   {#if href}
-    <a {href} class="pc-link" aria-label={product.name}>
-      <article class="pc-card pc-card--{variant}">
-        {@render cardInner()}
-      </article>
-    </a>
-  {:else if clickable}
-    <button
-      type="button"
-      class="pc-overlay-btn"
-      aria-label={`Ver detalles de ${product.name}`}
-      onclick={handleOpen}
-    ></button>
-    <article class="pc-card pc-card--{variant}">
+    <a {href} class="pc-card pc-card--{variant}" aria-label={product.name}>
       {@render cardInner()}
-    </article>
+    </a>
   {:else}
     <article class="pc-card pc-card--{variant}">
+      {#if clickable && !soldOut}
+        <button
+          type="button"
+          class="pc-open"
+          aria-label={`Ver ${product.name}`}
+          onclick={onOpen}
+        ></button>
+      {/if}
       {@render cardInner()}
     </article>
   {/if}
 </div>
 
 {#snippet cardInner()}
-  <!-- Image fills the card; card height set by aspect ratio -->
-  <figure class="pc-figure" aria-hidden="true">
+  <figure class="pc-figure">
     {#if imageUrl && !imgFailed}
       <img
         src={imageUrl}
-        alt={product.name}
+        alt=""
         class="pc-img"
         loading="lazy"
-        onerror={handleImgError}
+        decoding="async"
+        width="400"
+        height="300"
+        onerror={() => (imgFailed = true)}
       />
-      <!-- Gradient ensures text stays readable without killing image visibility -->
-      <div class="pc-gradient"></div>
     {:else}
-      <div
-        class="pc-no-image"
-        role="img"
-        aria-label={`Imagen no disponible para ${product.name}`}
-      >
+      <ProductArt
+        name={product.name}
+        category={product.category_name}
+        scoops={product.ball_quantity}
+        seed={product.id}
+      />
+    {/if}
+
+    {#if soldOut}
+      <span class="pc-badge pc-badge--muted">Agotado</span>
+    {:else if offer}
+      <span class="pc-badge pc-badge--offer">{offer.label || "Oferta"}</span>
+    {:else if lowStock}
+      <span class="pc-badge pc-badge--warn">Últimas unidades</span>
+    {/if}
+
+    {#if countdown && !soldOut}
+      <span class="pc-countdown" aria-label={`Termina en ${countdown}`}>
         <Icon
-          icon="lucide:image-off"
-          class="size-10 opacity-30"
+          icon="lucide:clock-3"
+          class="size-3"
           aria-hidden="true"
-        />
-      </div>
+        />{countdown}
+      </span>
     {/if}
   </figure>
 
-  <!-- Stock status badge -->
-  {#if product.stock_status === "out_of_stock"}
-    <span class="badge badge-error badge-sm absolute left-3 top-3 z-20">
-      Agotado
-    </span>
-  {:else if product.stock_status === "low_stock"}
-    <span class="badge badge-warning badge-sm absolute left-3 top-3 z-20">
-      Stock bajo
-    </span>
-  {/if}
-
-  <!-- Offer badge -->
-  {#if offer}
-    <span class="badge badge-warning badge-sm absolute left-3 top-3 z-20">
-      {offer.label || "Oferta"}
-    </span>
-  {/if}
-
-  <!-- Seasonal badge -->
-  {#if showSeasonalBadge}
-    <span class="badge badge-primary badge-sm absolute right-3 top-3 z-20">
-      {seasonalLabel}
-    </span>
-  {/if}
-
-  <!-- Countdown chip -->
-  {#if countdown}
-    <div class="pc-countdown" aria-label="Tiempo restante">
-      <Icon icon="lucide:clock-3" class="size-3" />
-      <span>{countdown}</span>
-    </div>
-  {/if}
-
-  <!-- Floating info pill at the bottom; gradient + subtle blur keeps image visible -->
-  <div class="pc-info">
-    <div class="pc-info-inner">
-      <h3 class="pc-name">{product.name}</h3>
-
-      {#if note}
-        <p class="pc-note">{note}</p>
-      {/if}
-
-      <div class="pc-price-row">
-        <div class="pc-prices">
-          {#if hasDiscount}
-            <span class="pc-price-before">{formatCurrency(product.price)}</span>
-            <span class="pc-price-main"
-              >{formatCurrency(offer?.discount_price ?? 0)}</span
-            >
-          {:else}
-            <span class="pc-price-main">{formatCurrency(product.price)}</span>
-          {/if}
-        </div>
-
-        {#if ordersEnabled}
-          {#if showSelectButton}
-            <button type="button" class="pc-action-btn" onclick={handleSelect}>
-              Seleccionar
-            </button>
-          {:else}
-            <button type="button" class="pc-action-btn" onclick={handleAdd}>
-              Agregar
-            </button>
-          {/if}
+  <div class="pc-body">
+    <h3 class="pc-name">{product.name}</h3>
+    {#if note}
+      <p class="pc-note">{note}</p>
+    {:else if showSeasonalBadge}
+      <p class="pc-note pc-note--season">
+        {seasonalLabel}
+      </p>
+    {/if}
+    <div class="pc-foot">
+      <p class="pc-price">
+        {#if hasDiscount}
+          <span class="pc-price-now"
+            >{formatCurrency(offer?.discount_price ?? 0)}</span
+          >
+          <s class="pc-price-was">{formatCurrency(product.price)}</s>
+        {:else}
+          <span class="pc-price-now">{formatCurrency(product.price)}</span>
         {/if}
-      </div>
+      </p>
+      {#if canOrder}
+        <button
+          type="button"
+          class="pc-add"
+          aria-label={actionLabel}
+          title={actionLabel}
+          onclick={handleAction}
+        >
+          <Icon icon="lucide:plus" class="size-5" aria-hidden="true" />
+        </button>
+      {/if}
     </div>
   </div>
 {/snippet}
 
 <style>
-  /* ── Root wrapper ────────────────────────────────────────────── */
   .pc-root {
     position: relative;
-    width: 100%;
     height: 100%;
   }
-
-  /* Full-card invisible overlay for clickable cards */
-  .pc-overlay-btn {
+  .pc-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    border-radius: var(--radius-box);
+    border: 1px solid var(--color-base-300);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    text-decoration: none;
+    box-shadow:
+      0 1px 2px rgb(var(--brand-shadow) / 0.05),
+      0 4px 14px rgb(var(--brand-shadow) / 0.06);
+    transition:
+      transform var(--dur-panel) var(--ease-out),
+      box-shadow var(--dur-panel) var(--ease-out),
+      border-color var(--dur-panel) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .pc-root:not(.pc-root--sold-out) .pc-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgb(var(--brand-shadow) / 0.14);
+      border-color: color-mix(
+        in oklab,
+        var(--color-primary) 35%,
+        var(--color-base-300)
+      );
+    }
+  }
+  :global([data-theme="night"]) .pc-card {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.05),
+      0 8px 24px rgb(0 0 0 / 0.32);
+  }
+  @media (hover: hover) {
+    :global([data-theme="night"])
+      .pc-root:not(.pc-root--sold-out)
+      .pc-card:hover {
+      box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.06),
+        0 16px 36px rgb(0 0 0 / 0.5);
+    }
+  }
+  /* Whole card opens the product; the add button sits above this layer. */
+  .pc-open {
     position: absolute;
     inset: 0;
-    z-index: 10;
-    border-radius: 1.25rem;
+    z-index: 1;
+    border: 0;
     background: transparent;
-    border: none;
     cursor: pointer;
+    border-radius: inherit;
   }
-  .pc-overlay-btn:focus-visible {
-    outline: 2px solid var(--ishos-teal);
+  .pc-open:focus-visible,
+  .pc-card:focus-visible {
+    outline: 3px solid var(--color-primary);
     outline-offset: 2px;
   }
 
-  /* ── Link wrapper ────────────────────────────────────────────── */
-  .pc-link {
-    display: block;
-    height: 100%;
-    text-decoration: none;
-  }
-
-  /* ── Card shell ──────────────────────────────────────────────── */
-  .pc-card {
-    position: relative;
-    display: block;
-    width: 100%;
-    height: 100%;
-    /* Taller ratio so products feel substantial and images show fully */
-    aspect-ratio: 3 / 4;
-    overflow: hidden;
-    border-radius: 1.25rem;
-    border: 1px solid oklch(var(--b2) / 0.7);
-    background-color: oklch(var(--b2) / 0.55);
-    box-shadow: var(--pc-card-shadow);
-    transition:
-      box-shadow 0.25s ease,
-      transform 0.25s ease;
-    isolation: isolate;
-  }
-  @media (min-width: 640px) {
-    .pc-card {
-      border-radius: 1.5rem;
-    }
-  }
-
-  .pc-card--featured {
-    box-shadow: 0 1px 2px oklch(0% 0 0 / 0.06);
-  }
-
-  /* Hover: lift + subtle scale on the whole group */
-  .pc-root:hover .pc-card,
-  .pc-link:hover .pc-card {
-    box-shadow: var(--pc-card-shadow-hover);
-    transform: translateY(-2px) scale(1.01);
-  }
-
-  /* ── Image ───────────────────────────────────────────────────── */
   .pc-figure {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
+    position: relative;
     margin: 0;
+    aspect-ratio: 4 / 3;
+    max-width: 100%;
+    overflow: hidden;
+    background: var(--color-base-200);
   }
-
   .pc-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center;
-    transition: transform 0.5s ease;
     display: block;
   }
-  .pc-root:hover .pc-img,
-  .pc-link:hover .pc-img {
-    transform: scale(1.04);
+  .pc-root--sold-out .pc-figure,
+  .pc-root--sold-out .pc-name,
+  .pc-root--sold-out .pc-price {
+    opacity: 0.5;
   }
 
-  /* Gradient keeps text legible while letting the image show through */
-  .pc-gradient {
+  .pc-badge {
     position: absolute;
-    inset: 0;
-    background: var(--pc-gradient-overlay);
-    pointer-events: none;
+    top: 8px;
+    left: 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 3px 9px;
+    border-radius: 999px;
   }
-
-  /* Fallback when no image */
-  .pc-no-image {
-    width: 100%;
-    height: 100%;
-    display: grid;
-    place-items: center;
+  .pc-badge--offer {
+    background: var(--color-secondary);
+    color: var(--color-secondary-content);
   }
-
-  .pc-no-image :global(svg) {
-    opacity: 0.25;
+  .pc-badge--muted {
+    background: var(--st-late);
+    color: var(--st-late-ink);
   }
-
-  /* ── Countdown chip ─────────────────────────────────────────── */
+  .pc-badge--warn {
+    background: var(--st-review);
+    color: var(--st-review-ink);
+  }
   .pc-countdown {
     position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    z-index: 20;
-    display: flex;
+    right: 8px;
+    bottom: 8px;
+    display: inline-flex;
     align-items: center;
-    gap: 0.2rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 9999px;
-    background: var(--pc-countdown-bg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--pc-countdown-border);
-    color: var(--pc-text-over-image);
-    font-size: 0.68rem;
-    font-weight: 700;
+    gap: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.03em;
-    pointer-events: none;
-    text-shadow: 0 1px 2px oklch(0% 0 0 / 0.35);
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--color-base-100);
+    color: var(--color-base-content);
   }
 
-  /* ── Floating info pill ──────────────────────────────────────── */
-  .pc-info {
-    position: absolute;
-    left: 0.5rem;
-    right: 0.5rem;
-    bottom: 0.5rem;
-    z-index: 20;
-  }
-
-  .pc-info-inner {
-    padding: 0.625rem 0.75rem;
+  .pc-body {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    background-color: var(--pc-pill-bg);
-    backdrop-filter: blur(10px) saturate(1.4);
-    -webkit-backdrop-filter: blur(10px) saturate(1.4);
-    border-radius: 0.875rem;
-    border: 1px solid var(--pc-pill-border);
+    gap: 4px;
+    padding: 10px 12px 12px;
+    flex: 1;
   }
-
   .pc-name {
-    font-size: 0.9rem;
+    margin: 0;
+    font-size: 0.95rem;
     font-weight: 700;
-    line-height: 1.2;
-    color: var(--pc-text-over-image);
-    margin: 0;
+    line-height: 1.25;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    text-shadow: 0 1px 3px oklch(0% 0 0 / 0.45);
   }
-  @media (min-width: 640px) {
-    .pc-name {
-      font-size: 1rem;
-    }
-  }
-
   .pc-note {
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--pc-note-over);
-    line-height: 1.35;
     margin: 0;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-shadow: 0 1px 3px oklch(0% 0 0 / 0.55);
+    font-size: 0.78rem;
+    color: var(--brand-ink-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
-
-  /* ── Pricing ─────────────────────────────────────────────────── */
-  .pc-price-row {
+  .pc-note--season {
+    color: var(--st-review-ink);
+    font-weight: 500;
+  }
+  .pc-foot {
+    margin-top: auto;
+    padding-top: 6px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    margin-top: 0.125rem;
+    gap: 8px;
   }
-
-  .pc-prices {
+  .pc-price {
+    margin: 0;
     display: flex;
     align-items: baseline;
-    flex-wrap: wrap;
-    gap: 0.375rem;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
   }
-
-  .pc-price-main {
+  .pc-price-now {
+    font-weight: 900;
     font-size: 1.05rem;
-    font-weight: 800;
-    color: var(--pc-text-over-image);
-    line-height: 1;
-    text-shadow: 0 1px 3px oklch(0% 0 0 / 0.45);
+    color: var(--brand-price);
   }
-  @media (min-width: 640px) {
-    .pc-price-main {
-      font-size: 1.15rem;
-    }
+  .pc-price-was {
+    font-size: 0.8rem;
+    color: var(--brand-ink-muted);
   }
-
-  .pc-price-before {
-    font-size: 0.75rem;
-    text-decoration: line-through;
-    color: var(--pc-price-strikethrough-over);
-    text-shadow: 0 1px 2px oklch(0% 0 0 / 0.35);
-  }
-
-  /* ── Action button ───────────────────────────────────────────── */
-  .pc-action-btn {
-    flex-shrink: 0;
-    padding: 0.35rem 0.875rem;
-    border-radius: 9999px;
-    border: 1px solid oklch(1 0 0 / 0.25);
-    background-color: var(--ishos-teal);
-    color: white;
-    font-size: 0.75rem;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 2px 8px oklch(0% 0 0 / 0.25);
-    transition:
-      box-shadow 0.2s ease,
-      transform 0.15s ease,
-      filter 0.2s ease;
+  .pc-add {
     position: relative;
-    z-index: 20;
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    cursor: pointer;
+    transition: transform var(--dur-fast) var(--ease-out);
   }
-  .pc-action-btn:hover {
-    box-shadow: 0 4px 12px oklch(0% 0 0 / 0.35);
-    transform: translateY(-1px);
-    filter: brightness(1.08);
+  .pc-add:active {
+    transform: scale(0.92);
   }
-  .pc-action-btn:focus-visible {
-    outline: 2px solid var(--ishos-teal);
+  .pc-add:focus-visible {
+    outline: 3px solid var(--brand-price);
     outline-offset: 2px;
-  }
-  @media (min-width: 640px) {
-    .pc-action-btn {
-      padding: 0.4rem 1rem;
-      font-size: 0.8125rem;
-    }
-  }
-
-  /* ── Dark-theme overrides ────────────────────────────────────── */
-  :global([data-theme="night"]) .pc-card {
-    border-color: oklch(var(--bc) / 0.18);
-  }
-
-  :global([data-theme="night"]) .pc-info-inner {
-    background-color: oklch(var(--b1) / 0.35);
-    border-color: oklch(1 0 0 / 0.06);
-  }
-
-  :global([data-theme="night"]) .pc-price-before {
-    color: oklch(1 0 0 / 0.55);
   }
 </style>

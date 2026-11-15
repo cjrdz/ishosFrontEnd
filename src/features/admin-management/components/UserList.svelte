@@ -212,9 +212,9 @@
         <thead class="bg-base-200/60 text-base-content">
           <tr>
             <th class="font-bold">Nombre</th>
-            <th class="font-bold">Tipo</th>
-            <th class="font-bold">Telefono</th>
-            <th class="font-bold">Correo</th>
+            <th class="hidden font-bold md:table-cell">Tipo</th>
+            <th class="hidden font-bold sm:table-cell">Teléfono</th>
+            <th class="hidden font-bold md:table-cell">Correo</th>
             <th class="text-center font-bold">Estado</th>
             <th class="text-center font-bold">Acciones</th>
           </tr>
@@ -222,17 +222,25 @@
         <tbody>
           {#if filteredUsers.length === 0}
             <tr
-              ><td colspan="6" class="text-center py-6 text-base-content/50"
+              ><td colspan="6" class="text-center py-6 text-ink-muted"
                 >No hay usuarios</td
               ></tr
             >
           {:else}
             {#each visibleUsers as user (user.id)}
               <tr class="hover:bg-base-300/40 transition-colors">
-                <td>{user.name}</td>
-                <td>{user.user_type === "company" ? "empresa" : "usuario"}</td>
-                <td>{user.phone}</td>
-                <td>{user.email || "-"}</td>
+                <td>
+                  {user.name}
+                  <!-- Phones: phone number under the name instead of its own column. -->
+                  <span class="block text-xs text-ink-muted sm:hidden"
+                    >{user.phone}</span
+                  >
+                </td>
+                <td class="hidden md:table-cell"
+                  >{user.user_type === "company" ? "Empresa" : "Cliente"}</td
+                >
+                <td class="hidden sm:table-cell">{user.phone}</td>
+                <td class="hidden md:table-cell">{user.email || "-"}</td>
                 <td class="text-center align-middle">
                   <input
                     class="toggle toggle-sm {user.status === 'active'
@@ -296,7 +304,7 @@
     <div
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
-      <span class="text-sm text-base-content/60">
+      <span class="text-sm text-ink-muted">
         {filteredUsers.length === 0
           ? "0 resultados"
           : `${startItem}-${endItem} de ${filteredUsers.length}`}
@@ -313,7 +321,7 @@
           <Icon icon="lucide:chevron-left" class="h-4 w-4" />
         </button>
 
-        <span class="text-sm text-base-content/60">
+        <span class="text-sm text-ink-muted">
           Página {currentPage} de {totalPages}
         </span>
 

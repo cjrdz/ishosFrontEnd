@@ -2,7 +2,9 @@
 export const prerender = false;
 
 import AdminLayout from "../../layouts/AdminLayout.astro";
-import { AdminLoginForm } from "@features/auth";
+// Island entries import the component file directly, not a feature barrel:
+// Astro bundles the imported module, so a barrel would ship every export.
+import AdminLoginForm from "@features/auth/components/AdminLoginForm.svelte";
 ---
 
 <AdminLayout title="Admin Login - IshosFactory">
