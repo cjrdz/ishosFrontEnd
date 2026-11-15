@@ -7,6 +7,7 @@
 
 import type { APIRoute } from "astro";
 import { forwardUpstreamJson, getServerApiBaseUrl } from "@core/bff/proxy";
+import { clientIdentityHeaders } from "@core/bff/upstream-headers";
 
 const ORDER_NUMBER_RE = /^ORD-\d{8}-\d{4}$/;
 
@@ -24,6 +25,13 @@ export const GET: APIRoute = async (context) => {
     );
   }
 
+  if (trackingToken.length > 128) {
+    return new Response(JSON.stringify({ error: "Invalid tracking token" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (!ORDER_NUMBER_RE.test(orderNumber)) {
     return new Response(
       JSON.stringify({ error: "Invalid order number format" }),
@@ -39,6 +47,7 @@ export const GET: APIRoute = async (context) => {
 
     const response = await fetch(
       `${getServerApiBaseUrl(context)}/orders/track?${query.toString()}`,
+      { headers: clientIdentityHeaders(context) },
     );
     return forwardUpstreamJson(response);
   } catch (error) {

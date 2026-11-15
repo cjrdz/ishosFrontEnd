@@ -1,7 +1,6 @@
 <script lang="ts">
   import Icon from "@shared/components/AppIcon.svelte";
   import AdminModalShell from "@features/admin-management/components/shared/AdminModalShell.svelte";
-  import AdminFormActions from "@features/admin-management/components/shared/AdminFormActions.svelte";
   import type {
     Addon,
     Category,
@@ -15,6 +14,17 @@
     ManualOrderItemDraft,
     OrderFormState,
   } from "../../types/orders-tab";
+  import type { CreatedOrder } from "@features/admin-management/lib/order-handlers";
+  import type { TicketKind } from "../../lib/receipt-renderer";
+  import type { AutoPrintMode } from "../../types/orders-tab";
+
+  const AUTO_PRINT_OPTIONS: { value: AutoPrintMode; label: string }[] = [
+    { value: "both", label: "Imprimir ambos" },
+    { value: "kitchen", label: "Solo comanda" },
+    { value: "none", label: "No imprimir" },
+  ];
+  import { fly } from "svelte/transition";
+  import { motionMs, celebrate } from "@shared/motion/motion";
 
   interface AddonGroup {
     key: string;
@@ -79,6 +89,14 @@
     onResolveAddonNames: (productId: string, addonIds: string[]) => string[];
     onManualItemSubtotal: (item: ManualOrderItemDraft) => number;
     onDraftItemKey: (item: ManualOrderItemDraft, index: number) => string;
+    /** Set once a new order was created: the editor shows the print/next screen. */
+    createdOrder?: CreatedOrder | null;
+    autoPrint?: AutoPrintMode;
+    onAutoPrintChange?: (value: AutoPrintMode) => void;
+    onPrint?: (kinds: TicketKind[]) => void;
+    /** Move the new order to "Preparando" (starts preparation, uses stock). */
+    onStartPreparing?: () => void;
+    onNewOrder?: () => void;
   }
 
   let {
@@ -132,28 +150,24 @@
     onResolveAddonNames,
     onManualItemSubtotal,
     onDraftItemKey,
+    createdOrder = null,
+    autoPrint = "both",
+    onAutoPrintChange,
+    onPrint,
+    onStartPreparing,
+    onNewOrder,
   }: Props = $props();
 
   let dialogRef = $state<HTMLDialogElement | null>(null);
-  let noteDialogRef = $state<HTMLDialogElement | null>(null);
 
   $effect(() => {
     if (!dialogRef) return;
     if (open && !dialogRef.open) {
       dialogRef.showModal();
     } else if (!open && dialogRef.open) {
-      noteDialogRef?.close();
       dialogRef.close();
     }
   });
-
-  function openNotesDialog() {
-    noteDialogRef?.showModal();
-  }
-
-  function closeNotesDialog() {
-    noteDialogRef?.close();
-  }
 
   const displayTotal = $derived(
     manualItems.length > 0 ? manualOrderTotal : totalPreview,
@@ -165,7 +179,7 @@
   const stepLabels: Record<EditorStep, string> = {
     products: "Productos",
     customer: "Cliente",
-    summary: "Resumen",
+    summary: "Cobro",
   };
   const stepOrder: EditorStep[] = ["products", "customer", "summary"];
 
@@ -210,7 +224,64 @@
   );
 
   function setReceivedAmount(value: number) {
-    orderForm.amount_received = value;
+    orderForm.amount_received = Math.round(value * 100) / 100;
+  }
+
+  /** Bills a customer is likely to hand over for this total. */
+  const cashSuggestions = $derived.by(() => {
+    const total = displayTotal;
+    const options = new Set<number>();
+    const whole = Math.ceil(total);
+    if (whole > total) options.add(whole);
+    for (const bill of [1, 2, 5, 10, 20]) if (bill > total) options.add(bill);
+    return [...options].sort((a, b) => a - b).slice(0, 5);
+  });
+
+  const roundedChange = $derived(
+    changeAmount != null ? Math.round(changeAmount * 100) / 100 : null,
+  );
+
+  const PAYMENT_OPTIONS: {
+    value: OrderFormState["payment_method"];
+    label: string;
+    icon: string;
+  }[] = [
+    { value: "efectivo", label: "Efectivo", icon: "lucide:banknote" },
+    { value: "tarjeta", label: "Tarjeta", icon: "lucide:credit-card" },
+    {
+      value: "transferencia",
+      label: "Transferencia",
+      icon: "lucide:smartphone",
+    },
+    { value: "otro", label: "Otro", icon: "lucide:wallet" },
+  ];
+
+  const itemUnits = $derived(
+    manualItems.reduce((sum, item) => sum + item.quantity, 0),
+  );
+
+  let receivedRef = $state<HTMLInputElement | null>(null);
+  $effect(() => {
+    if (
+      step === "summary" &&
+      orderForm.payment_method === "efectivo" &&
+      receivedRef &&
+      !createdOrder
+    ) {
+      receivedRef.focus();
+    }
+  });
+
+  let doneRef = $state<HTMLElement | null>(null);
+  $effect(() => {
+    if (!createdOrder) return;
+    step = "products";
+    stepError = "";
+    if (doneRef) celebrate(doneRef);
+  });
+
+  function shortNumber(orderNumber: string): string {
+    return orderNumber.split("-").pop() ?? orderNumber;
   }
 
   function isStepValid(target: EditorStep): boolean {
@@ -221,8 +292,7 @@
       if (!isStepValid("products")) return false;
       return (
         orderForm.customer_name.trim().length > 0 &&
-        orderForm.customer_phone.trim().length > 0 &&
-        orderForm.payment_method.trim().length > 0 &&
+        phoneLooksValid(orderForm.customer_phone) &&
         orderForm.order_type.trim().length > 0 &&
         (orderForm.order_type !== "en_local" ||
           (orderForm.table_number !== "" && Number(orderForm.table_number) > 0))
@@ -243,6 +313,21 @@
     step = target;
   }
 
+  /**
+   * Online orders (no staff creator) keep their phone: it is how the shop
+   * reaches the customer. Counter orders may skip it.
+   */
+  const phoneRequired = $derived(
+    isEditing && !!selectedOrder && !selectedOrder.created_by_user_id,
+  );
+
+  /** A typed phone must be real; an empty one only on counter orders. */
+  function phoneLooksValid(phone: string): boolean {
+    const digits = phone.replace(/\D/g, "").length;
+    if (phone.trim() === "") return !phoneRequired;
+    return digits >= 7 && digits <= 15;
+  }
+
   function getStepError(target: EditorStep): string {
     if (target === "customer" && !isStepValid("products")) {
       return "Agrega al menos un producto completo antes de continuar.";
@@ -250,6 +335,11 @@
     if (target === "summary") {
       if (!isStepValid("products")) {
         return "Agrega al menos un producto completo antes de continuar.";
+      }
+      if (!phoneLooksValid(orderForm.customer_phone)) {
+        return phoneRequired
+          ? "Las órdenes en línea necesitan el teléfono del cliente (7 a 15 dígitos)."
+          : "El teléfono debe tener entre 7 y 15 dígitos, o déjalo vacío.";
       }
       if (!isStepValid("customer")) {
         return "Completa los datos del cliente antes de continuar.";
@@ -308,464 +398,769 @@
 <!-- Main order editor dialog -->
 <AdminModalShell
   bind:dialogRef
-  title={`${isEditing ? "Editar orden" : "Crear orden manual"}${isEditing && selectedOrder ? ` · ${selectedOrder.order_number}` : ""}`}
+  title={`${isEditing ? "Editar orden" : "Nueva orden"}${isEditing && selectedOrder ? ` · ${selectedOrder.order_number}` : ""}`}
   icon={isEditing ? "lucide:pencil" : "lucide:clipboard-list"}
-  widthClass="max-w-5xl"
+  widthClass="max-w-6xl"
   {onClose}
 >
-  <form class="space-y-4" onsubmit={onSubmit}>
-    <!-- Stepper -->
-    <div class="steps steps-horizontal w-full">
-      {#each stepOrder as stepName}
+  {#if createdOrder}
+    <!-- Created: hand over change, print, start the next one -->
+    <section
+      bind:this={doneRef}
+      class="mx-auto max-w-2xl space-y-6 py-2 text-center"
+      in:fly={{ y: 12, duration: motionMs(220) }}
+    >
+      <div class="space-y-2">
+        <span
+          class="mx-auto grid size-14 place-items-center rounded-full bg-success/15 text-success"
+        >
+          <Icon icon="lucide:check" class="size-7" aria-hidden="true" />
+        </span>
+        <p class="text-sm font-medium text-base-content/70">
+          Orden creada ·
+          {#if createdOrder.order?.status === "en_proceso"}
+            <span class="font-semibold text-info">Preparando</span>
+          {:else}
+            <span class="font-semibold text-success">Aceptada</span>
+          {/if}
+        </p>
+        <p class="font-display text-6xl font-bold leading-none">
+          #{shortNumber(createdOrder.orderNumber)}
+        </p>
+        <p class="text-sm text-base-content/70">
+          {createdOrder.orderNumber} · Total {formatCurrency(
+            createdOrder.total,
+          )}
+        </p>
+      </div>
+
+      {#if createdOrder.change != null}
+        <div
+          class="rounded-box border-2 border-success/40 bg-success/10 p-5"
+          role="status"
+        >
+          <p
+            class="text-sm font-semibold uppercase tracking-wide text-base-content/70"
+          >
+            Cambio a entregar
+          </p>
+          <p class="text-5xl font-bold tabular-nums text-success">
+            {formatCurrency(createdOrder.change)}
+          </p>
+        </div>
+      {/if}
+
+      <div class="space-y-3 rounded-box border border-base-300 p-4 text-left">
+        <div class="flex items-center justify-between gap-2">
+          <h4 class="flex items-center gap-2 font-semibold">
+            <Icon
+              icon="lucide:printer"
+              class="size-4 text-primary"
+              aria-hidden="true"
+            />
+            Tickets
+          </h4>
+          <div
+            class="flex flex-wrap items-center gap-2 text-sm"
+            role="radiogroup"
+            aria-label="Al crear una orden en este dispositivo"
+          >
+            <span class="text-base-content/70">Al crear:</span>
+            <div class="join">
+              {#each AUTO_PRINT_OPTIONS as option (option.value)}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={autoPrint === option.value}
+                  class={`btn btn-sm min-h-11 join-item ${autoPrint === option.value ? "btn-primary" : "btn-ghost border-base-300"}`}
+                  onclick={() => onAutoPrintChange?.(option.value)}
+                  >{option.label}</button
+                >
+              {/each}
+            </div>
+          </div>
+        </div>
+        {#if createdOrder.order}
+          <div class="grid gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              class="btn btn-outline h-auto flex-col gap-1 py-3"
+              onclick={() => onPrint?.(["customer"])}
+            >
+              <Icon
+                icon="lucide:receipt-text"
+                class="size-5"
+                aria-hidden="true"
+              />
+              <span>Ticket cliente</span>
+              <span class="text-xs font-normal text-base-content/70"
+                >Con precios y cambio</span
+              >
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline h-auto flex-col gap-1 py-3"
+              onclick={() => onPrint?.(["kitchen"])}
+            >
+              <Icon icon="lucide:chef-hat" class="size-5" aria-hidden="true" />
+              <span>Comanda cocina</span>
+              <span class="text-xs font-normal text-base-content/70"
+                >Sabores y toppings</span
+              >
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary h-auto flex-col gap-1 py-3"
+              onclick={() => onPrint?.(["customer", "kitchen"])}
+            >
+              <Icon icon="lucide:copy" class="size-5" aria-hidden="true" />
+              <span>Imprimir ambos</span>
+              <span class="text-xs font-normal opacity-80">Uno tras otro</span>
+            </button>
+          </div>
+        {:else}
+          <p class="text-sm text-base-content/70">
+            La orden se creó, pero no se pudo cargar para imprimir aquí. Ábrela
+            desde el tablero para imprimir sus tickets.
+          </p>
+        {/if}
+      </div>
+
+      <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
+        <button type="button" class="btn btn-ghost" onclick={onClose}
+          >Cerrar</button
+        >
+        {#if onStartPreparing && createdOrder.order && createdOrder.order.status === "recibida"}
+          <button
+            type="button"
+            class="btn btn-outline"
+            onclick={() => onStartPreparing?.()}
+            title="La orden pasa a Preparando y se descuenta el inventario"
+          >
+            <Icon icon="lucide:chef-hat" class="size-4" aria-hidden="true" />
+            Pasar a Preparando
+          </button>
+        {/if}
         <button
           type="button"
-          class={`step ${isStepReached(stepName) ? "step-primary" : ""} ${canNavigateToStep(stepName) ? "cursor-pointer" : "cursor-not-allowed opacity-70"}`}
-          aria-current={step === stepName ? "step" : undefined}
-          disabled={!canNavigateToStep(stepName)}
-          onclick={() => goToStep(stepName)}
+          class="btn btn-primary"
+          onclick={() => onNewOrder?.()}
         >
-          {stepLabels[stepName]}
+          <Icon icon="lucide:plus" class="size-4" aria-hidden="true" />
+          Nueva orden
         </button>
-      {/each}
-    </div>
-
-    {#if stepError}
-      <div class="alert alert-warning py-2 text-sm">
-        <Icon icon="lucide:alert-triangle" width="16" height="16" />
-        <span>{stepError}</span>
       </div>
-    {/if}
+    </section>
+  {:else}
+    <form class="space-y-4" onsubmit={onSubmit}>
+      <!-- Stepper -->
+      <ol class="editor-steps" aria-label="Pasos">
+        {#each stepOrder as stepName, index (stepName)}
+          {@const reached = isStepReached(stepName)}
+          {@const current = step === stepName}
+          <li class="editor-step" class:editor-step-done={reached && !current}>
+            <button
+              type="button"
+              class={`editor-step-btn ${current ? "editor-step-current" : ""}`}
+              aria-current={current ? "step" : undefined}
+              disabled={!canNavigateToStep(stepName)}
+              onclick={() => goToStep(stepName)}
+            >
+              <span class="editor-step-dot">
+                {#if reached && !current}
+                  <Icon
+                    icon="lucide:check"
+                    class="size-3.5"
+                    aria-hidden="true"
+                  />
+                {:else}
+                  {index + 1}
+                {/if}
+              </span>
+              <span>{stepLabels[stepName]}</span>
+            </button>
+          </li>
+        {/each}
+      </ol>
 
-    {#if step === "products"}
-      <!-- Products section -->
-      <OrderItemBuilder
-        {products}
-        {categories}
-        {orderForm}
-        {manualItems}
-        {draftItemEditIndex}
-        {selectedProductFlavors}
-        {toppingAddons}
-        {jaleaAddons}
-        {selectedProductAddons}
-        {paidAddonGroups}
-        {selectedFlavorId}
-        {selectedFlavorIds}
-        {includedToppingIds}
-        {includedJaleaIds}
-        {selectedExtraAddonIds}
-        {toppingFreeAllowance}
-        {jaleaFreeAllowance}
-        {toppingSelection}
-        {jaleaSelection}
-        {hasCustomizationOptions}
-        {totalPreview}
-        {manualOrderTotal}
-        {addItemError}
-        {busy}
-        {onProductChange}
-        {onQuantityChange}
-        {onFlavorChange}
-        {onFlavorIdsChange}
-        {onToppingSelectionChange}
-        {onJaleaSelectionChange}
-        {onToggleExtraAddonSelection}
-        {onAddDraftItem}
-        {onEditDraftItem}
-        {onCancelDraftItemEdit}
-        {onRemoveDraftItem}
-        {onUpdateDraftItemQuantity}
-        {onProductById}
-        {onResolveFlavorName}
-        {onResolveAddonNames}
-        {onManualItemSubtotal}
-        {onDraftItemKey}
-      />
+      {#if stepError}
+        <div class="alert alert-warning py-2 text-sm" role="alert">
+          <Icon icon="lucide:alert-triangle" width="16" height="16" />
+          <span>{stepError}</span>
+        </div>
+      {/if}
 
-      <span class="hidden" aria-hidden="true">{draftItemEditIndex ?? ""}</span>
-    {:else if step === "customer"}
-      <!-- Customer + order details section -->
-      <div class="space-y-3">
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-          <div class="form-control">
-            <span
-              id="order-customer-name-label"
-              class="label-text text-xs mb-1"
-            >
-              Nombre
-            </span>
-            <input
-              id="order-customer-name"
-              class="input input-bordered input-sm w-full"
-              placeholder="Nombre completo"
-              bind:value={orderForm.customer_name}
-              required
-              aria-labelledby="order-customer-name-label"
-            />
-          </div>
-          <div class="form-control">
-            <span
-              id="order-customer-phone-label"
-              class="label-text text-xs mb-1"
-            >
-              Teléfono
-            </span>
-            <input
-              id="order-customer-phone"
-              class="input input-bordered input-sm w-full"
-              placeholder="Ej. 7000-0000"
-              bind:value={orderForm.customer_phone}
-              required
-              aria-labelledby="order-customer-phone-label"
-            />
-          </div>
-          <div class="form-control sm:col-span-2 md:col-span-1">
-            <span
-              id="order-customer-email-label"
-              class="label-text text-xs mb-1"
-            >
-              Correo <span class="text-base-content/40 font-normal"
-                >(opcional)</span
+      {#if step === "products"}
+        <OrderItemBuilder
+          {products}
+          {categories}
+          {orderForm}
+          {manualItems}
+          {draftItemEditIndex}
+          {selectedProductFlavors}
+          {toppingAddons}
+          {jaleaAddons}
+          {selectedProductAddons}
+          {paidAddonGroups}
+          {selectedFlavorId}
+          {selectedFlavorIds}
+          {includedToppingIds}
+          {includedJaleaIds}
+          {selectedExtraAddonIds}
+          {toppingFreeAllowance}
+          {jaleaFreeAllowance}
+          {toppingSelection}
+          {jaleaSelection}
+          {hasCustomizationOptions}
+          {totalPreview}
+          {manualOrderTotal}
+          {addItemError}
+          {busy}
+          {onProductChange}
+          {onQuantityChange}
+          {onFlavorChange}
+          {onFlavorIdsChange}
+          {onToppingSelectionChange}
+          {onJaleaSelectionChange}
+          {onToggleExtraAddonSelection}
+          {onAddDraftItem}
+          {onEditDraftItem}
+          {onCancelDraftItemEdit}
+          {onRemoveDraftItem}
+          {onUpdateDraftItemQuantity}
+          {onProductById}
+          {onResolveFlavorName}
+          {onResolveAddonNames}
+          {onManualItemSubtotal}
+          {onDraftItemKey}
+        />
+      {:else if step === "customer"}
+        <div class="mx-auto max-w-3xl space-y-5">
+          <fieldset class="grid gap-3 sm:grid-cols-2">
+            <legend class="mb-2 text-sm font-semibold">Cliente</legend>
+            <label class="form-control">
+              <span class="label-text mb-1 text-sm"
+                >Nombre <span class="text-error" aria-hidden="true">*</span
+                ></span
               >
+              <input
+                id="order-customer-name"
+                class="input input-bordered w-full"
+                placeholder="Nombre del cliente"
+                autocomplete="off"
+                bind:value={orderForm.customer_name}
+                required
+              />
+            </label>
+            <label class="form-control">
+              <span class="label-text mb-1 text-sm"
+                >Teléfono {#if phoneRequired}<span
+                    class="text-error"
+                    aria-hidden="true">*</span
+                  >{:else}<span class="text-ink-muted">(opcional)</span
+                  >{/if}</span
+              >
+              <input
+                id="order-customer-phone"
+                class="input input-bordered w-full"
+                type="tel"
+                inputmode="tel"
+                placeholder="7000-0000"
+                autocomplete="off"
+                bind:value={orderForm.customer_phone}
+                required={phoneRequired}
+              />
+            </label>
+            <label class="form-control sm:col-span-2">
+              <span class="label-text mb-1 text-sm"
+                >Correo <span class="text-ink-muted">(opcional)</span></span
+              >
+              <input
+                id="order-customer-email"
+                class="input input-bordered w-full"
+                type="email"
+                placeholder="correo@ejemplo.com"
+                bind:value={orderForm.customer_email}
+              />
+            </label>
+          </fieldset>
+
+          <fieldset class="space-y-2">
+            <legend class="mb-2 text-sm font-semibold"
+              >¿Dónde lo consume?</legend
+            >
+            <div
+              class="grid grid-cols-2 gap-2"
+              role="radiogroup"
+              aria-label="Tipo de orden"
+            >
+              {#each [{ value: "para_llevar", label: "Para llevar", icon: "lucide:shopping-bag" }, { value: "en_local", label: "En local", icon: "lucide:armchair" }] as option (option.value)}
+                {@const active = orderForm.order_type === option.value}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  class={`btn h-14 justify-start gap-3 ${active ? "btn-primary" : "btn-outline border-base-300"}`}
+                  onclick={() => {
+                    orderForm.order_type =
+                      option.value as OrderFormState["order_type"];
+                    if (option.value !== "en_local")
+                      orderForm.table_number = "";
+                  }}
+                >
+                  <Icon icon={option.icon} class="size-5" aria-hidden="true" />
+                  {option.label}
+                </button>
+              {/each}
+            </div>
+            {#if orderForm.order_type === "en_local"}
+              <label
+                class="form-control max-w-xs"
+                in:fly={{ y: -6, duration: motionMs(160) }}
+              >
+                <span class="label-text mb-1 text-sm"
+                  >Número de mesa <span class="text-error" aria-hidden="true"
+                    >*</span
+                  ></span
+                >
+                <input
+                  id="order-table-number"
+                  class="input input-bordered w-full"
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  placeholder="Ej. 4"
+                  bind:value={orderForm.table_number}
+                  required
+                />
+              </label>
+            {/if}
+          </fieldset>
+
+          <label class="form-control block">
+            <span class="label-text mb-1 text-sm">
+              Nota de la orden
+              {#if isEditing}
+                <span class="text-error">(obligatoria al editar)</span>
+              {:else}
+                <span class="text-ink-muted">(opcional)</span>
+              {/if}
             </span>
-            <input
-              id="order-customer-email"
-              class="input input-bordered input-sm w-full"
-              type="email"
-              placeholder="correo@ejemplo.com"
-              bind:value={orderForm.customer_email}
-              aria-labelledby="order-customer-email-label"
-            />
-          </div>
+            <textarea
+              class="textarea textarea-bordered w-full"
+              rows="3"
+              placeholder={isEditing
+                ? "Explica qué cambió y por qué"
+                : "Ej: sin azúcar, alérgico a nueces, recoge su hermana…"}
+              bind:value={orderForm.notes}
+              aria-label="Nota de la orden"
+            ></textarea>
+          </label>
         </div>
-
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-          <div class="form-control">
-            <span
-              id="order-payment-method-label"
-              class="label-text text-xs mb-1"
+      {:else if step === "summary"}
+        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          <!-- Ticket preview -->
+          <section
+            class="flex flex-col rounded-box border border-base-300 bg-base-100"
+          >
+            <header
+              class="flex items-start justify-between gap-3 border-b border-base-300 p-4"
             >
-              Pago
-            </span>
-            <select
-              id="order-payment-method"
-              class="select select-bordered select-sm w-full"
-              bind:value={orderForm.payment_method}
-              aria-labelledby="order-payment-method-label"
+              <div class="min-w-0">
+                <p class="truncate font-bold">
+                  {orderForm.customer_name || "Cliente"}
+                </p>
+                <p class="text-sm text-base-content/70">
+                  {orderForm.customer_phone || "Sin teléfono"}
+                  {#if orderForm.customer_email}· {orderForm.customer_email}{/if}
+                </p>
+              </div>
+              <span class="badge badge-outline shrink-0">
+                {orderForm.order_type === "en_local"
+                  ? `Mesa ${orderForm.table_number}`
+                  : "Para llevar"}
+              </span>
+            </header>
+            <ul
+              class="max-h-72 flex-1 divide-y divide-base-300 overflow-y-auto px-4"
             >
-              <option value="efectivo">Efectivo</option>
-              <option value="tarjeta">Tarjeta</option>
-              <option value="transferencia">Transferencia</option>
-              <option value="otro">Otro</option>
-            </select>
-          </div>
-          <div class="form-control">
-            <span id="order-type-label" class="label-text text-xs mb-1">
-              Tipo
-            </span>
-            <select
-              id="order-type"
-              class="select select-bordered select-sm w-full"
-              bind:value={orderForm.order_type}
-              aria-labelledby="order-type-label"
-            >
-              <option value="para_llevar">Para llevar</option>
-              <option value="en_local">En local</option>
-            </select>
-          </div>
-          <div class="form-control sm:col-span-2 md:col-span-1">
-            <span id="order-table-number-label" class="label-text text-xs mb-1">
-              Mesa
-            </span>
-            <input
-              id="order-table-number"
-              class="input input-bordered input-sm w-full"
-              type="number"
-              min="1"
-              placeholder={orderForm.order_type === "en_local"
-                ? "Número"
-                : "No aplica"}
-              bind:value={orderForm.table_number}
-              required={orderForm.order_type === "en_local"}
-              disabled={orderForm.order_type !== "en_local"}
-              aria-labelledby="order-table-number-label"
-            />
-          </div>
-        </div>
-
-        <label class="form-control w-full">
-          <span class="label-text text-xs mb-1">Notas (opcional)</span>
-          <textarea
-            class="textarea textarea-bordered w-full"
-            rows="3"
-            placeholder="Ej: Sin hielo, entregar en planta baja, alérgico a nueces..."
-            bind:value={orderForm.notes}
-            aria-label="Notas de la orden"
-          ></textarea>
-        </label>
-      </div>
-    {:else if step === "summary"}
-      <!-- Summary section -->
-      <div class="space-y-4">
-        {#if isEditing}
-          <div class="alert alert-info py-2 text-sm">
-            <Icon icon="lucide:info" width="16" height="16" />
-            <span>
-              Puedes editar productos, cantidades y configuraciones. Debes
-              agregar una nota explicando los cambios antes de guardar.
-            </span>
-          </div>
-        {/if}
-
-        <div
-          class="rounded-xl border border-base-300 bg-base-100 p-4 space-y-3"
-        >
-          <h4 class="font-semibold text-sm">Productos agregados</h4>
-          {#if manualItems.length === 0}
-            <p class="text-sm text-base-content/50">Sin productos</p>
-          {:else}
-            <div class="space-y-3 max-h-64 overflow-y-auto">
               {#each manualItems as item, index (onDraftItemKey(item, index))}
                 {@const product = onProductById(item.product_id)}
                 {@const summary = resolveItemSummary(item)}
-                <div
-                  class="flex items-start justify-between gap-3 border-b border-base-200/60 last:border-0 pb-3 last:pb-0"
-                >
-                  <div class="min-w-0 space-y-1">
-                    <p class="text-sm font-medium">
-                      {item.quantity} x {product?.name ?? "Producto"}
+                <li class="flex items-start gap-3 py-3">
+                  <span class="w-7 shrink-0 font-bold tabular-nums"
+                    >{item.quantity}×</span
+                  >
+                  <div class="min-w-0 flex-1">
+                    <p class="font-semibold leading-snug">
+                      {product?.name ?? "Producto"}
                     </p>
-                    {#if summary.length > 0}
-                      <div class="flex flex-wrap gap-1">
-                        {#each summary as line (line.label)}
-                          <span class="text-xs text-base-content/70"
-                            >{line.label}: {line.value}</span
-                          >
-                        {/each}
-                      </div>
-                    {/if}
+                    {#each summary as line (line.label)}
+                      <p class="text-xs text-base-content/70">
+                        {line.label}: {line.value}
+                      </p>
+                    {/each}
                   </div>
-                  <p class="text-sm font-semibold whitespace-nowrap">
-                    {formatCurrency(onManualItemSubtotal(item))}
-                  </p>
-                </div>
+                  <span class="font-semibold tabular-nums"
+                    >{formatCurrency(onManualItemSubtotal(item))}</span
+                  >
+                </li>
               {/each}
-            </div>
-          {/if}
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div
-            class="rounded-xl border border-base-300 bg-base-100 p-4 space-y-2"
-          >
-            <h4 class="font-semibold text-sm">Datos del cliente</h4>
-            <div class="text-sm space-y-1">
-              <p>
-                <span class="text-base-content/60">Nombre:</span>
-                {orderForm.customer_name || "—"}
+            </ul>
+            {#if orderForm.notes.trim()}
+              <p
+                class="mx-4 mb-3 rounded-field border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+              >
+                <span class="font-semibold">Nota:</span>
+                {orderForm.notes}
               </p>
-              <p>
-                <span class="text-base-content/60">Teléfono:</span>
-                {orderForm.customer_phone || "—"}
-              </p>
-              {#if orderForm.customer_email}
-                <p>
-                  <span class="text-base-content/60">Correo:</span>
-                  {orderForm.customer_email}
-                </p>
-              {/if}
-              <p>
-                <span class="text-base-content/60">Pago:</span>
-                <span class="capitalize">{orderForm.payment_method}</span>
-              </p>
-              <p>
-                <span class="text-base-content/60">Tipo:</span>
-                {orderForm.order_type === "en_local"
-                  ? "En local"
-                  : "Para llevar"}
-              </p>
-              {#if orderForm.order_type === "en_local"}
-                <p>
-                  <span class="text-base-content/60">Mesa:</span>
-                  {orderForm.table_number}
-                </p>
-              {/if}
-              {#if orderForm.notes.trim()}
-                <p>
-                  <span class="text-base-content/60">Notas:</span>
-                  {orderForm.notes}
-                </p>
-              {/if}
-            </div>
-          </div>
-
-          <div
-            class="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3"
-          >
-            <h4 class="font-semibold text-sm text-base-content/80">
-              Total estimado
-            </h4>
-            <p class="text-2xl font-bold text-primary">
-              {formatCurrency(displayTotal)}
-            </p>
-            {#if isEditing && selectedOrder}
-              <p class="text-xs text-base-content/60">
-                Total previo: {formatCurrency(selectedOrder.total_amount)}
+            {:else if isEditing}
+              <p
+                class="mx-4 mb-3 rounded-field border border-error/40 bg-error/10 px-3 py-2 text-sm text-error"
+              >
+                Agrega una nota en el paso “Cliente” explicando los cambios.
               </p>
             {/if}
+            <footer
+              class="flex items-baseline justify-between border-t border-base-300 p-4"
+            >
+              <span class="text-sm text-base-content/70"
+                >{itemUnits} {itemUnits === 1 ? "artículo" : "artículos"}</span
+              >
+              {#if isEditing && selectedOrder}
+                <span class="text-xs text-base-content/70"
+                  >Antes: {formatCurrency(selectedOrder.total_amount)}</span
+                >
+              {/if}
+            </footer>
+          </section>
+
+          <!-- Payment -->
+          <section
+            class="space-y-4 rounded-box border border-primary/30 bg-primary/5 p-4 md:p-5"
+          >
+            <div class="flex items-baseline justify-between gap-3">
+              <h4
+                class="text-sm font-semibold uppercase tracking-wide text-base-content/70"
+              >
+                Total a cobrar
+              </h4>
+              <p
+                class="text-4xl font-bold tabular-nums text-primary md:text-5xl"
+              >
+                {formatCurrency(displayTotal)}
+              </p>
+            </div>
+
+            <div
+              class="grid grid-cols-2 gap-2 sm:grid-cols-4"
+              role="radiogroup"
+              aria-label="Método de pago"
+            >
+              {#each PAYMENT_OPTIONS as option (option.value)}
+                {@const active = orderForm.payment_method === option.value}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  class={`btn h-auto flex-col gap-1 py-2.5 ${active ? "btn-primary" : "btn-outline border-base-300 bg-base-100"}`}
+                  onclick={() => {
+                    orderForm.payment_method = option.value;
+                    if (option.value !== "efectivo")
+                      orderForm.amount_received = "";
+                  }}
+                >
+                  <Icon icon={option.icon} class="size-5" aria-hidden="true" />
+                  <span class="text-sm">{option.label}</span>
+                </button>
+              {/each}
+            </div>
 
             {#if orderForm.payment_method === "efectivo"}
-              <div class="border-t border-primary/10 pt-3 space-y-2">
-                <div class="flex flex-wrap gap-1.5">
-                  {#each [displayTotal, 1, 5, 10, 20] as amount (amount)}
+              <div class="space-y-3 border-t border-primary/20 pt-4">
+                <label class="form-control block">
+                  <span class="label-text mb-1 text-sm font-medium"
+                    >Recibido</span
+                  >
+                  <div
+                    class="input input-bordered input-lg flex w-full items-center gap-2 bg-base-100"
+                  >
+                    <span class="text-2xl text-ink-muted">$</span>
+                    <input
+                      bind:this={receivedRef}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      inputmode="decimal"
+                      class="w-full text-2xl font-semibold tabular-nums"
+                      placeholder="0.00"
+                      value={orderForm.amount_received}
+                      oninput={(e) => {
+                        const raw = e.currentTarget.value;
+                        orderForm.amount_received =
+                          raw === "" ? "" : Number(raw);
+                      }}
+                      aria-describedby="order-change"
+                    />
+                  </div>
+                </label>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class={`btn ${effectiveReceived === Math.round(displayTotal * 100) / 100 ? "btn-primary" : "btn-outline border-base-300 bg-base-100"}`}
+                    onclick={() => setReceivedAmount(displayTotal)}
+                  >
+                    Exacto
+                  </button>
+                  {#each cashSuggestions as amount (amount)}
                     <button
                       type="button"
-                      class="btn btn-xs {effectiveReceived === amount
-                        ? 'btn-primary'
-                        : 'btn-outline'}"
+                      class={`btn tabular-nums ${effectiveReceived === amount ? "btn-primary" : "btn-outline border-base-300 bg-base-100"}`}
                       onclick={() => setReceivedAmount(amount)}
                     >
-                      {amount === displayTotal ? "Exacto" : `$${amount}`}
+                      ${amount}
                     </button>
                   {/each}
                 </div>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="input input-xs input-bordered w-full bg-base-100"
-                  placeholder="Monto recibido"
-                  value={orderForm.amount_received}
-                  oninput={(e) => {
-                    const raw = e.currentTarget.value;
-                    orderForm.amount_received = raw === "" ? "" : Number(raw);
-                  }}
-                />
-                {#if changeAmount !== null}
-                  <p class="text-sm">
-                    <span class="text-base-content/60">Cambio:</span>
-                    <span
-                      class="font-semibold {cashError
-                        ? 'text-error'
-                        : 'text-success'}"
-                    >
-                      {formatCurrency(changeAmount)}
-                    </span>
-                  </p>
-                {/if}
-                {#if cashError}
-                  <p class="text-xs text-error">
-                    El monto recibido debe ser igual o mayor al total.
+
+                <div
+                  id="order-change"
+                  class={`flex items-baseline justify-between gap-3 rounded-box p-4 ${
+                    cashError
+                      ? "bg-error/10 text-error"
+                      : roundedChange != null
+                        ? "bg-success/10"
+                        : "bg-base-100"
+                  }`}
+                  aria-live="polite"
+                >
+                  <span class="text-sm font-semibold uppercase tracking-wide">
+                    {cashError ? "Faltan" : "Cambio"}
+                  </span>
+                  <span
+                    class={`text-4xl font-bold tabular-nums ${cashError ? "" : roundedChange != null ? "text-success" : "text-ink-muted"}`}
+                  >
+                    {roundedChange == null
+                      ? "—"
+                      : formatCurrency(Math.abs(roundedChange))}
+                  </span>
+                </div>
+                {#if roundedChange == null}
+                  <p class="text-xs text-base-content/70">
+                    Sin monto recibido se registra como pago exacto.
                   </p>
                 {/if}
               </div>
+            {:else}
+              <p
+                class="rounded-box bg-base-100 p-3 text-sm text-base-content/70"
+              >
+                {orderForm.payment_method === "tarjeta"
+                  ? "Cobra con la terminal antes de crear la orden."
+                  : orderForm.payment_method === "transferencia"
+                    ? "Confirma que la transferencia llegó antes de crear la orden."
+                    : "Registra el detalle del pago en la nota si hace falta."}
+              </p>
             {/if}
-          </div>
+          </section>
+        </div>
+      {/if}
+
+      <!-- Feedback messages -->
+      {#if editError}
+        <div class="alert alert-error py-2 text-sm" role="alert">
+          <Icon icon="lucide:circle-alert" width="16" height="16" />
+          <span>{editError}</span>
+        </div>
+      {/if}
+      {#if editNotice}
+        <div class="alert alert-success py-2 text-sm">
+          <Icon icon="lucide:circle-check" width="16" height="16" />
+          <span>{editNotice}</span>
+        </div>
+      {/if}
+
+      <!-- Action bar stays visible while the step scrolls -->
+      <div class="editor-actions">
+        <div class="flex gap-2">
+          <button class="btn btn-ghost" type="button" onclick={onCancelEdit}>
+            {isEditing ? "Cancelar edición" : "Cancelar"}
+          </button>
+          {#if !isEditing && step === "products" && manualItems.length > 0}
+            <button
+              class="btn btn-ghost text-error"
+              type="button"
+              onclick={onClearForm}
+            >
+              Vaciar
+            </button>
+          {/if}
+        </div>
+        <div class="flex items-center gap-2">
+          {#if step !== "summary"}
+            <span class="hidden text-right text-sm sm:block">
+              <span class="block text-xs text-base-content/70"
+                >{itemUnits} {itemUnits === 1 ? "artículo" : "artículos"}</span
+              >
+              <span class="font-bold tabular-nums"
+                >{formatCurrency(manualOrderTotal)}</span
+              >
+            </span>
+          {/if}
+          {#if step !== "products"}
+            <button
+              class="btn btn-outline"
+              type="button"
+              onclick={prevStep}
+              disabled={busy}
+            >
+              <Icon
+                icon="lucide:arrow-left"
+                class="size-4"
+                aria-hidden="true"
+              />
+              Atrás
+            </button>
+          {/if}
+          {#if step !== "summary"}
+            <button
+              class="btn btn-primary"
+              type="button"
+              onclick={nextStep}
+              disabled={busy}
+            >
+              Siguiente
+              <Icon
+                icon="lucide:arrow-right"
+                class="size-4"
+                aria-hidden="true"
+              />
+            </button>
+          {:else}
+            <button
+              class="btn btn-primary"
+              type="submit"
+              disabled={busy || !isStepValid("summary") || requiresEditNote}
+            >
+              {#if busy}<span class="loading loading-spinner loading-sm"
+                ></span>{/if}
+              {isEditing
+                ? "Guardar cambios"
+                : `Crear orden · ${formatCurrency(displayTotal)}`}
+            </button>
+          {/if}
         </div>
       </div>
-    {/if}
-
-    <!-- Feedback messages -->
-    {#if editError}
-      <div class="alert alert-error py-2 text-sm">
-        <Icon icon="lucide:circle-alert" width="16" height="16" />
-        <span>{editError}</span>
-      </div>
-    {/if}
-    {#if editNotice}
-      <div class="alert alert-success py-2 text-sm">
-        <Icon icon="lucide:circle-check" width="16" height="16" />
-        <span>{editNotice}</span>
-      </div>
-    {/if}
-
-    <!-- Action buttons -->
-    <div
-      class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-base-200"
-    >
-      <div class="flex flex-wrap gap-2">
-        <button class="btn btn-outline" type="button" onclick={onCancelEdit}>
-          {isEditing ? "Cancelar edición" : "Cancelar"}
-        </button>
-        {#if !isEditing}
-          <button class="btn btn-outline" type="button" onclick={onClearForm}>
-            Limpiar
-          </button>
-        {/if}
-      </div>
-      <div class="flex flex-wrap gap-2">
-        {#if step !== "products"}
-          <button
-            class="btn btn-outline"
-            type="button"
-            onclick={prevStep}
-            disabled={busy}
-          >
-            Atrás
-          </button>
-        {/if}
-        {#if step !== "summary"}
-          <button
-            class="btn btn-primary"
-            type="button"
-            onclick={nextStep}
-            disabled={busy}
-          >
-            Siguiente
-          </button>
-        {:else}
-          <button
-            class="btn btn-primary"
-            type="submit"
-            disabled={busy || !isStepValid("summary") || requiresEditNote}
-          >
-            {isEditing ? "Guardar cambios" : "Crear orden"}
-          </button>
-        {/if}
-      </div>
-    </div>
-  </form>
-</AdminModalShell>
-
-<!-- Notes sub-dialog -->
-<AdminModalShell
-  bind:dialogRef={noteDialogRef}
-  title="Nota de la orden"
-  icon="lucide:sticky-note"
-  widthClass="max-w-lg"
-  onClose={closeNotesDialog}
->
-  <p class="text-sm text-base-content/60">
-    Agrega una observación general para esta orden. El cliente puede verla en su
-    seguimiento.
-  </p>
-
-  {#if orderForm.notes.trim()}
-    <div class="flex justify-end">
-      <button
-        class="btn btn-ghost btn-xs text-error"
-        type="button"
-        onclick={() => (orderForm.notes = "")}
-      >
-        <Icon icon="lucide:trash-2" width="12" height="12" />
-        Limpiar
-      </button>
-    </div>
+    </form>
   {/if}
-
-  <textarea
-    id="order-notes"
-    class="textarea textarea-bordered w-full min-h-36"
-    rows="6"
-    placeholder="Ej: Sin hielo, entregar en planta baja, alérgico a nueces..."
-    bind:value={orderForm.notes}
-    aria-label="Notas de la orden"
-  ></textarea>
-
-  <AdminFormActions
-    submitLabel="Guardar nota"
-    submitType="button"
-    onSubmit={closeNotesDialog}
-    onCancel={closeNotesDialog}
-  />
 </AdminModalShell>
+
+<style>
+  .editor-steps {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .editor-step {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* Connector between steps; filled once the step behind it is done. */
+  .editor-step + .editor-step::before {
+    content: "";
+    flex: 1;
+    height: 2px;
+    min-width: 0.75rem;
+    border-radius: 1px;
+    background: var(--color-base-300);
+  }
+
+  .editor-step-done + .editor-step::before,
+  .editor-step:has(.editor-step-current)::before {
+    background: var(--color-primary);
+  }
+
+  .editor-step:first-child {
+    flex: none;
+  }
+
+  .editor-step-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.625rem 0.25rem 0.25rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    white-space: nowrap;
+  }
+
+  .editor-step-btn:disabled {
+    cursor: not-allowed;
+  }
+
+  .editor-step-btn:not(:disabled):hover {
+    background: var(--color-base-200);
+  }
+
+  .editor-step-btn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  .editor-step-dot {
+    display: grid;
+    width: 1.75rem;
+    height: 1.75rem;
+    place-items: center;
+    border-radius: 999px;
+    border: 2px solid var(--color-base-300);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .editor-step-done .editor-step-dot {
+    border-color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+  }
+
+  .editor-step-current {
+    color: var(--color-base-content);
+  }
+
+  .editor-step-current .editor-step-dot {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+  }
+
+  .editor-actions {
+    position: sticky;
+    bottom: -1.25rem;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0 -1.25rem -1.25rem;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--color-base-300);
+    background: var(--color-base-100);
+  }
+
+  @media (max-width: 479.98px) {
+    .editor-step-btn > span:last-child {
+      display: none;
+    }
+    .editor-step-current > span:last-child {
+      display: inline;
+    }
+  }
+</style>

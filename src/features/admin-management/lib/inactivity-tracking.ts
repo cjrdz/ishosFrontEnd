@@ -62,6 +62,12 @@ export function createInactivityTracking(
   let countdownTimer: ReturnType<typeof setInterval> | null = null;
   let listenersAttached = false;
   let lastActivityAt = 0;
+  /**
+   * Wall-clock time of the last user activity. Timers do not run while a
+   * laptop or tablet sleeps, so the remaining time is always computed from
+   * this, and re-checked when the page becomes visible again.
+   */
+  let lastUserActivityAt = Date.now();
 
   function clearTimers() {
     if (logoutTimer) {
@@ -85,15 +91,28 @@ export function createInactivityTracking(
   function schedule() {
     if (typeof window === "undefined") return;
     const timeoutValue = options.getTimeoutSeconds();
-    if (timeoutValue === null) return;
+    if (timeoutValue === null) {
+      // Idle: cancel any pending warning/logout scheduled earlier.
+      clearTimers();
+      notifyWarning(null);
+      return;
+    }
 
     const timeoutSeconds = Math.max(1, timeoutValue);
-    const timeoutMs = timeoutSeconds * 1000;
+    const timeoutMs = Math.max(
+      0,
+      timeoutSeconds * 1000 - (Date.now() - lastUserActivityAt),
+    );
 
     clearTimers();
     notifyWarning(null);
 
-    if (timeoutSeconds > warningSeconds) {
+    if (timeoutMs <= 0) {
+      options.onTimeout();
+      return;
+    }
+
+    if (timeoutMs > warningSeconds * 1000) {
       warningTimer = setTimeout(
         () => {
           warningTimer = null;
@@ -123,6 +142,7 @@ export function createInactivityTracking(
   }
 
   function handleActivity() {
+    lastUserActivityAt = Date.now();
     schedule();
     if (!options.onActivity) return;
     const timeoutValue = options.getTimeoutSeconds();
@@ -139,12 +159,22 @@ export function createInactivityTracking(
     options.onActivity();
   }
 
+  // Back from sleep or another tab: log out right away if the time is up.
+  function handleResume() {
+    if (document.visibilityState === "hidden") return;
+    schedule();
+  }
+
   function start() {
     if (typeof window === "undefined") return;
     if (!listenersAttached) {
+      lastUserActivityAt = Date.now();
       for (const eventName of ACTIVITY_EVENTS) {
         window.addEventListener(eventName, handleActivity, true);
       }
+      document.addEventListener("visibilitychange", handleResume);
+      window.addEventListener("focus", handleResume);
+      window.addEventListener("pageshow", handleResume);
       listenersAttached = true;
     }
     schedule();
@@ -157,6 +187,9 @@ export function createInactivityTracking(
       for (const eventName of ACTIVITY_EVENTS) {
         window.removeEventListener(eventName, handleActivity, true);
       }
+      document.removeEventListener("visibilitychange", handleResume);
+      window.removeEventListener("focus", handleResume);
+      window.removeEventListener("pageshow", handleResume);
       listenersAttached = false;
     }
   }

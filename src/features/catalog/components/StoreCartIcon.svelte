@@ -1,10 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Icon from "@shared/components/AppIcon.svelte";
-  import { fetchStoreSettings } from "@features/catalog/lib/api";
+  import { showToast } from "@shared/toast/toast";
 
   let itemCount = $state(0);
-  let ordersEnabled = $state(true);
   let badgePop = $state(false);
   let previousCount = 0;
   let popTimer: ReturnType<typeof setTimeout> | undefined;
@@ -23,20 +22,32 @@
     previousCount = nextCount;
   }
 
+  function onCartAdded(event: Event) {
+    const detail =
+      (event as CustomEvent<{ name?: string; quantity?: number }>).detail ?? {};
+    const quantity = Number(detail.quantity || 1);
+    const name = detail.name || "Producto";
+    showToast(`${quantity > 1 ? `${quantity} × ` : ""}${name} en tu carrito`, {
+      actionLabel: "Ver carrito",
+      onAction: () => {
+        window.location.href = "/order/cart";
+      },
+      durationMs: 3500,
+    });
+  }
+
   onMount(() => {
-    const persisted = localStorage.getItem("ishos_storefront_cart_count");
+    window.addEventListener("storefront-cart-added", onCartAdded);
+    let persisted: string | null = null;
+    try {
+      persisted = localStorage.getItem("ishos_storefront_cart_count");
+    } catch {
+      persisted = null;
+    }
     if (persisted) {
       itemCount = Number(persisted) || 0;
       previousCount = itemCount;
     }
-
-    fetchStoreSettings()
-      .then((s) => {
-        ordersEnabled = s.orders_enabled;
-      })
-      .catch(() => {
-        ordersEnabled = true;
-      });
 
     window.addEventListener(
       "storefront-cart-count",
@@ -48,25 +59,27 @@
         "storefront-cart-count",
         updateCount as EventListener,
       );
+      window.removeEventListener("storefront-cart-added", onCartAdded);
     };
   });
 </script>
 
-{#if ordersEnabled}
-  <a
-    href="/order/cart"
-    class="btn btn-ghost btn-circle relative"
-    aria-label="Ver carrito"
-  >
-    <Icon icon="lucide:shopping-cart" class="h-6 w-6" />
-    {#if itemCount > 0}
-      <span
-        class={`badge badge-sm badge-primary absolute -top-1 -right-1 ${badgePop ? "cart-badge-pop" : ""}`}
-        >{itemCount}</span
-      >
-    {/if}
-  </a>
-{/if}
+<a
+  href="/order/cart"
+  class="btn btn-ghost btn-circle relative min-h-11 min-w-11"
+  aria-label={itemCount > 0
+    ? `Ver carrito (${itemCount} productos)`
+    : "Ver carrito"}
+  data-cart-target
+>
+  <Icon icon="lucide:shopping-cart" class="h-6 w-6" aria-hidden="true" />
+  {#if itemCount > 0}
+    <span
+      class={`badge badge-sm badge-primary absolute -top-1 -right-1 ${badgePop ? "cart-badge-pop" : ""}`}
+      >{itemCount}</span
+    >
+  {/if}
+</a>
 
 <style>
   .cart-badge-pop {

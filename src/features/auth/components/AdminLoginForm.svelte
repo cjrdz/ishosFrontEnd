@@ -56,6 +56,9 @@
 
   function playEntranceAnimations() {
     if (prefersReducedMotion()) {
+      // Everything that starts at opacity:0 must be revealed here, or the
+      // page stays blank for users with animations turned off.
+      if (cardRef) cardRef.style.opacity = "1";
       if (albertoRef) albertoRef.style.opacity = "1";
       if (yuyuRef) yuyuRef.style.opacity = "1";
       charsVisible = true;
@@ -494,10 +497,10 @@
         onkeydown={(e) => handleCharacterKey(e, triggerYuyuEngine)}
       >
         <img
-          src="/images/Yuli.png"
+          src="/images/Yuli.webp"
           alt=""
-          width="768"
-          height="768"
+          width="680"
+          height="1021"
           loading="eager"
           decoding="async"
         />
@@ -520,10 +523,10 @@
         onkeydown={(e) => handleCharacterKey(e, triggerAlbertoBell)}
       >
         <img
-          src="/images/Alberto.png"
+          src="/images/Alberto.webp"
           alt=""
-          width="768"
-          height="768"
+          width="720"
+          height="720"
           loading="eager"
           decoding="async"
         />

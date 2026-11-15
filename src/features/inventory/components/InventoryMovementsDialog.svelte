@@ -58,16 +58,25 @@
                   class:badge-success={m.type === "entry"}
                   class:badge-error={m.type === "sale"}
                   class:badge-warning={m.type === "adjustment"}
+                  class:badge-neutral={m.type === "waste"}
                 >
                   {m.type === "entry"
                     ? "Entrada"
                     : m.type === "sale"
                       ? "Venta"
-                      : "Ajuste"}
+                      : m.type === "waste"
+                        ? "Merma"
+                        : "Ajuste"}
                 </span>
               </td>
+              <!-- Waste does not move stock (the sale already took it): it
+                   records how much of a cancelled order was lost. -->
               <td class="text-right font-mono">
-                {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
+                {m.type === "waste"
+                  ? `${m.quantity} perdida${m.quantity === 1 ? "" : "s"}`
+                  : m.quantity > 0
+                    ? `+${m.quantity}`
+                    : m.quantity}
               </td>
               <td class="text-xs">{m.reason || "-"}</td>
             </tr>
@@ -76,7 +85,7 @@
       </table>
     </div>
   {:else}
-    <div class="text-center py-6 text-base-content/50">
+    <div class="text-center py-6 text-ink-muted">
       No hay movimientos registrados
     </div>
   {/if}

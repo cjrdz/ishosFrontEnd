@@ -1,11 +1,7 @@
 import type { Order } from "@features/admin-management";
 
 export type LinearOrderStatus =
-  | "pendiente_revision"
-  | "recibida"
-  | "en_proceso"
-  | "lista"
-  | "entregada";
+  "pendiente_revision" | "recibida" | "en_proceso" | "lista" | "entregada";
 type CanceledOrderStatus = "pendiente_revision" | "cancelada";
 
 export const linearStatuses: LinearOrderStatus[] = [
@@ -21,23 +17,52 @@ export const canceledFlow: CanceledOrderStatus[] = [
   "cancelada",
 ];
 
+// Staff-facing names. "Por revisar" (not "Recibida") makes clear an order
+// still needs someone to accept it; the customer's tracking page says
+// "Recibida" for the same state.
 export const statusLabels: Record<Order["status"], string> = {
-  pendiente_revision: "Recibida",
-  recibida: "aceptada",
-  en_proceso: "preparando",
-  lista: "lista",
-  entregada: "entregada",
-  cancelada: "rechazada",
+  pendiente_revision: "Por revisar",
+  recibida: "Aceptada",
+  en_proceso: "Preparando",
+  lista: "Lista",
+  entregada: "Entregada",
+  cancelada: "Rechazada",
 };
 
-export const statusBadgeClass: Record<Order["status"], string> = {
-  pendiente_revision: "badge-warning font-semibold text-warning-content",
-  recibida: "badge-success font-semibold !text-white",
-  en_proceso: "badge-info font-semibold !text-white",
-  lista: "badge-accent font-semibold !text-white",
-  entregada: "badge-primary font-semibold !text-white",
-  cancelada: "badge-error font-semibold !text-white",
+/** Board column titles (plural). */
+export const statusPluralLabels: Record<Order["status"], string> = {
+  pendiente_revision: "Por revisar",
+  recibida: "Aceptadas",
+  en_proceso: "Preparando",
+  lista: "Listas",
+  entregada: "Entregadas",
+  cancelada: "Rechazadas",
 };
+
+/** Each state also has its own icon, so staff never rely on colour alone.
+ *  (Icons, not glyphs: Roboto lacks ◐ and fallbacks render it clipped.) */
+export const statusIcons: Record<Order["status"], string> = {
+  pendiente_revision: "lucide:circle-dot",
+  recibida: "lucide:check",
+  en_proceso: "lucide:chef-hat",
+  lista: "lucide:bell",
+  entregada: "lucide:check-check",
+  cancelada: "lucide:x",
+};
+
+/** Chip colours from the --st-* tokens (brand.css); AA in both themes. */
+export const statusChipClass: Record<Order["status"], string> = {
+  pendiente_revision: "status-chip status-chip--review",
+  recibida: "status-chip status-chip--accepted",
+  en_proceso: "status-chip status-chip--preparing",
+  lista: "status-chip status-chip--ready",
+  entregada: "status-chip status-chip--done",
+  cancelada: "status-chip status-chip--rejected",
+};
+
+// Kept for callers that prefix "badge": the chip classes override its colours.
+export const statusBadgeClass: Record<Order["status"], string> =
+  statusChipClass;
 
 export const statusStepIconsActive: Record<LinearOrderStatus, string> = {
   pendiente_revision: "line-md:watch-loop",
@@ -76,7 +101,7 @@ export function kitchenBadge(
   if (order.status === "recibida") {
     return {
       text: "Nueva orden",
-      className: "badge badge-success badge-outline",
+      className: "status-chip status-chip--sm status-chip--accepted",
     };
   }
   return null;
@@ -117,8 +142,18 @@ export function amountColumnLabel(status: Order["status"]): string {
   return status === "lista" || status === "entregada" ? "Total" : "Subtotal";
 }
 
-export function isOrderEditable(status: Order["status"]): boolean {
-  return !["recibida", "lista", "entregada", "cancelada"].includes(status);
+/**
+ * Whether staff may still edit an order. Accepted orders are locked, except
+ * counter orders (created by staff): they start accepted while the customer
+ * is still at the counter. Mirrors the backend rule.
+ */
+export function isOrderEditable(
+  order: Pick<Order, "status"> & { created_by_user_id?: string | null },
+): boolean {
+  if (order.status === "recibida" && order.created_by_user_id) return true;
+  return !["recibida", "lista", "entregada", "cancelada"].includes(
+    order.status,
+  );
 }
 
 export function orderTypeLabel(orderType: Order["order_type"]): string {

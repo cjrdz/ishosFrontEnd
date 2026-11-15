@@ -92,6 +92,12 @@
       dialogRef.close();
     }
   });
+
+  const categoryOptions = $derived(
+    categories.length === 0
+      ? [{ id: "", name: "Sin categorías", disabled: true }]
+      : categories.map((c) => ({ id: c.id, name: c.name, disabled: false })),
+  );
 </script>
 
 <AdminModalShell
@@ -141,7 +147,7 @@
 
             <div class="form-control">
               <span id="product-category-label" class="label-text text-xs mb-1"
-                >Categoria</span
+                >Categoría</span
               >
               <select
                 id="product-category"
@@ -150,13 +156,13 @@
                 required
                 aria-labelledby="product-category-label"
               >
-                {#if categories.length === 0}
-                  <option value="" disabled>Sin categorias</option>
-                {:else}
-                  {#each categories as category}
-                    <option value={category.id}>{category.name}</option>
-                  {/each}
-                {/if}
+                <!-- One {#each} only: an {#if} directly inside <select> leaves a
+                     text anchor that browsers flag as invalid select content. -->
+                {#each categoryOptions as option (option.id)}
+                  <option value={option.id} disabled={option.disabled}
+                    >{option.name}</option
+                  >
+                {/each}
               </select>
             </div>
           </div>
@@ -329,12 +335,12 @@
           <textarea
             id="product-description"
             class="textarea textarea-bordered w-full flex-1 min-h-[180px] resize-none"
-            placeholder="Descripcion del producto"
+            placeholder="Descripción del producto"
             bind:value={form.description}
             required
             aria-labelledby="product-description-label"
           ></textarea>
-          <span id="product-description-label" class="sr-only">Descripcion</span
+          <span id="product-description-label" class="sr-only">Descripción</span
           >
         </div>
       </fieldset>
@@ -362,7 +368,7 @@
             <div
               class="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-base-300/70 p-4 text-center"
             >
-              <span class="text-sm text-base-content/60">
+              <span class="text-sm text-ink-muted">
                 No hay imagen seleccionada.
               </span>
             </div>

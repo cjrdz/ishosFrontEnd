@@ -57,4 +57,59 @@ describe("CreatePublicOrderSchema", () => {
       CreatePublicOrderSchema.parse({ ...validOrder, notes: "x".repeat(501) }),
     ).toThrow();
   });
+
+  const productId = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+
+  it("keeps location_id so the backend gets the pickup location", () => {
+    const parsed = CreatePublicOrderSchema.parse({
+      ...validOrder,
+      location_id: productId,
+    });
+    expect(parsed.location_id).toBe(productId);
+  });
+
+  it("rejects quantities above the cart cap", () => {
+    expect(() =>
+      CreatePublicOrderSchema.parse({
+        ...validOrder,
+        items: [{ product_id: productId, quantity: 101 }],
+      }),
+    ).toThrow();
+  });
+
+  it("accepts the customizations checkout sends", () => {
+    expect(() =>
+      CreatePublicOrderSchema.parse({
+        ...validOrder,
+        items: [
+          {
+            product_id: productId,
+            quantity: 2,
+            customizations: {
+              flavor_ids: [productId, productId],
+              included_addon_ids: [productId],
+              topping_selection: "selected",
+              jalea_selection: "none",
+              notes: "sin chispas",
+            },
+          },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects unknown or nested customization keys", () => {
+    expect(() =>
+      CreatePublicOrderSchema.parse({
+        ...validOrder,
+        items: [
+          {
+            product_id: productId,
+            quantity: 1,
+            customizations: { price: 0, deep: { a: { b: 1 } } },
+          },
+        ],
+      }),
+    ).toThrow();
+  });
 });

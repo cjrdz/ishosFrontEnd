@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { TAB_LABELS as SHARED_TAB_LABELS } from "../lib/tabs";
+  import LocationsSettings from "@features/settings/components/LocationsSettings.svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import AdminModalShell from "./shared/AdminModalShell.svelte";
   import AdminFormActions from "./shared/AdminFormActions.svelte";
@@ -9,38 +11,29 @@
   interface Props {
     tabOrder: string[];
     panelConfig: PanelConfigValues;
-    storeOrdersEnabled: boolean;
     rowsPerTable: RowsPerTableConfig;
     archiveConfig: OrderArchiveConfig;
     busy: boolean;
     moduleError: string;
     onSave: (tabOrder: string[]) => void;
     onSavePanelConfig: (config: PanelConfigValues) => void;
-    onToggleStoreOrders: (enabled: boolean) => void | Promise<void>;
     onSaveRowsPerTable: (rows: RowsPerTableConfig) => void;
     onSaveArchiveConfig: (config: OrderArchiveConfig) => void;
     onRunArchive: () => void;
   }
 
-  const TAB_LABELS: Record<string, string> = {
-    ordenes: "Ordenes",
-    categorias: "Categorias",
-    productos: "Productos",
-    personas: "Personas",
-    analitica: "Analitica",
-  };
+  // Shared with the panel header so names never drift.
+  const TAB_LABELS: Record<string, string> = SHARED_TAB_LABELS;
 
   let {
     tabOrder,
     panelConfig,
-    storeOrdersEnabled,
     rowsPerTable,
     archiveConfig,
     busy,
     moduleError,
     onSave,
     onSavePanelConfig,
-    onToggleStoreOrders,
     onSaveRowsPerTable,
     onSaveArchiveConfig,
     onRunArchive,
@@ -52,7 +45,6 @@
     tracking_token_ttl_hours: 720,
     inactivity_logout_seconds: 900,
   });
-  let confirmPauseDialog = $state<HTMLDialogElement | null>(null);
   let confirmPauseArchiveDialog = $state<HTMLDialogElement | null>(null);
   const rowsPerTableOptions = [5, 10, 25, 50, 100] as const;
   let localRowsPerTable = $state<RowsPerTableConfig>({
@@ -113,41 +105,48 @@
     onSave(localOrder);
   }
 
+  // Same bounds as the backend; out-of-range values are brought into range
+  // (and shown back in the form) instead of failing the save.
+  const LIMITS = {
+    session: { min: 1, max: 720 },
+    tracking: { min: 1, max: 2160 },
+    inactivity: { min: 60, max: 86400 },
+  } as const;
+
   function handleSavePanelConfig() {
-    onSavePanelConfig({
-      auth_cookie_ttl_hours: normalizeHours(
+    const next = {
+      auth_cookie_ttl_hours: clampValue(
         localPanelConfig.auth_cookie_ttl_hours,
         panelConfig.auth_cookie_ttl_hours,
+        LIMITS.session,
       ),
-      auth_token_ttl_hours: normalizeHours(
+      auth_token_ttl_hours: clampValue(
         localPanelConfig.auth_token_ttl_hours,
         panelConfig.auth_token_ttl_hours,
+        LIMITS.session,
       ),
-      tracking_token_ttl_hours: normalizeHours(
+      tracking_token_ttl_hours: clampValue(
         localPanelConfig.tracking_token_ttl_hours,
         panelConfig.tracking_token_ttl_hours,
+        LIMITS.tracking,
       ),
-      inactivity_logout_seconds: normalizeSeconds(
+      inactivity_logout_seconds: clampValue(
         localPanelConfig.inactivity_logout_seconds,
         panelConfig.inactivity_logout_seconds,
+        LIMITS.inactivity,
       ),
-    });
+    };
+    localPanelConfig = { ...localPanelConfig, ...next };
+    onSavePanelConfig(next);
   }
 
-  function normalizeHours(value: number, fallback: number): number {
-    if (!Number.isFinite(value) || value <= 0) {
-      return fallback;
-    }
-
-    return Math.round(value);
-  }
-
-  function normalizeSeconds(value: number, fallback: number): number {
-    if (!Number.isFinite(value) || value <= 0) {
-      return fallback;
-    }
-
-    return Math.round(value);
+  function clampValue(
+    value: number,
+    fallback: number,
+    limits: { min: number; max: number },
+  ): number {
+    const n = Number.isFinite(value) && value > 0 ? value : fallback;
+    return Math.min(limits.max, Math.max(limits.min, Math.round(n)));
   }
 
   function handleMoveTab(tab: string, direction: "up" | "down") {
@@ -158,23 +157,6 @@
       return;
     }
     moveDown(currentIndex);
-  }
-
-  function openPauseDialog() {
-    confirmPauseDialog?.showModal();
-  }
-
-  function confirmPauseOrders() {
-    confirmPauseDialog?.close();
-    void onToggleStoreOrders(false);
-  }
-
-  function handleStoreOrdersToggle(checked: boolean) {
-    if (checked) {
-      void onToggleStoreOrders(true);
-      return;
-    }
-    openPauseDialog();
   }
 
   function handleSaveRowsPerTable() {
@@ -230,13 +212,16 @@
     <div class="alert alert-warning"><span>{moduleError}</span></div>
   {/if}
 
+  <!-- Locations first: hours, switches and contact change most often -->
+  <LocationsSettings isAdmin={true} />
+
   <!-- Navigation -->
   <div id="navegacion-panel" class="card bg-base-100 shadow">
     <div class="card-body gap-4">
       <div>
-        <h2 class="card-title">Navegacion del panel</h2>
+        <h2 class="card-title">Navegación del panel</h2>
         <p class="text-sm text-base-content/70">
-          Reordena las pestanas globales del panel administrativo.
+          Reordena las pestañas globales del panel administrativo.
         </p>
       </div>
 
@@ -245,9 +230,7 @@
           <div
             class="inline-flex items-center gap-2 rounded-lg border border-base-300 bg-base-100 px-3 py-1.5 shadow-sm"
           >
-            <span class="text-xs font-medium text-base-content/50"
-              >{index + 1}</span
-            >
+            <span class="text-xs font-medium text-ink-muted">{index + 1}</span>
             <span class="text-sm font-medium">{TAB_LABELS[tab] ?? tab}</span>
             <div
               class="flex items-center gap-0.5 border-l border-base-300 pl-2"
@@ -286,73 +269,35 @@
     </div>
   </div>
 
-  <!-- Store operation -->
-  <div id="operacion-tienda" class="card bg-base-100 shadow">
-    <div class="card-body gap-4">
-      <div>
-        <h2 class="card-title">Operacion de tienda</h2>
-        <p class="text-sm text-base-content/70">
-          Controla si los clientes pueden crear pedidos publicos.
-        </p>
-      </div>
-
-      <div
-        class="flex flex-col gap-4 rounded-lg border border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div>
-          <p class="font-medium text-base-content">
-            {storeOrdersEnabled ? "Pedidos activos" : "Pedidos pausados"}
-          </p>
-          <p class="text-sm text-base-content/60">
-            {storeOrdersEnabled
-              ? "El catalogo es visible y los clientes pueden ordenar."
-              : "El catalogo es visible pero no se aceptan nuevos pedidos publicos."}
-          </p>
-        </div>
-        <input
-          class="toggle toggle-md {storeOrdersEnabled
-            ? 'toggle-success'
-            : 'toggle-error'}"
-          type="checkbox"
-          checked={storeOrdersEnabled}
-          onchange={(event) =>
-            handleStoreOrdersToggle(
-              (event.currentTarget as HTMLInputElement).checked,
-            )}
-          disabled={busy}
-          aria-label={storeOrdersEnabled
-            ? "Pedidos activos"
-            : "Pedidos pausados"}
-        />
-      </div>
-    </div>
-  </div>
-
   <!-- Security -->
   <div id="seguridad-panel" class="card bg-base-100 shadow">
     <div class="card-body gap-4">
       <div>
         <h2 class="card-title">Seguridad y sesiones</h2>
         <p class="text-sm text-base-content/70">
-          Configura sesiones, expiraciones y reglas de seguridad del panel.
+          Cuánto dura una sesión del panel y cuándo se cierra sola. Los cambios
+          aplican al siguiente inicio de sesión; la inactividad aplica de
+          inmediato.
         </p>
       </div>
 
       <div class="grid gap-4 md:grid-cols-2">
         <label class="form-control">
           <span class="label-text text-sm font-medium"
-            >Cookie de sesion (horas)</span
+            >Cookie de sesión (horas)</span
           >
           <input
             class="input input-bordered input-sm w-full mt-1"
             type="number"
             min="1"
+            max="720"
             step="1"
             bind:value={localPanelConfig.auth_cookie_ttl_hours}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Usado por el backend para cookie HttpOnly.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Tiempo máximo de una sesión en el navegador (1–720 h). Al vencer,
+            hay que iniciar sesión de nuevo.</span
           >
         </label>
 
@@ -364,12 +309,14 @@
             class="input input-bordered input-sm w-full mt-1"
             type="number"
             min="1"
+            max="720"
             step="1"
             bind:value={localPanelConfig.auth_token_ttl_hours}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >JWT de empleados para iniciar sesion.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Validez del token del personal (1–720 h). La sesión dura el menor
+            de estos dos valores.</span
           >
         </label>
 
@@ -381,12 +328,13 @@
             class="input input-bordered input-sm w-full mt-1"
             type="number"
             min="1"
+            max="2160"
             step="1"
             bind:value={localPanelConfig.tracking_token_ttl_hours}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Token publico para rastreo de ordenes.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Cuánto tiempo puede un cliente seguir su orden (1–2160 h).</span
           >
         </label>
 
@@ -397,13 +345,16 @@
           <input
             class="input input-bordered input-sm w-full mt-1"
             type="number"
-            min="1"
+            min="60"
+            max="86400"
             step="1"
             bind:value={localPanelConfig.inactivity_logout_seconds}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Cierra sesion automaticamente sin actividad.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Cierra la sesión de todo el personal tras este tiempo sin uso
+            (60–86400 s; 900 = 15 min). En modo mostrador la tablet no cierra
+            sesión mientras el panel está abierto.</span
           >
         </label>
       </div>
@@ -425,7 +376,7 @@
       <div>
         <h2 class="card-title">Filas por tabla</h2>
         <p class="text-sm text-base-content/70">
-          Define el numero de filas visible por defecto en cada tabla.
+          Define el número de filas visible por defecto en cada tabla.
         </p>
       </div>
 
@@ -444,7 +395,7 @@
         </label>
 
         <label class="form-control">
-          <span class="label-text text-sm font-medium">Ordenes</span>
+          <span class="label-text text-sm font-medium">Órdenes</span>
           <select
             class="select select-bordered select-sm w-full mt-1"
             bind:value={localRowsPerTable.ordenes}
@@ -457,7 +408,7 @@
         </label>
 
         <label class="form-control">
-          <span class="label-text text-sm font-medium">Categorias</span>
+          <span class="label-text text-sm font-medium">Categorías</span>
           <select
             class="select select-bordered select-sm w-full mt-1"
             bind:value={localRowsPerTable.categorias}
@@ -537,9 +488,9 @@
   <div id="archivo-ordenes" class="card bg-base-100 shadow">
     <div class="card-body gap-4">
       <div>
-        <h2 class="card-title">Archivo de ordenes</h2>
+        <h2 class="card-title">Archivo de órdenes</h2>
         <p class="text-sm text-base-content/70">
-          Oculta automaticamente ordenes terminadas o canceladas despues de un
+          Oculta automáticamente órdenes terminadas o canceladas después de un
           tiempo, y permite archivar manualmente desde el panel.
         </p>
       </div>
@@ -550,13 +501,13 @@
         <div>
           <p class="font-medium text-base-content">
             {localArchiveConfig.enabled
-              ? "Archivo automatico activo"
-              : "Archivo automatico pausado"}
+              ? "Archivo automático activo"
+              : "Archivo automático pausado"}
           </p>
-          <p class="text-sm text-base-content/60">
+          <p class="text-sm text-ink-muted">
             {localArchiveConfig.enabled
-              ? `Las ordenes entregadas o canceladas se archivan despues de ${localArchiveConfig.age_days} dias.`
-              : "Las ordenes no se archivan automaticamente."}
+              ? `Las órdenes entregadas o canceladas se archivan después de ${localArchiveConfig.age_days} días.`
+              : "Las órdenes no se archivan automáticamente."}
           </p>
         </div>
         <input
@@ -571,15 +522,15 @@
             )}
           disabled={busy}
           aria-label={localArchiveConfig.enabled
-            ? "Archivo automatico activo"
-            : "Archivo automatico pausado"}
+            ? "Archivo automático activo"
+            : "Archivo automático pausado"}
         />
       </div>
 
       <div class="grid gap-4 md:grid-cols-2">
         <label class="form-control">
           <span class="label-text text-sm font-medium">
-            Antiguedad para archivo (dias)
+            Antigüedad para archivo (días)
           </span>
           <input
             class="input input-bordered input-sm w-full mt-1"
@@ -589,8 +540,8 @@
             bind:value={localArchiveConfig.age_days}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Dias desde que la orden quedo en estado terminal.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Días desde que la orden quedó en estado terminal.</span
           >
         </label>
 
@@ -606,8 +557,8 @@
             bind:value={localArchiveConfig.interval_minutes}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Cada cuanto el servidor busca ordenes candidatas.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Cada cuánto el servidor busca órdenes candidatas.</span
           >
         </label>
       </div>
@@ -631,35 +582,14 @@
 </section>
 
 <AdminModalShell
-  bind:dialogRef={confirmPauseDialog}
-  title="Pausar pedidos publicos"
-  icon="lucide:pause-circle"
-  widthClass="max-w-md"
-  onClose={() => {}}
->
-  <p>
-    Los clientes podran seguir viendo el catalogo, pero no podran crear pedidos
-    nuevos hasta reactivar la tienda.
-  </p>
-  <AdminFormActions
-    submitLabel="Pausar pedidos"
-    submitType="button"
-    submitVariant="error"
-    onSubmit={confirmPauseOrders}
-    onCancel={() => confirmPauseDialog?.close()}
-    {busy}
-  />
-</AdminModalShell>
-
-<AdminModalShell
   bind:dialogRef={confirmPauseArchiveDialog}
-  title="Pausar archivo automatico"
+  title="Pausar archivo automático"
   icon="lucide:archive-x"
   widthClass="max-w-md"
   onClose={() => {}}
 >
   <p>
-    Las ordenes entregadas y canceladas dejaran de archivarse automaticamente.
+    Las órdenes entregadas y canceladas dejarán de archivarse automáticamente.
     Puedes seguir archivando manualmente desde el panel.
   </p>
   <AdminFormActions

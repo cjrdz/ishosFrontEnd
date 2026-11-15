@@ -2,9 +2,11 @@
 export const prerender = false;
 
 import AdminLayout from "../../layouts/AdminLayout.astro";
-import { AnalyticsPage } from "@features/analytics";
+// Island entries import the component file directly, not a feature barrel:
+// Astro bundles the imported module, so a barrel would ship every export.
+import AnalyticsPage from "@features/analytics/components/AnalyticsPage.svelte";
 ---
 
-<AdminLayout title="Analitica - IshosFactory">
+<AdminLayout title="Analítica - IshosFactory">
   <AnalyticsPage client:load />
 </AdminLayout>

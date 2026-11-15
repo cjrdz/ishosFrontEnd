@@ -24,6 +24,8 @@
     allowance?: number;
     required?: boolean;
     error?: string;
+    /** Whether "none" was explicitly chosen; without it nothing looks picked yet. */
+    noneSelected?: boolean;
     onUnifiedChange?: (includedIds: string[], extraIds: string[]) => void;
     onToggleExtra: (addonId: string, checked: boolean) => void;
   }
@@ -39,6 +41,7 @@
     allowance = 1,
     required = false,
     error = "",
+    noneSelected,
     onUnifiedChange,
     onToggleExtra,
   }: Props = $props();
@@ -77,6 +80,7 @@
   }
 
   function isNoneSelected(): boolean {
+    if (noneSelected !== undefined) return noneSelected;
     return includedIds.length === 0 && selectedIds.length === 0;
   }
 
@@ -114,12 +118,21 @@
     <legend class="fieldset-legend flex items-center gap-1.5">
       <span class="text-sm font-semibold text-base-content/90">{label}</span>
       {#if required}
-        <span class="text-error">*</span>
+        <span class="text-error" aria-hidden="true">*</span>
+      {/if}
+      {#if variant === "unified" && allowance > 0}
+        <span
+          class={`badge badge-sm border-0 ${remainingFree > 0 ? "bg-success/15 text-success" : "bg-base-200 text-base-content/70"}`}
+        >
+          {remainingFree > 0
+            ? `${remainingFree} incluido${remainingFree === 1 ? "" : "s"}`
+            : "Incluido usado · extra con costo"}
+        </span>
       {/if}
       {#if canClear}
         <button
           type="button"
-          class="btn btn-ghost btn-xs btn-square text-error ml-1"
+          class="btn btn-ghost btn-sm btn-square size-11 text-error ml-1"
           aria-label={`Borrar ${label.toLowerCase()}`}
           title={`Borrar ${label.toLowerCase()}`}
           onclick={clearSelection}
@@ -143,8 +156,8 @@
       <button
         type="button"
         data-chip
-        class={`btn btn-sm h-9 min-h-9 ${
-          isNoneSelected() ? "btn-primary" : "btn-ghost"
+        class={`btn btn-sm h-10 min-h-10 ${
+          isNoneSelected() ? "btn-primary" : "btn-ghost border-base-300"
         }`}
         role="option"
         aria-selected={isNoneSelected()}
@@ -161,8 +174,12 @@
       <button
         type="button"
         data-chip
-        class={`btn btn-sm h-9 min-h-9 ${
-          included ? "btn-primary" : extra ? "btn-secondary" : "btn-ghost"
+        class={`btn btn-sm h-10 min-h-10 ${
+          included
+            ? "btn-primary"
+            : extra
+              ? "btn-secondary"
+              : "btn-ghost border-base-300"
         }`}
         role="option"
         aria-selected={included || extra}
@@ -183,13 +200,6 @@
       </button>
     {/each}
   </div>
-
-  {#if remainingFree > 0 && variant === "unified"}
-    <p class="text-xs text-success">
-      {remainingFree}
-      {label?.toLowerCase() ?? "item"}{remainingFree === 1 ? "" : "s"} gratis
-    </p>
-  {/if}
 
   {#if error}
     <p class="label text-error text-xs">{error}</p>

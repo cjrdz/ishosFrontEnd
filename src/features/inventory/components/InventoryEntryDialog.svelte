@@ -12,6 +12,13 @@
     containerTypes: ContainerType[];
     flavorItems: InventoryItem[];
     unitItems: InventoryItem[];
+    /**
+     * Every product sold by unit. Ones without inventory yet are listed too:
+     * admins start tracking them with this entry; others cannot pick them.
+     */
+    unitProducts?: { id: string; name: string }[];
+    /** A submit is in flight: block double submits. */
+    busy?: boolean;
     onClose: () => void;
     onSubmit: (payload: {
       type: "flavor" | "unit";
@@ -20,9 +27,16 @@
       quantity_containers?: number;
       balls_per_container?: number;
       inventory_item_id?: string;
+      /** A unit product without inventory yet: start tracking it first. */
+      new_product?: { id: string; name: string };
       quantity?: number;
     }) => void;
-    onOpenContainerTypes: () => void;
+    /** Absent for managers: only admins edit container types. */
+    onOpenContainerTypes?: () => void;
+    /** Admin only: open "Llevar inventario de un producto". */
+    onTrackProduct?: () => void;
+    /** Opened from a row's "+ Entrada": start with that item selected. */
+    preselect?: { type: "flavor" | "unit"; id: string } | null;
   }
 
   let {
@@ -30,9 +44,13 @@
     containerTypes,
     flavorItems,
     unitItems,
+    unitProducts = [],
+    busy = false,
     onClose,
     onSubmit,
     onOpenContainerTypes,
+    onTrackProduct,
+    preselect = null,
   }: Props = $props();
 
   let dialogRef = $state<HTMLDialogElement | null>(null);
@@ -85,6 +103,11 @@
   $effect(() => {
     if (!dialogRef) return;
     if (open && !dialogRef.open) {
+      if (preselect) {
+        entryType = preselect.type;
+        if (preselect.type === "flavor") flavorForm.flavor_id = preselect.id;
+        else unitForm.inventory_item_id = preselect.id;
+      }
       dialogRef.showModal();
     } else if (!open && dialogRef.open) {
       dialogRef.close();
@@ -107,7 +130,7 @@
 
   function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
-    if (!formValid) return;
+    if (!formValid || busy) return;
     if (entryType === "flavor") {
       onSubmit({
         type: "flavor",
@@ -117,6 +140,15 @@
         balls_per_container: isCustom
           ? flavorForm.balls_per_container
           : undefined,
+      });
+    } else if (unitForm.inventory_item_id.startsWith(NEW_PREFIX)) {
+      const id = unitForm.inventory_item_id.slice(NEW_PREFIX.length);
+      const product = untrackedProducts.find((p) => p.id === id);
+      if (!product) return;
+      onSubmit({
+        type: "unit",
+        new_product: { id: product.id, name: product.name },
+        quantity: unitForm.quantity,
       });
     } else {
       onSubmit({
@@ -129,9 +161,55 @@
   }
 
   function handleOpenContainerTypes() {
-    onOpenContainerTypes();
+    onOpenContainerTypes?.();
     onClose();
   }
+
+  // Each <select> renders a single {#each} over a prepared list (placeholder
+  // included): extra blocks or nodes beside it trip the browser's
+  // select-content check.
+  type SelectOption = { key: string; value: string; label: string };
+  const flavorOptions = $derived<SelectOption[]>([
+    { key: "", value: "", label: "Elige un sabor…" },
+    ...flavorItems.map((item) => ({
+      key: item.id,
+      value: item.flavor_id ?? item.id,
+      label: item.name,
+    })),
+  ]);
+  const containerOptions = $derived<SelectOption[]>([
+    { key: "", value: "", label: "Seleccionar..." },
+    ...containerTypes.map((ct) => ({
+      key: ct.id,
+      value: ct.id,
+      label: `${ct.name} (${ct.is_custom ? "personalizado" : `${ct.balls_per_container} bolas`})`,
+    })),
+  ]);
+  // Untracked products use this value prefix (they have no inventory id yet).
+  const NEW_PREFIX = "new:";
+  const untrackedProducts = $derived.by(() => {
+    const tracked = new Set(unitItems.map((item) => item.product_id));
+    return unitProducts
+      .filter((p) => !tracked.has(p.id))
+      .sort((a, b) => a.name.localeCompare(b.name, "es"));
+  });
+  const unitOptions = $derived<(SelectOption & { disabled?: boolean })[]>([
+    { key: "", value: "", label: "Elige un producto…" },
+    ...[...unitItems]
+      .sort((a, b) => a.name.localeCompare(b.name, "es"))
+      .map((item) => ({ key: item.id, value: item.id, label: item.name })),
+    ...untrackedProducts.map((p) => ({
+      key: `${NEW_PREFIX}${p.id}`,
+      value: `${NEW_PREFIX}${p.id}`,
+      label: onTrackProduct
+        ? `${p.name} · empieza a llevar inventario`
+        : `${p.name} · sin inventario (lo activa un admin)`,
+      disabled: !onTrackProduct,
+    })),
+  ]);
+  const startsTracking = $derived(
+    entryType === "unit" && unitForm.inventory_item_id.startsWith(NEW_PREFIX),
+  );
 </script>
 
 <AdminModalShell
@@ -178,11 +256,8 @@
             bind:value={flavorForm.flavor_id}
             required
           >
-            <option value="">Seleccionar sabor...</option>
-            {#each flavorItems as item (item.id)}
-              <option value={item.flavor_id ?? item.id}>
-                {item.name}
-              </option>
+            {#each flavorOptions as option (option.key)}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
         </div>
@@ -204,16 +279,8 @@
             bind:value={flavorForm.container_type_id}
             required
           >
-            <option value="">Seleccionar...</option>
-            {#each containerTypes as ct (ct.id)}
-              <option value={ct.id}>
-                {ct.name}
-                {#if !ct.is_custom}
-                  ({ct.balls_per_container} bolas)
-                {:else}
-                  (custom)
-                {/if}
-              </option>
+            {#each containerOptions as option (option.key)}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
         </div>
@@ -243,26 +310,50 @@
             required
           />
           {#if flavorForm.container_type_id && flavorForm.quantity_containers > 0}
-            <p class="text-sm text-base-content/60 mt-1.5">
+            <p class="text-sm text-ink-muted mt-1.5">
               = {totalBalls.toLocaleString()} bolas totales
             </p>
           {/if}
         </div>
 
         <div class="flex justify-end">
-          <button
-            type="button"
-            class="btn btn-xs btn-ghost gap-1"
-            onclick={handleOpenContainerTypes}
-          >
-            <Icon icon="lucide:settings" width="12" height="12" />
-            Gestionar contenedores
-          </button>
+          {#if onOpenContainerTypes}
+            <button
+              type="button"
+              class="btn btn-xs btn-ghost gap-1"
+              onclick={handleOpenContainerTypes}
+            >
+              <Icon icon="lucide:settings" width="12" height="12" />
+              Gestionar contenedores
+            </button>
+          {/if}
         </div>
       </div>
     {/if}
 
-    {#if entryType === "unit"}
+    {#if entryType === "unit" && unitItems.length === 0 && untrackedProducts.length === 0}
+      <div class="space-y-3 rounded-lg border border-base-300/70 p-4 text-sm">
+        <p class="font-medium">
+          Aún no llevas inventario de productos por unidad.
+        </p>
+        <p class="text-ink-muted">
+          Los conos y vasos descuentan de sus sabores. Para paletas, bebidas y
+          otros productos por unidad, primero activa su inventario.
+        </p>
+        {#if onTrackProduct}
+          <button
+            type="button"
+            class="btn btn-outline btn-sm gap-2"
+            onclick={onTrackProduct}
+          >
+            <Icon icon="lucide:package-plus" width="16" height="16" />
+            Llevar inventario de un producto
+          </button>
+        {:else}
+          <p class="text-ink-muted">Pídeselo a un administrador.</p>
+        {/if}
+      </div>
+    {:else if entryType === "unit"}
       <div class="space-y-3 rounded-lg border border-base-300/70 p-3">
         <div class="form-control">
           <span class="label-text text-xs mb-1">Producto</span>
@@ -271,9 +362,10 @@
             bind:value={unitForm.inventory_item_id}
             required
           >
-            <option value="">Seleccionar producto...</option>
-            {#each unitItems as item (item.id)}
-              <option value={item.id}>{item.name}</option>
+            {#each unitOptions as option (option.key)}
+              <option value={option.value} disabled={option.disabled}
+                >{option.label}</option
+              >
             {/each}
           </select>
         </div>
@@ -289,11 +381,18 @@
             required
           />
         </div>
+        {#if startsTracking}
+          <p class="text-xs text-ink-muted" role="note">
+            Al registrar, este producto empieza a llevar inventario en todas las
+            sucursales (mínimo 10, puedes cambiarlo) y la entrada se suma aquí.
+          </p>
+        {/if}
       </div>
     {/if}
 
     <AdminFormActions
-      submitLabel="Registrar Entrada"
+      submitLabel="Registrar entrada"
+      {busy}
       onCancel={onClose}
       disabled={!formValid}
     />

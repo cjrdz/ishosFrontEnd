@@ -6,14 +6,14 @@
  */
 
 import type { APIContext } from "astro";
-import { z } from "zod";
+import { z } from "@core/zod";
 
-const uuidSchema = z.string().uuid("Invalid UUID");
+const uuidSchema = z.guid("Invalid UUID");
 
 const orderItemSchema = z.object({
   product_id: uuidSchema,
   quantity: z.number().int().positive("Quantity must be at least 1"),
-  customizations: z.record(z.unknown()).optional(),
+  customizations: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const productCreateSchema = z.object({
@@ -71,10 +71,22 @@ export const addonCreateSchema = z.object({
 
 export const addonUpdateSchema = addonCreateSchema.partial();
 
+/** Staff orders: the phone is optional; a typed one needs 7–15 digits. */
+const optionalPhoneSchema = z
+  .string()
+  .trim()
+  .max(25)
+  .refine((value) => {
+    const digits = value.replace(/\D/g, "").length;
+    return value === "" || (digits >= 7 && digits <= 15);
+  }, "El teléfono debe tener entre 7 y 15 dígitos")
+  .optional()
+  .default("");
+
 export const orderCreateSchema = z.object({
   customer_name: z.string().trim().min(1).max(120),
-  customer_phone: z.string().trim().min(7).max(25),
-  customer_email: z.string().email().optional(),
+  customer_phone: optionalPhoneSchema,
+  customer_email: z.email().optional(),
   payment_method: z.enum(["efectivo", "tarjeta", "transferencia", "otro"]),
   amount_received: z.number().nonnegative().optional(),
   order_type: z.enum(["en_local", "para_llevar"]),
@@ -89,6 +101,16 @@ export const orderUpdateSchema = orderCreateSchema.partial().extend({
 
 export const orderRejectSchema = z.object({
   reason: z.string().trim().min(1).max(500),
+  /** Cancelling: how much of each item goes back to stock (rest is waste). */
+  restock: z
+    .array(
+      z.object({
+        inventory_item_id: z.uuid(),
+        quantity: z.number().int().min(0).max(100000),
+      }),
+    )
+    .max(200)
+    .optional(),
 });
 
 export const orderStatusSchema = z.object({
@@ -114,11 +136,13 @@ export const orderArchiveSchema = z.object({
 
 // Employees
 export const employeeCreateSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().trim().pipe(z.email()),
   password: z.string().trim().min(6).max(100),
   name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(7).max(25).optional(),
-  role: z.enum(["admin", "employee"]),
+  role: z.enum(["admin", "manager", "employee"]),
+  // Required for managers and employees, empty for admins (backend checks).
+  location_id: z.union([z.uuid(), z.literal("")]).optional(),
   state: z.enum(["active", "inactive"]).optional(),
 });
 
@@ -134,7 +158,7 @@ export const userCreateSchema = z.object({
   name: z.string().trim().min(1).max(120),
   user_type: z.enum(["user", "company"]).optional(),
   phone: z.string().trim().min(7).max(25),
-  email: z.string().trim().email().optional(),
+  email: z.string().trim().pipe(z.email()).optional(),
   status: z.enum(["active", "inactive"]).optional(),
 });
 
@@ -146,31 +170,96 @@ const offerItemSchema = z.object({
   label: z.string().trim().min(1).max(200),
   note: z.string().trim().max(500).optional(),
   discount_price: z.number().nonnegative().optional(),
-  flavor_id: z.string().trim().optional(),
-  flavor_ids: z.array(z.string().trim()).optional(),
-  expires_at: z.string().trim().min(1),
+  flavor_id: z.string().trim().max(64).optional(),
+  flavor_ids: z.array(z.string().trim().max(64)).max(20).optional(),
+  expires_at: z.string().trim().min(1).max(64),
 });
 
 export const storeSettingsUpdateSchema = z.object({
   orders_enabled: z.boolean(),
   offers: z.array(offerItemSchema).max(50),
+  /** Public "Seguir mi orden" page; omitted keeps the saved value. */
+  tracking_enabled: z.boolean().optional(),
+});
+
+// Weekly opening hours. Shape only; the backend checks order and overlaps.
+const clockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+const timeRangeSchema = z.object({ open: clockSchema, close: clockSchema });
+export const storeHoursUpdateSchema = z.object({
+  days: z.partialRecord(
+    z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
+    z.array(timeRangeSchema).max(3),
+  ),
+});
+
+// Locations (sucursales). The backend decides which fields a manager may
+// change (hours and the orders switch of their own location).
+const weeklyHoursSchema = z.partialRecord(
+  z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
+  z.array(timeRangeSchema).max(3),
+);
+export const locationUpdateSchema = z
+  .object({
+    slug: z.string().trim().min(1).max(60),
+    name: z.string().trim().min(1).max(120),
+    address: z.string().trim().max(255),
+    maps_url: z.string().trim().max(2000),
+    maps_embed_url: z.string().trim().max(2000),
+    whatsapp: z.string().trim().max(30),
+    phone: z.string().trim().max(30),
+    hours: weeklyHoursSchema,
+    orders_enabled: z.boolean(),
+    online_orders_enabled: z.boolean(),
+    is_active: z.boolean(),
+    sort_order: z.number().int().min(0).max(1000),
+  })
+  .partial();
+export const locationCreateSchema = locationUpdateSchema.required({
+  slug: true,
+  name: true,
+});
+export const locationAvailabilitySchema = z.object({
+  item_type: z.enum(["product", "flavor"]),
+  item_id: z.uuid(),
+  sold_out: z.boolean(),
 });
 
 export const archiveConfigUpdateSchema = z.object({
   enabled: z.boolean(),
-  age_days: z.number().int().nonnegative(),
-  interval_minutes: z.number().int().nonnegative(),
+  age_days: z.number().int().nonnegative().max(3650),
+  interval_minutes: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(60 * 24 * 30),
 });
 
+// Same bounds as the backend (services.ValidateTokenTTLConfig).
 export const panelConfigUpdateSchema = z.object({
-  auth_cookie_ttl_hours: z.number().int().positive(),
-  auth_token_ttl_hours: z.number().int().positive(),
-  tracking_token_ttl_hours: z.number().int().positive(),
-  inactivity_logout_seconds: z.number().int().nonnegative(),
+  auth_cookie_ttl_hours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 30),
+  auth_token_ttl_hours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 30),
+  tracking_token_ttl_hours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 90),
+  inactivity_logout_seconds: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60 * 24),
 });
 
 export const tabsSettingsSchema = z.object({
-  tab_order: z.array(z.string().trim().min(1)).min(1),
+  tab_order: z.array(z.string().trim().min(1).max(40)).min(1).max(20),
 });
 
 // Container types
@@ -197,6 +286,20 @@ export const inventoryUnitEntrySchema = z.object({
   quantity: z.number().int().positive(),
 });
 
+/** Minimum below which an item shows as "Stock bajo" (backend bound). */
+const lowStockThresholdSchema = z.number().int().min(0).max(100000);
+
+export const inventoryThresholdSchema = z.object({
+  low_stock_threshold: lowStockThresholdSchema,
+});
+
+/** Start tracking a unit product (at every location). */
+export const inventoryUnitProductSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  product_id: z.uuid(),
+  low_stock_threshold: lowStockThresholdSchema,
+});
+
 export const inventoryAdjustmentSchema = z.object({
   quantity: z.number().int(),
   reason: z.string().trim().min(1).max(500),
@@ -204,7 +307,7 @@ export const inventoryAdjustmentSchema = z.object({
 
 // Auth
 export const authLockoutResetSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().trim().pipe(z.email()),
 });
 
 // Upload
@@ -233,8 +336,7 @@ function validationErrorResponse(
 }
 
 type ValidationResult =
-  | { success: true; data: unknown }
-  | { success: false; response: Response };
+  { success: true; data: unknown } | { success: false; response: Response };
 
 export async function parseJsonBody(
   context: APIContext,

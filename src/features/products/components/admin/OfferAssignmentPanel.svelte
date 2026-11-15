@@ -182,13 +182,11 @@
   widthClass="max-w-md"
   {onClose}
 >
-  <p class="text-sm text-base-content/60">
-    Visible en la portada hasta que expire.
-  </p>
+  <p class="text-sm text-ink-muted">Visible en la portada hasta que expire.</p>
 
   {#if label.trim()}
     <div class="flex items-center gap-2 text-sm">
-      <span class="text-base-content/60">Vista previa:</span>
+      <span class="text-ink-muted">Vista previa:</span>
       <span class="badge badge-warning badge-sm">{label.trim()}</span>
     </div>
   {/if}
@@ -217,7 +215,7 @@
 
     <label class="form-control w-full">
       <span class="label-text text-sm">Precio oferta</span>
-      <span class="text-xs text-base-content/60">
+      <span class="text-xs text-ink-muted">
         Precio normal: {formatCurrency(regularPrice)}
       </span>
       <input
@@ -245,7 +243,7 @@
     {#if activeFlavors.length > 0}
       <div class="form-control w-full">
         <span class="label-text text-sm">Sabores incluidos en la oferta</span>
-        <span class="text-xs text-base-content/60 mb-1">
+        <span class="text-xs text-ink-muted mb-1">
           Opcional. Selecciona los sabores a los que aplica la oferta.
         </span>
 

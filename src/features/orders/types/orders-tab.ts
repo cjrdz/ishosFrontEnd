@@ -1,3 +1,4 @@
+import type { CreatedOrder } from "@features/admin-management/lib/order-handlers";
 import type {
   Category,
   Employee,
@@ -66,6 +67,11 @@ export interface OrderFormState {
 
 export interface OrdersTabProps {
   isAdmin: boolean;
+  /**
+   * Admins and managers may cancel accepted orders (and those in
+   * preparation, giving their stock back). The backend enforces it too.
+   */
+  canCancelOrders?: boolean;
   orders: Order[];
   products: Product[];
   allProducts?: Product[];
@@ -85,7 +91,12 @@ export interface OrdersTabProps {
   onOpenOrder: (id: string) => Promise<Order | null>;
   onClearSelectedOrder: () => void;
   onApprove: (id: string, reason?: string) => Promise<Order | null>;
-  onReject: (id: string, reason: string) => Promise<Order | null>;
+  /** restock: cancelling, how much of each item goes back to stock. */
+  onReject: (
+    id: string,
+    reason: string,
+    restock?: { inventory_item_id: string; quantity: number }[],
+  ) => Promise<Order | null>;
   onStatusChange: (
     id: string,
     status: "recibida" | "en_proceso" | "lista" | "entregada",
@@ -95,10 +106,11 @@ export interface OrdersTabProps {
     payload: OrderUpdatePayload,
   ) => Promise<Order | null>;
   onDelete: (id: string) => void;
+  /** Resolves null when the order was not created. */
   onCreate: (
     payload: CreateOrderPayload,
     idempotencyKey?: string,
-  ) => Promise<boolean>;
+  ) => Promise<CreatedOrder | null>;
   onArchive: (id: string, archived: boolean) => Promise<Order | null>;
   saveUserFromOrder: (payload: {
     name: string;
@@ -108,3 +120,6 @@ export interface OrdersTabProps {
     status: "active" | "inactive";
   }) => Promise<boolean>;
 }
+
+/** What prints automatically when a counter order is created. */
+export type AutoPrintMode = "none" | "kitchen" | "both";

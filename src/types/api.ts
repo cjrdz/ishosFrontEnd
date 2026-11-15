@@ -16,8 +16,7 @@ export type ActiveOffer = components["schemas"]["ActiveOffer"];
 export type PaginationMetadata = components["schemas"]["PaginationMetadata"];
 
 export type PaginatedList<T> =
-  | { data: T[]; pagination: PaginationMetadata }
-  | T[];
+  { data: T[]; pagination: PaginationMetadata } | T[];
 
 export interface PaginationInfo {
   page: number;
@@ -28,12 +27,7 @@ export interface PaginationInfo {
 
 // Product admin payload types derived from the generated Product schema.
 type ProductExcludedFields =
-  | "id"
-  | "category_name"
-  | "image_url"
-  | "flavors"
-  | "addons"
-  | "created_at";
+  "id" | "category_name" | "image_url" | "flavors" | "addons" | "created_at";
 
 export type ProductCreatePayload = Omit<Product, ProductExcludedFields> &
   Required<Pick<Product, "category_id">>;
@@ -59,10 +53,21 @@ export type ArchiveOrderRequest =
   components["schemas"]["ArchiveOrderInputBody"];
 
 // Employees. The Employee entity type is defined locally to match UI enums.
-export type CreateEmployeeRequest =
-  components["schemas"]["CreateEmployeeInputBody"];
-export type UpdateEmployeeRequest =
-  components["schemas"]["UpdateEmployeeInputBody"];
+// Managers and employees belong to one location (sucursal); admins have none.
+type EmployeeRoleAndLocation = {
+  role?: "admin" | "manager" | "employee";
+  location_id?: string;
+};
+export type CreateEmployeeRequest = Omit<
+  components["schemas"]["CreateEmployeeInputBody"],
+  "role"
+> &
+  EmployeeRoleAndLocation & { role: "admin" | "manager" | "employee" };
+export type UpdateEmployeeRequest = Omit<
+  components["schemas"]["UpdateEmployeeInputBody"],
+  "role"
+> &
+  EmployeeRoleAndLocation;
 
 // Users. The User entity type is defined locally to match UI enums.
 export type CreateUserRequest = components["schemas"]["CreateUserInputBody"];

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { currentChartTheme } from "@shared/theme/chart-colors";
+  import { statusLabels } from "@features/orders/lib/order-status";
   import { onMount } from "svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import { Chart } from "svelte-echarts";
@@ -24,6 +26,13 @@
     type AnalyticsTopProduct,
   } from "@features/admin-management";
   import { formatCurrency } from "@shared/utils/formatters";
+  import {
+    delta,
+    lastDays,
+    previousRange,
+    storeTodayISO,
+    type Delta,
+  } from "../lib/compare";
 
   use([
     TitleComponent,
@@ -48,27 +57,51 @@
   let endDate = $state("");
   let useCustomRange = $state(false);
   let quickRange = $state<"7d" | "30d" | "90d" | "1y">("30d");
-  let chartTextColor = $state("#d1d5db");
-  let chartMutedTextColor = $state("#9ca3af");
-  let chartGridColor = $state("rgba(148, 163, 184, 0.25)");
-  let chartTooltipBackground = $state("#111827");
-  let chartTooltipBorder = $state("rgba(148, 163, 184, 0.35)");
-  let chartTooltipTextColor = $state("#f8fafc");
+  const initialChart = currentChartTheme();
+  let chartTextColor = $state(initialChart.text);
+  let chartMutedTextColor = $state(initialChart.muted);
+  let chartGridColor = $state(initialChart.grid);
+  let chartTooltipBackground = $state(initialChart.tooltipBackground);
+  let chartTooltipBorder = $state(initialChart.tooltipBorder);
+  let chartTooltipTextColor = $state(initialChart.tooltipText);
 
   let overview = $state<AnalyticsOverview | null>(null);
+  /** Same-length period just before the selected one, for the KPI deltas. */
+  let previousOverview = $state<AnalyticsOverview | null>(null);
+  const ordersDelta = $derived(
+    delta(overview?.total_orders ?? 0, previousOverview?.total_orders),
+  );
+  const revenueDelta = $derived(
+    delta(overview?.total_revenue ?? 0, previousOverview?.total_revenue),
+  );
+  const ticketDelta = $derived(
+    delta(overview?.avg_order_value ?? 0, previousOverview?.avg_order_value),
+  );
   let ordersOverTime = $state<AnalyticsTimelinePoint[]>([]);
   let topProducts = $state<AnalyticsTopProduct[]>([]);
 
-  const CHART_COLORS = [
-    "#3b82f6",
-    "#22c55e",
-    "#f59e0b",
-    "#8b5cf6",
-    "#ef4444",
-    "#06b6d4",
-    "#ec4899",
-    "#84cc16",
+  let CHART_COLORS = $state<string[]>(initialChart.categorical);
+  let STATUS_COLORS = $state<Record<string, string>>(initialChart.status);
+  /** Single-series marks (orders and revenue over time). */
+  let chartSeriesColor = $state(initialChart.series);
+  /** Card surface behind the charts (slice gaps are drawn in it). */
+  let chartSurfaceColor = $state(initialChart.surface);
+
+  function withAlpha(hex: string, alpha: number): string {
+    const n = Number.parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+  }
+
+  // Each status keeps its colour whichever statuses are present.
+  const STATUS_ORDER = [
+    "pendiente_revision",
+    "recibida",
+    "en_proceso",
+    "lista",
+    "entregada",
+    "cancelada",
   ];
+  const STATUS_NAMES: Record<string, string> = statusLabels;
 
   const quickRangeConfig: Record<
     "7d" | "30d" | "90d" | "1y",
@@ -103,15 +136,8 @@
   }
 
   function applyRangePreset(days: 7 | 30 | 90 | 365) {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - days);
-    startDate = toISODate(start);
-    endDate = toISODate(end);
-  }
-
-  function toISODate(date: Date): string {
-    return date.toISOString().slice(0, 10);
+    // Inclusive range ending today in store time ("7 días" = today + 6 before).
+    ({ start: startDate, end: endDate } = lastDays(days));
   }
 
   function setQuickRange(nextRange: "7d" | "30d" | "90d" | "1y") {
@@ -140,29 +166,22 @@
 
   function syncChartThemeColors() {
     if (typeof window === "undefined") return;
-    const isDark =
-      (document.documentElement.getAttribute("data-theme") || "night") ===
-      "night";
-    if (isDark) {
-      chartTextColor = "#e5e7eb";
-      chartMutedTextColor = "#cbd5e1";
-      chartGridColor = "rgba(148, 163, 184, 0.28)";
-      chartTooltipBackground = "rgba(15, 23, 42, 0.96)";
-      chartTooltipBorder = "rgba(148, 163, 184, 0.45)";
-      chartTooltipTextColor = "#f8fafc";
-    } else {
-      chartTextColor = "#111827";
-      chartMutedTextColor = "#374151";
-      chartGridColor = "rgba(156, 163, 175, 0.32)";
-      chartTooltipBackground = "rgba(17, 24, 39, 0.96)";
-      chartTooltipBorder = "rgba(31, 41, 55, 0.55)";
-      chartTooltipTextColor = "#f9fafb";
-    }
+    const theme = currentChartTheme();
+    chartTextColor = theme.text;
+    chartMutedTextColor = theme.muted;
+    chartGridColor = theme.grid;
+    chartTooltipBackground = theme.tooltipBackground;
+    chartTooltipBorder = theme.tooltipBorder;
+    chartTooltipTextColor = theme.tooltipText;
+    CHART_COLORS = theme.categorical;
+    STATUS_COLORS = theme.status;
+    chartSeriesColor = theme.series;
+    chartSurfaceColor = theme.surface;
   }
 
   // Shared donut style
   function donutSeries(
-    data: { name: string; value: number }[],
+    data: { name: string; value: number; itemStyle?: { color: string } }[],
     colors: string[],
     labelFormatter?: (name: string, value: number) => string,
   ): EChartsOption["series"] {
@@ -174,7 +193,7 @@
         avoidLabelOverlap: true,
         itemStyle: {
           borderRadius: 6,
-          borderColor: "transparent",
+          borderColor: chartSurfaceColor,
           borderWidth: 2,
         },
         label: {
@@ -212,11 +231,16 @@
     },
     legend: { bottom: 0, textStyle: { color: chartMutedTextColor } },
     series: donutSeries(
-      Object.entries(overview?.status_breakdown || {}).map(([name, value]) => ({
-        name,
-        value: Number(value ?? 0),
+      STATUS_ORDER.filter(
+        (key) => (overview?.status_breakdown ?? {})[key] != null,
+      ).map((key) => ({
+        name: STATUS_NAMES[key],
+        value: Number(overview?.status_breakdown?.[key] ?? 0),
+        itemStyle: { color: STATUS_COLORS[key] },
       })),
-      ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"],
+      STATUS_ORDER.filter(
+        (key) => (overview?.status_breakdown ?? {})[key] != null,
+      ).map((key) => STATUS_COLORS[key]),
     ),
   });
 
@@ -283,8 +307,8 @@
         height: 22,
         bottom: 28,
         borderColor: chartGridColor,
-        fillerColor: "rgba(59,130,246,0.12)",
-        handleStyle: { color: "#3b82f6" },
+        fillerColor: withAlpha(chartSeriesColor, 0.12),
+        handleStyle: { color: chartSeriesColor },
         textStyle: { color: chartMutedTextColor },
       },
     ],
@@ -313,8 +337,8 @@
         type: "line",
         smooth: 0.4,
         showSymbol: false,
-        lineStyle: { width: 2.5, color: "#3b82f6" },
-        itemStyle: { color: "#3b82f6" },
+        lineStyle: { width: 2, color: chartSeriesColor },
+        itemStyle: { color: chartSeriesColor },
         areaStyle: {
           opacity: 1,
           color: {
@@ -324,8 +348,8 @@
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: "rgba(59,130,246,0.22)" },
-              { offset: 1, color: "rgba(59,130,246,0.02)" },
+              { offset: 0, color: withAlpha(chartSeriesColor, 0.22) },
+              { offset: 1, color: withAlpha(chartSeriesColor, 0.02) },
             ],
           },
         },
@@ -335,10 +359,12 @@
           symbol: "none",
           label: {
             color: chartMutedTextColor,
-            formatter: "Prom: {c}",
+            formatter: "Promedio: {c}",
             fontSize: 11,
+            // Inside the plot: at the line's end it was clipped by the card edge.
+            position: "insideEndTop",
           },
-          lineStyle: { type: "dashed", color: "#f59e0b", width: 1.5 },
+          lineStyle: { type: "dashed", color: chartMutedTextColor, width: 1 },
           data: [{ type: "average", name: "Promedio" }],
         },
         data: ordersOverTime.map((p) => p.count),
@@ -390,7 +416,7 @@
         name: "Ingresos",
         type: "bar",
         barMaxWidth: 38,
-        itemStyle: { borderRadius: [5, 5, 0, 0], color: "#22c55e" },
+        itemStyle: { borderRadius: [4, 4, 0, 0], color: chartSeriesColor },
         emphasis: { focus: "series" },
         data: ordersOverTime.map((p) => p.revenue),
       },
@@ -446,9 +472,21 @@
         return;
       }
 
+      const previous = previousRange(start, end);
+      // The comparison is a nice-to-have: never let it fail the page.
+      const previousRequest = getAnalyticsDashboard(
+        previous.start,
+        previous.end,
+        groupBy,
+        1,
+      ).catch(() => null);
       const dashboard = await getAnalyticsDashboard(start, end, groupBy, 10);
 
       overview = dashboard.overview;
+      previousOverview = null;
+      void previousRequest.then((result) => {
+        previousOverview = result?.overview ?? null;
+      });
       ordersOverTime = dashboard.orders_over_time;
       topProducts = dashboard.top_products;
     } catch (err) {
@@ -460,15 +498,11 @@
   }
 
   function todayISO() {
-    return new Date().toISOString().slice(0, 10);
+    return storeTodayISO();
   }
 
   function getPeriodStart(p: "week" | "month" | "year") {
-    const d = new Date();
-    if (p === "week") d.setDate(d.getDate() - 7);
-    else if (p === "month") d.setMonth(d.getMonth() - 1);
-    else d.setFullYear(d.getFullYear() - 1);
-    return d.toISOString().slice(0, 10);
+    return lastDays(p === "week" ? 7 : p === "month" ? 30 : 365).start;
   }
 
   onMount(() => {
@@ -564,7 +598,7 @@
       {#if useCustomRange}
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label class="flex items-center gap-3">
-            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60"
+            <span class="w-24 shrink-0 text-sm font-medium text-ink-muted"
               >Fecha inicio</span
             >
             <input
@@ -575,7 +609,7 @@
             />
           </label>
           <label class="flex items-center gap-3">
-            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60"
+            <span class="w-24 shrink-0 text-sm font-medium text-ink-muted"
               >Fecha fin</span
             >
             <input
@@ -600,26 +634,29 @@
         </div>
       {:else}
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div class="stat bg-base-200/30 rounded-box py-3">
+          <div class="stat rounded-box border-0 bg-base-200 py-3">
             <div class="stat-title text-xs">Órdenes</div>
-            <div class="stat-value text-primary text-2xl">
+            <div class="stat-value text-2xl tabular-nums">
               {overview?.total_orders ?? 0}
             </div>
             <div class="stat-desc text-xs">{getActivePeriodDescription()}</div>
+            {@render deltaLine(ordersDelta)}
           </div>
-          <div class="stat bg-base-200/30 rounded-box py-3">
+          <div class="stat rounded-box border-0 bg-base-200 py-3">
             <div class="stat-title text-xs">Ingresos</div>
-            <div class="stat-value text-success text-2xl">
+            <div class="stat-value text-2xl tabular-nums">
               {formatCurrency(overview?.total_revenue ?? 0)}
             </div>
             <div class="stat-desc text-xs">Sin órdenes canceladas</div>
+            {@render deltaLine(revenueDelta)}
           </div>
-          <div class="stat bg-base-200/30 rounded-box py-3">
+          <div class="stat rounded-box border-0 bg-base-200 py-3">
             <div class="stat-title text-xs">Ticket promedio</div>
-            <div class="stat-value text-info text-2xl">
+            <div class="stat-value text-2xl tabular-nums">
               {formatCurrency(overview?.avg_order_value ?? 0)}
             </div>
             <div class="stat-desc text-xs">Por orden completada</div>
+            {@render deltaLine(ticketDelta)}
           </div>
         </div>
       {/if}
@@ -650,15 +687,12 @@
           <div
             class="w-16 h-16 rounded-full bg-base-300/50 flex items-center justify-center"
           >
-            <Icon
-              icon="lucide:bar-chart-2"
-              class="h-8 w-8 text-base-content/30"
-            />
+            <Icon icon="lucide:bar-chart-2" class="h-8 w-8 text-ink-muted" />
           </div>
-          <p class="font-medium text-base-content/60">
+          <p class="font-medium text-ink-muted">
             Sin datos para el periodo seleccionado
           </p>
-          <p class="text-sm text-base-content/40 max-w-xs">
+          <p class="text-sm text-ink-muted max-w-xs">
             Cambia el rango de fechas o espera a que se registren nuevas
             órdenes.
           </p>
@@ -705,7 +739,7 @@
               </h4>
               {#if topProducts.length === 0}
                 <div
-                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                  class="h-72 flex items-center justify-center text-sm text-ink-muted"
                 >
                   Sin datos de productos
                 </div>
@@ -726,7 +760,7 @@
               </h4>
               {#if !overview?.status_breakdown || Object.keys(overview.status_breakdown).length === 0}
                 <div
-                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                  class="h-72 flex items-center justify-center text-sm text-ink-muted"
                 >
                   Sin datos de estados
                 </div>
@@ -747,7 +781,7 @@
               </h4>
               {#if !overview?.payment_method_breakdown || Object.keys(overview.payment_method_breakdown).length === 0}
                 <div
-                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                  class="h-72 flex items-center justify-center text-sm text-ink-muted"
                 >
                   Sin datos de métodos de pago
                 </div>
@@ -773,7 +807,7 @@
               </h4>
               {#if topProducts.length === 0}
                 <div
-                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                  class="h-72 flex items-center justify-center text-sm text-ink-muted"
                 >
                   Sin datos de productos
                 </div>
@@ -789,3 +823,22 @@
     </div>
   </div>
 </section>
+
+{#snippet deltaLine(change: Delta | null)}
+  {#if change}
+    <div
+      class={`stat-desc mt-1 flex items-center gap-1 text-xs font-medium ${change.direction === "up" ? "text-success" : change.direction === "down" ? "text-error" : "text-ink-muted"}`}
+    >
+      <Icon
+        icon={change.direction === "up"
+          ? "lucide:trending-up"
+          : change.direction === "down"
+            ? "lucide:trending-down"
+            : "lucide:minus"}
+        class="size-3.5"
+        aria-hidden="true"
+      />
+      {change.label}
+    </div>
+  {/if}
+{/snippet}
