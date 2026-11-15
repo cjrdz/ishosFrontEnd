@@ -142,7 +142,7 @@
   function requestDelete(user: User) {
     openConfirm(
       "Eliminar usuario",
-      `Eliminar permanentemente ${user.name}? Esta accion no se puede deshacer.`,
+      `Eliminar permanentemente ${user.name}? Esta acción no se puede deshacer.`,
       () => onDelete(user.id),
     );
   }
@@ -243,7 +243,7 @@
     </div>
 
     <div class="form-control">
-      <span id="user-phone-label" class="label-text text-xs mb-1">Telefono</span
+      <span id="user-phone-label" class="label-text text-xs mb-1">Teléfono</span
       >
       <input
         id="user-phone"
@@ -300,7 +300,7 @@
 
 <AdminModalShell
   bind:dialogRef={historyDialog}
-  title={`Historial de ordenes: ${selectedUserName || "Usuario"}`}
+  title={`Historial de órdenes: ${selectedUserName || "Usuario"}`}
   icon="lucide:clock"
   widthClass="max-w-3xl"
   onClose={closeHistory}
@@ -319,7 +319,7 @@
         {#if historyBusy}
           <tr><td colspan="4">Cargando historial...</td></tr>
         {:else if selectedUserOrders.length === 0}
-          <tr><td colspan="4">Sin ordenes registradas</td></tr>
+          <tr><td colspan="4">Sin órdenes registradas</td></tr>
         {:else}
           {#each selectedUserOrders as order}
             <tr>

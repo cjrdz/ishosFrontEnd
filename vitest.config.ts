@@ -7,6 +7,13 @@ export default defineConfig({
       "@core": fileURLToPath(new URL("./src/core", import.meta.url)),
       "@shared": fileURLToPath(new URL("./src/shared", import.meta.url)),
       "@features": fileURLToPath(new URL("./src/features", import.meta.url)),
+      // Astro virtual modules used by src/middleware.ts.
+      "astro:middleware": fileURLToPath(
+        new URL("./src/test/astro-middleware.stub.ts", import.meta.url),
+      ),
+      "astro:env/server": fileURLToPath(
+        new URL("./src/test/astro-env-server.stub.ts", import.meta.url),
+      ),
     },
   },
   test: {
@@ -23,6 +30,7 @@ export default defineConfig({
         "src/pages/**",
         "src/types/**",
         "src/env.d.ts",
+        "src/test/**",
       ],
       thresholds: {
         lines: 60,

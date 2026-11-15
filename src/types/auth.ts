@@ -17,6 +17,11 @@ export interface Session {
   phone: string;
   role: UserRole;
   active: boolean;
+  /** Location (sucursal) the employee works at; null for admins. */
+  location_id?: string | null;
+  location_name?: string | null;
+  /** Inactivity logout (seconds) configured by the admin. */
+  inactivity_logout_seconds?: number;
 }
 
 /**

@@ -7,12 +7,22 @@ export type TabKey =
   | "analitica";
 
 export const TAB_LABELS: Record<TabKey, string> = {
-  ordenes: "Ordenes",
-  categorias: "Categorias",
+  ordenes: "Órdenes",
+  categorias: "Categorías",
   productos: "Productos",
   inventario: "Inventario",
   personas: "Personas",
-  analitica: "Analitica",
+  analitica: "Analítica",
+};
+
+/** Icons for the phone bottom navigation. */
+export const TAB_ICONS: Record<TabKey, string> = {
+  ordenes: "lucide:receipt-text",
+  categorias: "lucide:layout-grid",
+  productos: "lucide:ice-cream-cone",
+  inventario: "lucide:package",
+  personas: "lucide:users",
+  analitica: "lucide:chart-line",
 };
 
 export const ADMIN_ONLY_TABS = new Set<TabKey>([
@@ -22,6 +32,19 @@ export const ADMIN_ONLY_TABS = new Set<TabKey>([
   "personas",
   "analitica",
 ]);
+
+/** Tabs a manager sees: their location's orders and stock. */
+export const MANAGER_TABS = new Set<TabKey>(["ordenes", "inventario"]);
+
+/**
+ * Whether a role may open a tab. Admins see everything; managers their
+ * location's orders and inventory; employees only orders.
+ */
+export function canSeeTab(role: string | undefined, tab: TabKey): boolean {
+  if (role === "admin") return true;
+  if (role === "manager") return MANAGER_TABS.has(tab);
+  return !ADMIN_ONLY_TABS.has(tab);
+}
 
 export const DEFAULT_TAB_ORDER: TabKey[] = [
   "ordenes",

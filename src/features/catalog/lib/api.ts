@@ -99,6 +99,15 @@ interface PublicOrderCreateResponse {
 
 export interface PublicOrderTrackingResponse {
   order_number: string;
+  /** Where to pick the order up. */
+  location?: {
+    id: string;
+    name: string;
+    address?: string;
+    maps_url?: string;
+    whatsapp?: string;
+    phone?: string;
+  } | null;
   customer_name?: string;
   customer_phone?: string;
   status: PublicOrderStatus;
@@ -220,13 +229,20 @@ export async function listPublicCategories(
   return data;
 }
 
+/**
+ * Lists public products. `fresh` bypasses the in-memory and HTTP caches; the
+ * cart uses it to re-check prices and availability right before checkout.
+ */
 export async function listPublicProducts(
   params: ListProductsParams = { all: true },
+  options: { fresh?: boolean } = {},
 ): Promise<PublicProduct[]> {
   const query = buildQueryParams(params);
   const key = cacheKey("/api/store/products", query);
-  const cached = getCached<PublicProduct[]>(key);
-  if (cached) return cached;
+  if (!options.fresh) {
+    const cached = getCached<PublicProduct[]>(key);
+    if (cached) return cached;
+  }
 
   const search = new URLSearchParams(query).toString();
   const path = `/api/store/products${search ? `?${search}` : ""}`;
@@ -234,7 +250,7 @@ export async function listPublicProducts(
     | { data: PublicProduct[] }
     | PublicProduct[]
     | PaginatedResponse<PublicProduct>
-  >(path);
+  >(path, options.fresh ? { cache: "no-cache" } : undefined);
   const data = extractData(res);
   setCached(key, data);
   return data;
@@ -296,11 +312,101 @@ export interface StoreOfferItem {
   expires_at: string;
 }
 
-interface StorePublicSettings {
-  orders_enabled: boolean;
-  offers: StoreOfferItem[];
+export interface StoreTimeRange {
+  open: string; // "HH:MM", store-local
+  close: string;
 }
 
-export async function fetchStoreSettings(): Promise<StorePublicSettings> {
-  return bffRequest<StorePublicSettings>("/api/store/settings");
+/** Schedule-derived status computed by the backend in the store's time zone. */
+export interface StoreHoursStatus {
+  configured: boolean;
+  is_open: boolean;
+  closes_at?: string; // RFC 3339, when open
+  opens_at?: string; // RFC 3339, when closed
+  today: StoreTimeRange[];
+  weekly: Record<string, StoreTimeRange[]>;
+}
+
+export interface StorePublicSettings {
+  orders_enabled: boolean;
+  /** Public "Seguir mi orden" page; off until the admin enables it. */
+  tracking_enabled?: boolean;
+  offers: StoreOfferItem[];
+  /** Absent from older backends: treat as "no schedule, always open". */
+  hours?: StoreHoursStatus;
+}
+
+// Several islands on one page need the store status (navbar chip, cart icon,
+// menu, cart). Share one request among them for a short window.
+const SETTINGS_SHARE_MS = 10_000;
+let sharedSettings: {
+  at: number;
+  promise: Promise<StorePublicSettings>;
+} | null = null;
+
+export async function fetchStoreSettings(
+  options: { fresh?: boolean } = {},
+): Promise<StorePublicSettings> {
+  const now = Date.now();
+  if (
+    !options.fresh &&
+    sharedSettings &&
+    now - sharedSettings.at < SETTINGS_SHARE_MS
+  ) {
+    return sharedSettings.promise;
+  }
+  const promise = bffRequest<StorePublicSettings>(
+    "/api/store/settings",
+    options.fresh ? { cache: "no-cache" } : undefined,
+  );
+  sharedSettings = { at: now, promise };
+  promise.catch(() => {
+    if (sharedSettings?.promise === promise) sharedSettings = null;
+  });
+  return promise;
+}
+
+// ── Public Locations (sucursales) ────────────────────────────────────
+
+export interface PublicLocation {
+  id: string;
+  slug: string;
+  name: string;
+  address: string;
+  maps_url: string;
+  maps_embed_url: string;
+  /** Digits with country code, e.g. "50376454347" (may be empty). */
+  whatsapp: string;
+  phone: string;
+  accepts_online_orders: boolean;
+  hours: StoreHoursStatus;
+}
+
+const LOCATIONS_SHARE_MS = 10_000;
+let sharedLocations: {
+  at: number;
+  promise: Promise<PublicLocation[]>;
+} | null = null;
+
+/** Active locations with live hours; one request shared across islands. */
+export async function fetchStoreLocations(
+  options: { fresh?: boolean } = {},
+): Promise<PublicLocation[]> {
+  const now = Date.now();
+  if (
+    !options.fresh &&
+    sharedLocations &&
+    now - sharedLocations.at < LOCATIONS_SHARE_MS
+  ) {
+    return sharedLocations.promise;
+  }
+  const promise = bffRequest<{ data: PublicLocation[] }>(
+    "/api/store/locations",
+    options.fresh ? { cache: "no-cache" } : undefined,
+  ).then((body) => body?.data ?? []);
+  sharedLocations = { at: now, promise };
+  promise.catch(() => {
+    if (sharedLocations?.promise === promise) sharedLocations = null;
+  });
+  return promise;
 }

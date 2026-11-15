@@ -17,6 +17,9 @@ pnpm-debug.log*
 # environment variables
 .env
 .env.production
+.env.development
+.env.*.local
+.dev.vars
 
 # macOS-specific files
 .DS_Store
@@ -36,3 +39,13 @@ src/types/api-generated.ts
 AGENTS.md
 .agents
 skills-lock.json
+
+
+# >>> githints (managed)
+.githints/
+# <<< githints (managed)
+
+# Playwright
+test-results/
+playwright-report/
+coverage/

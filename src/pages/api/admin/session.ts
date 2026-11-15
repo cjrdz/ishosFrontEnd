@@ -29,9 +29,10 @@ export const GET: APIRoute = async (context) => {
     });
   } catch (error) {
     if (error instanceof Error) {
+      console.error("[session] failed:", error.message);
       return new Response(
         JSON.stringify({
-          error: error.message || "Session fetch failed",
+          error: "Tu sesión no es válida. Inicia sesión de nuevo.",
           code: "SESSION_ERROR",
         }),
         {

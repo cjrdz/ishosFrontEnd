@@ -100,9 +100,9 @@
 
   const categoryFilterLabel = $derived(
     categoryFilter === "all"
-      ? "Categorias"
+      ? "Categorías"
       : (categories.find((category) => category.id === categoryFilter)?.name ??
-          "Categoria"),
+          "Categoría"),
   );
 
   const availabilityFilterLabel = $derived(
@@ -276,19 +276,99 @@
         disabled={busy}
       >
         <Icon icon="lucide:plus" class="h-4 w-4" />
-        Producto
+        Nuevo producto
       </button>
     </div>
 
-    <!-- Table -->
+    <!-- Phones: one card per product, so the switch and actions stay in reach. -->
+    <ul class="space-y-2 md:hidden" aria-label="Productos">
+      {#if filteredProducts.length === 0}
+        <li
+          class="rounded-box border border-base-300 p-6 text-center text-ink-muted"
+        >
+          No hay productos
+        </li>
+      {/if}
+      {#each visibleProducts as product (product.id)}
+        {@const offer = offerByProductId.get(product.id)}
+        <li class="rounded-box border border-base-300 bg-base-100 p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="font-semibold leading-tight">{product.name}</p>
+              <p class="text-sm text-ink-muted">
+                {product.category_name || "Sin categoría"} · {formatCurrency(
+                  product.price,
+                )}
+              </p>
+              {#if offer}
+                <span
+                  class="badge badge-sm mt-1 border-0 bg-primary/10 text-primary"
+                  >Oferta activa</span
+                >
+              {/if}
+            </div>
+            <label class="flex shrink-0 items-center gap-2 text-sm">
+              <span class={product.is_available ? "" : "text-ink-muted"}>
+                {product.is_available ? "Disponible" : "Agotado"}
+              </span>
+              <input
+                class="toggle toggle-primary toggle-sm"
+                type="checkbox"
+                checked={product.is_available}
+                onchange={(event) =>
+                  onToggleAvailability(
+                    product,
+                    (event.currentTarget as HTMLInputElement).checked,
+                  )}
+                disabled={busy}
+                aria-label={`${product.name} disponible`}
+              />
+            </label>
+          </div>
+          <div
+            class="mt-2 flex justify-end gap-1 border-t border-base-300 pt-2"
+          >
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              onclick={() => onOpenOfferPanel(product)}
+              disabled={busy}
+            >
+              <Icon icon="lucide:tag" class="h-4 w-4" aria-hidden="true" />
+              Oferta
+            </button>
+            <button
+              class="btn btn-ghost btn-sm"
+              type="button"
+              onclick={() => onEdit(product)}
+              disabled={busy}
+            >
+              <Icon icon="lucide:pencil" class="h-4 w-4" aria-hidden="true" />
+              Editar
+            </button>
+            <button
+              class="btn btn-ghost btn-sm btn-square text-error"
+              type="button"
+              onclick={() => onRequestDelete(product)}
+              disabled={busy}
+              aria-label={`Eliminar ${product.name}`}
+            >
+              <Icon icon="lucide:trash-2" class="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </li>
+      {/each}
+    </ul>
+
+    <!-- Table (tablet and up) -->
     <div
-      class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
+      class="hidden overflow-x-auto rounded-box border border-base-content/5 bg-base-100 md:block"
     >
       <table class="table w-full">
         <thead class="bg-base-200/60 text-base-content">
           <tr>
             <th class="font-bold">Nombre</th>
-            <th class="text-center font-bold">Categoria</th>
+            <th class="text-center font-bold">Categoría</th>
             <th class="text-center font-bold">Precio</th>
             <th class="text-center font-bold">Oferta</th>
             <th class="text-center font-bold">Estado</th>
@@ -298,7 +378,7 @@
         <tbody>
           {#if filteredProducts.length === 0}
             <tr
-              ><td colspan="6" class="text-center py-6 text-base-content/50"
+              ><td colspan="6" class="text-center py-6 text-ink-muted"
                 >No hay productos</td
               ></tr
             >
@@ -323,7 +403,7 @@
                     </span>
                   {:else}
                     <span
-                      class="inline-flex items-center gap-1.5 text-sm text-base-content/60"
+                      class="inline-flex items-center gap-1.5 text-sm text-ink-muted"
                     >
                       <span class="w-2 h-2 rounded-full bg-error"></span>
                       Inactiva
@@ -390,7 +470,7 @@
     <div
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
-      <span class="text-sm text-base-content/60">
+      <span class="text-sm text-ink-muted">
         {filteredTotal === 0
           ? "0 resultados"
           : `${startItem}-${endItem} de ${filteredTotal}`}
@@ -407,7 +487,7 @@
           <Icon icon="lucide:chevron-left" class="h-4 w-4" />
         </button>
 
-        <span class="text-sm text-base-content/60">
+        <span class="text-sm text-ink-muted">
           Página {currentPage} de {totalPages}
         </span>
 

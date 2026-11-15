@@ -59,7 +59,7 @@
     <div class="space-y-3 rounded-lg border border-base-300/70 p-3">
       <div class="form-control">
         <span class="label-text text-xs mb-1">Cantidad de ajuste</span>
-        <span class="label-text-alt text-xs text-base-content/60"
+        <span class="label-text-alt text-xs text-ink-muted"
           >Negativo para restar</span
         >
         <input

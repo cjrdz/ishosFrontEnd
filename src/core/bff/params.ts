@@ -66,3 +66,18 @@ export function parseOptionalBoundedInt(
 
   return parsed;
 }
+
+/** UUIDs and the fallback keys from orders/lib/idempotency.ts. */
+const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
+
+/**
+ * Idempotency-Key header to forward: null when absent, a 400 Response when
+ * it isn't a plain token (so odd values never reach the backend).
+ */
+export function idempotencyKeyFrom(request: Request): string | Response | null {
+  const key = request.headers.get("Idempotency-Key")?.trim();
+  if (!key) return null;
+  return IDEMPOTENCY_KEY_RE.test(key)
+    ? key
+    : validationError("Invalid Idempotency-Key header");
+}

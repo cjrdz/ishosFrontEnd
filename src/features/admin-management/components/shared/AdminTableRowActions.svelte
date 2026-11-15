@@ -31,7 +31,7 @@
 <div class="flex flex-wrap items-center justify-center gap-1">
   {#if onMoveUp}
     <button
-      class="btn btn-xs btn-ghost btn-square"
+      class="btn btn-sm btn-ghost btn-square size-11"
       type="button"
       onclick={onMoveUp}
       disabled={isBusy || !canMoveUp}
@@ -43,7 +43,7 @@
   {/if}
   {#if onMoveDown}
     <button
-      class="btn btn-xs btn-ghost btn-square"
+      class="btn btn-sm btn-ghost btn-square size-11"
       type="button"
       onclick={onMoveDown}
       disabled={isBusy || !canMoveDown}
@@ -54,13 +54,13 @@
     </button>
   {/if}
   <button
-    class="btn btn-xs btn-soft btn-accent"
+    class="btn btn-sm min-h-11 btn-soft btn-accent"
     type="button"
     onclick={onEdit}
     disabled={isBusy}>Editar</button
   >
   <button
-    class="btn btn-xs btn-soft btn-error"
+    class="btn btn-sm min-h-11 btn-soft btn-error"
     type="button"
     onclick={onDelete}
     disabled={isBusy}>Eliminar</button

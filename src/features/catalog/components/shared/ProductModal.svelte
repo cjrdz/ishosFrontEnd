@@ -1,9 +1,8 @@
 <script lang="ts">
-  import { tick } from "svelte";
-  import { animate, stagger } from "motion";
   import Icon from "@shared/components/AppIcon.svelte";
   import { formatCurrency } from "@shared/utils/formatters";
-  import "../../../../styles/product-modal.css";
+  import { DURATION, safeAnimate } from "@shared/motion/motion";
+  import ProductArt from "./ProductArt.svelte";
   import type { PublicProduct } from "@features/catalog/lib/api";
   import FlavorSelector from "@shared/components/FlavorSelector.svelte";
   import ProductAddonChipGroup from "./ProductAddonChipGroup.svelte";
@@ -26,6 +25,8 @@
     imageUrl?: string;
     initialDraft?: ProductCustomizationDraft | null;
     basePrice?: number;
+    /** Button verb: "Agregar" when adding, "Guardar cambios" when editing a cart line. */
+    confirmLabel?: string;
     onClose?: () => void;
     onConfirm?: (draft: ProductCustomizationDraft) => void | Promise<void>;
   }
@@ -36,6 +37,7 @@
     imageUrl,
     initialDraft = null,
     basePrice,
+    confirmLabel = "Agregar",
     onClose = () => {},
     onConfirm = () => {},
   }: Props = $props();
@@ -87,12 +89,16 @@
   const toppingHelperText = $derived(
     toppingFreeAllowance === 0
       ? "Cada topping tiene costo adicional."
-      : `Los primeros ${toppingFreeAllowance} topping${toppingFreeAllowance === 1 ? "" : "s"} son gratis. Los siguientes tienen costo.`,
+      : toppingFreeAllowance === 1
+        ? "El primer topping es gratis; los demás tienen costo."
+        : `Los primeros ${toppingFreeAllowance} toppings son gratis; los demás tienen costo.`,
   );
   const jaleaHelperText = $derived(
     jaleaFreeAllowance === 0
       ? "Cada jalea tiene costo adicional."
-      : `Las primeras ${jaleaFreeAllowance} jalea${jaleaFreeAllowance === 1 ? "" : "s"} son gratis. Las siguientes tienen costo.`,
+      : jaleaFreeAllowance === 1
+        ? "La primera jalea es gratis; las demás tienen costo."
+        : `Las primeras ${jaleaFreeAllowance} jaleas son gratis; las demás tienen costo.`,
   );
 
   // Mixed flavors support
@@ -123,6 +129,36 @@
       jaleaRequired,
   );
 
+  const remainingFlavors = $derived(
+    flavorSelections.filter((id) => !id).length,
+  );
+
+  /** What still blocks the button, in the customer's words. */
+  const missingHint = $derived.by(() => {
+    if (flavorRequired) return "Elige un sabor";
+    if (mixedFlavorsRequired) {
+      return remainingFlavors === 1
+        ? "Elige 1 sabor más"
+        : `Elige ${remainingFlavors} sabores más`;
+    }
+    if (toppingRequired) return "Elige un topping o «Sin topping»";
+    if (jaleaRequired) return "Elige una jalea o «Sin jalea»";
+    return "";
+  });
+
+  const flavorDone = $derived(
+    hasMixedFlavors
+      ? !mixedFlavorsRequired
+      : !flavorRequired && !!draft.flavor_id,
+  );
+
+  function isPhone(): boolean {
+    return (
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 639px)").matches
+    );
+  }
+
   function buildInitialDraft(): ProductCustomizationDraft {
     return {
       quantity: normalizeQuantity(initialDraft?.quantity ?? 1),
@@ -143,12 +179,12 @@
 
   function chipClass(selected: boolean, variant: "base" | "required" = "base") {
     if (selected) {
-      return "btn btn-sm rounded-full border-[var(--ishos-teal)] bg-[color-mix(in_srgb,var(--ishos-teal)_15%,transparent)] text-[var(--ishos-teal)] hover:bg-[color-mix(in_srgb,var(--ishos-teal)_20%,transparent)]";
+      return "btn btn-sm min-h-11 rounded-full border-primary bg-primary/10 text-primary hover:bg-primary/15";
     }
     if (variant === "required") {
-      return "btn btn-sm rounded-full btn-ghost border border-warning/40 text-base-content/75 hover:border-warning/60 hover:bg-warning/10";
+      return "btn btn-sm min-h-11 rounded-full btn-ghost border border-warning/40 text-base-content/75 hover:border-warning/60 hover:bg-warning/10";
     }
-    return "btn btn-sm rounded-full btn-ghost border border-base-300 text-base-content/80 hover:border-base-content/25 hover:bg-base-200/80";
+    return "btn btn-sm min-h-11 rounded-full btn-ghost border border-base-300 text-base-content/80 hover:border-base-content/25 hover:bg-base-200/80";
   }
 
   function increaseQty() {
@@ -240,11 +276,6 @@
     closing = true;
 
     const currentDialog = dialogRef;
-    const currentBox = modalBoxRef;
-    const reduceMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
     const finishClose = () => {
       closeDispatched = true;
       onClose();
@@ -256,15 +287,51 @@
       closing = false;
     };
 
-    if (currentBox && !reduceMotion) {
-      void animate(
-        currentBox,
-        { opacity: [1, 0], y: [0, 16], scale: [1, 0.98] },
-        { duration: 0.25, ease: [0.22, 1, 0.36, 1] },
-      ).finished.then(finishClose);
-    } else {
-      finishClose();
+    // Phones: the sheet slides back down; larger screens: fade and settle.
+    const from = modalBoxRef?.style.transform || "none";
+    void safeAnimate(
+      modalBoxRef,
+      isPhone()
+        ? [{ transform: from }, { transform: "translateY(100%)" }]
+        : [
+            { opacity: 1, transform: "none" },
+            { opacity: 0, transform: "translateY(12px) scale(0.98)" },
+          ],
+      { duration: DURATION.panel },
+    ).then(finishClose);
+  }
+
+  // Drag the sheet's handle down to dismiss (phones).
+  let dragStartY: number | null = null;
+  let dragOffset = 0;
+
+  function onDragStart(event: PointerEvent) {
+    if (!isPhone() || !modalBoxRef) return;
+    dragStartY = event.clientY;
+    dragOffset = 0;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    modalBoxRef.style.transition = "none";
+  }
+
+  function onDragMove(event: PointerEvent) {
+    if (dragStartY === null || !modalBoxRef) return;
+    dragOffset = Math.max(0, event.clientY - dragStartY);
+    modalBoxRef.style.transform = `translateY(${dragOffset}px)`;
+  }
+
+  function onDragEnd() {
+    if (dragStartY === null || !modalBoxRef) return;
+    dragStartY = null;
+    modalBoxRef.style.transition = "";
+    if (dragOffset > 110) {
+      closeDialog();
+      return;
     }
+    void safeAnimate(
+      modalBoxRef,
+      [{ transform: `translateY(${dragOffset}px)` }, { transform: "none" }],
+      { duration: DURATION.fast },
+    );
   }
 
   async function handleConfirm(): Promise<boolean> {
@@ -281,12 +348,6 @@
     });
 
     return true;
-  }
-
-  async function handleGoToCart() {
-    const confirmed = await handleConfirm();
-    if (!confirmed) return;
-    window.location.href = "/order/cart#checkout";
   }
 
   function handleNativeClose() {
@@ -315,33 +376,9 @@
         } else {
           dialogRef.setAttribute("open", "");
         }
-        void tick().then(() => {
-          if (!modalBoxRef) return;
-          if (
-            typeof window !== "undefined" &&
-            window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          )
-            return;
-          void animate(
-            modalBoxRef,
-            { opacity: [0, 1], y: [20, 0], scale: [0.97, 1] },
-            { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
-          );
-          void tick().then(() => {
-            if (!modalBoxRef) return;
-            const details = modalBoxRef.querySelectorAll("details");
-            if (details.length === 0) return;
-            void animate(
-              details,
-              { opacity: [0, 1], y: [14, 0] },
-              {
-                duration: 0.35,
-                ease: [0.22, 1, 0.36, 1],
-                delay: stagger(0.08, { startDelay: 0.15 }),
-              },
-            );
-          });
-        });
+        // A previous close leaves its last frame inline; daisyUI animates the entrance.
+        modalBoxRef?.style.removeProperty("opacity");
+        modalBoxRef?.style.removeProperty("transform");
       }
       return;
     }
@@ -355,6 +392,7 @@
 <dialog
   class="modal modal-bottom sm:modal-middle"
   bind:this={dialogRef}
+  aria-labelledby="product-sheet-title"
   onclose={handleNativeClose}
   oncancel={(event) => {
     event.preventDefault();
@@ -362,311 +400,305 @@
   }}
 >
   <div
-    class="modal-box w-full max-w-[min(96vw,72rem)] h-auto max-h-[94dvh] lg:max-h-208 p-0 overflow-hidden rounded-t-3xl sm:rounded-3xl border border-base-200/70 flex flex-col relative"
+    class="modal-box product-sheet flex w-full max-w-4xl flex-col overflow-hidden p-0"
     bind:this={modalBoxRef}
   >
-    <div class="brand-accent-bar"></div>
-    <div
-      class="stripe-bg absolute top-0 left-0 right-0 h-24 pointer-events-none"
-    ></div>
-    <button
-      type="button"
-      class="btn btn-circle btn-sm bg-base-100/92 border border-base-300/70 shadow-md absolute right-4 top-4 z-50"
-      aria-label="Cerrar"
-      onclick={closeDialog}
-    >
-      <Icon icon="lucide:x" class="size-5" aria-hidden="true" />
-    </button>
-
     {#if product}
-      <div class="sm:hidden flex justify-center pt-2 pb-1">
-        <span class="h-1.25 w-14 rounded-full bg-base-300"></span>
+      <div
+        class="sheet-handle"
+        role="presentation"
+        onpointerdown={onDragStart}
+        onpointermove={onDragMove}
+        onpointerup={onDragEnd}
+        onpointercancel={onDragEnd}
+      >
+        <span></span>
       </div>
+      <button
+        type="button"
+        class="btn btn-circle btn-sm size-11 absolute right-3 top-3 z-10 border-base-300 bg-base-100/90"
+        aria-label="Cerrar"
+        onclick={closeDialog}
+      >
+        <Icon icon="lucide:x" class="size-5" aria-hidden="true" />
+      </button>
 
-      <div class="flex-1 min-h-0 overflow-y-auto">
-        <div
-          class="flex flex-col lg:grid lg:grid-cols-[minmax(22rem,0.9fr)_minmax(0,1.1fr)] lg:min-h-full"
-        >
-          <section
-            class="border-b lg:border-b-0 lg:border-r border-base-200/70 bg-base-200/20 p-4 sm:p-6 lg:p-7 lg:flex lg:flex-col lg:gap-2"
-          >
-            {#if imageUrl && !modalImgFailed}
-              <figure
-                class="w-full aspect-4/3 sm:aspect-4/3 lg:aspect-4/3 lg:max-h-[56vh] rounded-2xl overflow-hidden border border-base-200 bg-base-100"
-              >
+      <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div class="sm:grid sm:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          <div class="p-4 pb-0 sm:sticky sm:top-0 sm:self-start sm:p-6">
+            <figure
+              class="aspect-[16/10] overflow-hidden rounded-box bg-base-200 sm:aspect-square"
+            >
+              {#if imageUrl && !modalImgFailed}
                 <img
                   src={imageUrl}
-                  alt={product.name}
+                  alt=""
                   class="h-full w-full object-cover"
-                  loading="lazy"
                   onerror={() => {
                     modalImgFailed = true;
                   }}
                 />
-              </figure>
-            {:else}
-              <div
-                class="w-full aspect-4/3 sm:aspect-4/3 lg:aspect-4/3 lg:max-h-[56vh] rounded-2xl border border-base-200 bg-base-100 grid place-items-center text-base-content/50"
+              {:else}
+                <ProductArt
+                  name={product.name}
+                  category={product.category_name}
+                  scoops={product.ball_quantity ?? 1}
+                  seed={product.id}
+                />
+              {/if}
+            </figure>
+          </div>
+
+          <div class="space-y-6 p-4 sm:p-6 sm:pl-0">
+            <header class="space-y-1 pr-10">
+              <h2
+                id="product-sheet-title"
+                class="font-display font-bold text-4xl leading-none md:text-5xl"
               >
-                <div class="flex flex-col items-center gap-2">
-                  <Icon icon="lucide:image-off" class="size-8 opacity-50" />
-                  <span class="font-medium">Sin imagen</span>
+                {product.name}
+              </h2>
+              {#if product.description}
+                <p class="text-base-content/70">{product.description}</p>
+              {/if}
+            </header>
+
+            {#if flavorOptions.length > 0}
+              <section class="space-y-3" aria-labelledby="sheet-flavor">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 id="sheet-flavor" class="font-semibold">
+                    {hasMixedFlavors
+                      ? `Elige ${ballQuantity} sabores`
+                      : "Elige tu sabor"}
+                  </h3>
+                  {@render requirement(flavorDone)}
                 </div>
-              </div>
+                {#if hasMixedFlavors}
+                  <p class="text-sm text-ink-muted">
+                    Puedes repetir un sabor. {ballQuantity - remainingFlavors} de
+                    {ballQuantity} elegidos.
+                  </p>
+                {/if}
+                <FlavorSelector
+                  flavors={flavorOptions}
+                  mode={hasMixedFlavors ? "fill" : "single"}
+                  {ballQuantity}
+                  selectedId={draft.flavor_id ?? ""}
+                  selectedIds={flavorSelections}
+                  label={hasMixedFlavors ? "Sabores" : "Sabor"}
+                  required={true}
+                  hideLabel={true}
+                  onChange={handleFlavorChange}
+                />
+              </section>
             {/if}
 
-            <div class="mt-4 space-y-2">
-              <h3 class="text-2xl font-bold leading-tight">{product.name}</h3>
-              <p
-                class="text-lg font-extrabold"
-                style="color: var(--ishos-teal);"
-                aria-live="polite"
-                aria-atomic="true"
+            {#if toppingOptions.length > 0}
+              <section class="space-y-3" aria-labelledby="sheet-topping">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 id="sheet-topping" class="font-semibold">Topping</h3>
+                  {@render requirement(!toppingRequired)}
+                </div>
+                <ProductAddonChipGroup
+                  items={toppingOptions}
+                  includedIds={selectedToppingIds}
+                  selectedIds={toppingExtraIds}
+                  allowance={toppingFreeAllowance}
+                  noneLabel="Sin topping"
+                  label="Topping"
+                  helperText={toppingHelperText}
+                  required={true}
+                  hideLabel={true}
+                  noneChosen={draft.topping_selection === "none"}
+                  {chipClass}
+                  onChange={updateToppingSelection}
+                />
+              </section>
+            {/if}
+
+            {#if jaleaOptions.length > 0}
+              <section class="space-y-3" aria-labelledby="sheet-jalea">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 id="sheet-jalea" class="font-semibold">Jalea</h3>
+                  {@render requirement(!jaleaRequired)}
+                </div>
+                <ProductAddonChipGroup
+                  items={jaleaOptions}
+                  includedIds={selectedJaleaIds}
+                  selectedIds={jaleaExtraIds}
+                  allowance={jaleaFreeAllowance}
+                  noneLabel="Sin jalea"
+                  label="Jalea"
+                  helperText={jaleaHelperText}
+                  required={true}
+                  hideLabel={true}
+                  noneChosen={draft.jalea_selection === "none"}
+                  {chipClass}
+                  onChange={updateJaleaSelection}
+                />
+              </section>
+            {/if}
+
+            {#each extraGroups as group (group.key)}
+              <section
+                class="space-y-3"
+                aria-labelledby={`sheet-extra-${group.key}`}
               >
-                {formatCurrency(totalPrice)}
-              </p>
-              {#if product.description}
-                <p class="text-sm text-base-content/70">
-                  {product.description}
-                </p>
-              {/if}
-            </div>
-
-            <div class="mt-4 flex flex-col gap-2">
-              <div>
-                <span class="label-text font-semibold text-base-content/70"
-                  >Cantidad</span
-                >
-                <div
-                  class="mt-2 inline-flex items-center gap-1 rounded-xl border border-base-300 bg-base-100 p-1"
-                >
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-ghost h-9 w-9 rounded-lg"
-                    aria-label="Reducir cantidad"
-                    onclick={decreaseQty}
-                  >
-                    <Icon icon="lucide:minus" class="size-4" />
-                  </button>
-                  <span class="w-10 text-center font-bold"
-                    >{normalizeQuantity(draft.quantity)}</span
-                  >
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-ghost h-9 w-9 rounded-lg"
-                    aria-label="Aumentar cantidad"
-                    onclick={increaseQty}
-                  >
-                    <Icon icon="lucide:plus" class="size-4" />
-                  </button>
-                </div>
-              </div>
-              <div class="mt-2">
-                <div class="grid gap-2">
-                  <button
-                    type="button"
-                    class="btn btn-lg w-full rounded-xl font-bold bg-[var(--ishos-teal)] text-white border-[var(--ishos-teal)] hover:bg-[var(--ishos-teal-deep)] hover:border-[var(--ishos-teal-deep)]"
-                    onclick={handleConfirm}
-                    disabled={addDisabled}
-                  >
-                    {#if !ordersEnabled}
-                      Pedidos pausados temporalmente
-                    {:else}
-                      Agregar al pedido · {formatCurrency(totalPrice)}
-                    {/if}
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-outline w-full rounded-xl font-semibold"
-                    onclick={handleGoToCart}
-                    disabled={addDisabled}
-                  >
-                    <Icon
-                      icon="lucide:shopping-bag"
-                      class="size-4 mr-1"
-                      aria-hidden="true"
-                    />
-                    Ir al carrito
-                  </button>
-                  {#if !ordersEnabled}
-                    <p class="text-center text-sm text-base-content/60">
-                      ¡Gracias por escoger nuestros productos 🙂!
-                    </p>
-                  {/if}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section
-            class="p-4 pb-6 sm:p-6 sm:pb-6 lg:p-7 lg:pb-7 lg:overflow-y-auto"
-          >
-            <div class="space-y-3">
-              <div class="hidden lg:flex items-center justify-between pb-1">
-                <h4 class="text-lg font-extrabold">Personaliza tu producto</h4>
-              </div>
-
-              {#if flavorRequired || toppingRequired || jaleaRequired}
-                <div class="alert alert-warning rounded-xl text-sm">
-                  <span>
-                    Completa los campos requeridos para agregar este producto.
-                  </span>
-                </div>
-              {/if}
-
-              {#if flavorOptions.length > 0}
-                <details
-                  class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                  open={flavorRequired ||
-                    mixedFlavorsRequired ||
-                    !draft.flavor_id}
-                >
-                  <summary
-                    class="collapse-title font-bold flex items-center gap-2"
-                  >
-                    {hasMixedFlavors ? "Sabores (mezclados)" : "Sabor"}
-                    <span class="badge badge-warning badge-sm">requerido</span>
-                  </summary>
-                  <div class="collapse-content pt-1">
-                    <FlavorSelector
-                      flavors={flavorOptions}
-                      mode={hasMixedFlavors ? "fill" : "single"}
-                      {ballQuantity}
-                      selectedId={draft.flavor_id ?? ""}
-                      selectedIds={flavorSelections}
-                      label={hasMixedFlavors ? "Sabores" : "Sabor"}
-                      required={true}
-                      error={flavorRequired || mixedFlavorsRequired
-                        ? "Selecciona un sabor"
-                        : ""}
-                      onChange={handleFlavorChange}
-                    />
-                  </div>
-                </details>
-              {/if}
-
-              {#if toppingOptions.length > 0}
-                <details
-                  class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                  open={toppingRequired || selectedToppingIds.length === 0}
-                >
-                  <summary
-                    class="collapse-title font-bold flex items-center gap-2"
-                  >
-                    Topping
-                  </summary>
-                  <div class="collapse-content pt-1">
-                    <ProductAddonChipGroup
-                      items={toppingOptions}
-                      includedIds={selectedToppingIds}
-                      selectedIds={toppingExtraIds}
-                      allowance={toppingFreeAllowance}
-                      noneLabel="Sin topping"
-                      label="Topping"
-                      helperText={toppingHelperText}
-                      required={true}
-                      error={toppingRequired
-                        ? "Selecciona un topping o 'Sin topping'"
-                        : ""}
-                      {chipClass}
-                      onChange={updateToppingSelection}
-                    />
-                  </div>
-                </details>
-              {/if}
-
-              {#if jaleaOptions.length > 0}
-                <details
-                  class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                  open={jaleaRequired || selectedJaleaIds.length === 0}
-                >
-                  <summary
-                    class="collapse-title font-bold flex items-center gap-2"
-                  >
-                    Jalea
-                  </summary>
-                  <div class="collapse-content pt-1">
-                    <ProductAddonChipGroup
-                      items={jaleaOptions}
-                      includedIds={selectedJaleaIds}
-                      selectedIds={jaleaExtraIds}
-                      allowance={jaleaFreeAllowance}
-                      noneLabel="Sin jalea"
-                      label="Jalea"
-                      helperText={jaleaHelperText}
-                      required={true}
-                      error={jaleaRequired
-                        ? "Selecciona una jalea o 'Sin jalea'"
-                        : ""}
-                      {chipClass}
-                      onChange={updateJaleaSelection}
-                    />
-                  </div>
-                </details>
-              {/if}
-
-              {#each extraGroups as group (group.key)}
-                {@const groupSelectedCount = (
-                  draft.extra_addon_ids ?? []
-                ).filter((id) =>
-                  group.items.some((item) => item.id === id),
-                ).length}
-                <details
-                  class="collapse collapse-arrow border border-base-200 bg-base-100 rounded-2xl"
-                  open={groupSelectedCount > 0}
-                >
-                  <summary
-                    class="collapse-title font-bold flex items-center gap-2"
-                  >
+                <div class="flex items-center justify-between gap-2">
+                  <h3 id={`sheet-extra-${group.key}`} class="font-semibold">
                     {group.label}
-                    <span class="badge badge-ghost badge-sm">opcional</span>
-                  </summary>
-                  <div class="collapse-content pt-1">
-                    <div class="flex flex-wrap gap-2">
-                      {#each group.items as addon (addon.id)}
-                        {@const checked = (
-                          draft.extra_addon_ids ?? []
-                        ).includes(addon.id)}
-                        <button
-                          type="button"
-                          class={chipClass(checked)}
-                          onclick={() => toggleExtra(addon.id, !checked)}
-                        >
-                          {addon.name}
-                          {#if Number(addon.price ?? 0) > 0}
-                            <span class="ml-1" style="color: var(--ishos-teal);"
-                              >+{formatCurrency(Number(addon.price))}</span
-                            >
-                          {/if}
-                        </button>
-                      {/each}
-                    </div>
-                  </div>
-                </details>
-              {/each}
-
-              {#if flavorOptions.length === 0 && toppingOptions.length === 0 && jaleaOptions.length === 0 && extraGroups.length === 0}
-                <div
-                  class="rounded-2xl border border-base-200 bg-base-100 p-4 text-sm text-base-content/70"
-                >
-                  Este producto no tiene personalizaciones disponibles.
+                  </h3>
+                  <span class="text-sm text-ink-muted">Opcional</span>
                 </div>
-              {/if}
-            </div>
-          </section>
+                <div class="flex flex-wrap gap-2">
+                  {#each group.items as addon (addon.id)}
+                    {@const checked = (draft.extra_addon_ids ?? []).includes(
+                      addon.id,
+                    )}
+                    <button
+                      type="button"
+                      class={chipClass(checked)}
+                      aria-pressed={checked}
+                      onclick={() => toggleExtra(addon.id, !checked)}
+                    >
+                      {addon.name}
+                      {#if Number(addon.price ?? 0) > 0}
+                        <span class="text-ink-muted"
+                          >+{formatCurrency(Number(addon.price))}</span
+                        >
+                      {/if}
+                    </button>
+                  {/each}
+                </div>
+              </section>
+            {/each}
+          </div>
         </div>
       </div>
+
+      <footer class="sheet-footer">
+        {#if ordersEnabled && missingHint}
+          <p
+            class="mb-2 text-center text-sm text-base-content/70"
+            aria-live="polite"
+          >
+            {missingHint} para continuar.
+          </p>
+        {/if}
+        <div class="flex items-center gap-3">
+          <div
+            class="flex items-center rounded-full border border-base-300"
+            role="group"
+            aria-label="Cantidad"
+          >
+            <button
+              type="button"
+              class="btn btn-ghost btn-circle btn-sm size-11"
+              aria-label="Reducir cantidad"
+              disabled={normalizeQuantity(draft.quantity) <= 1}
+              onclick={decreaseQty}
+            >
+              <Icon icon="lucide:minus" class="size-4" aria-hidden="true" />
+            </button>
+            <span
+              class="w-8 text-center font-semibold tabular-nums"
+              aria-live="polite">{normalizeQuantity(draft.quantity)}</span
+            >
+            <button
+              type="button"
+              class="btn btn-ghost btn-circle btn-sm size-11"
+              aria-label="Aumentar cantidad"
+              onclick={increaseQty}
+            >
+              <Icon icon="lucide:plus" class="size-4" aria-hidden="true" />
+            </button>
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary btn-lg flex-1 rounded-full"
+            onclick={handleConfirm}
+            disabled={addDisabled}
+          >
+            {#if !ordersEnabled}
+              Pedidos en pausa
+            {:else}
+              {confirmLabel} ·
+              <span class="tabular-nums">{formatCurrency(totalPrice)}</span>
+            {/if}
+          </button>
+        </div>
+      </footer>
     {/if}
   </div>
 
   <form
     method="dialog"
-    class="modal-backdrop bg-base-300/60 backdrop-blur-sm"
+    class="modal-backdrop bg-neutral/50"
     onsubmit={(event) => {
       event.preventDefault();
       closeDialog();
     }}
   >
-    <button type="submit" class="sr-only"> Cerrar </button>
+    <button type="submit" class="sr-only">Cerrar</button>
   </form>
 </dialog>
+
+{#snippet requirement(done: boolean)}
+  {#if done}
+    <span
+      class="inline-flex items-center gap-1 text-sm font-medium text-success"
+    >
+      <Icon icon="lucide:check" class="size-4" aria-hidden="true" />Listo
+    </span>
+  {:else}
+    <span
+      class="badge badge-sm border-warning/60 bg-warning/20 text-base-content"
+      >Requerido</span
+    >
+  {/if}
+{/snippet}
+
+<style>
+  .product-sheet {
+    max-height: min(92dvh, 52rem);
+    border-radius: var(--radius-box) var(--radius-box) 0 0;
+  }
+
+  @media (min-width: 640px) {
+    .product-sheet {
+      border-radius: var(--radius-box);
+    }
+  }
+
+  .sheet-handle {
+    display: flex;
+    justify-content: center;
+    padding: 0.6rem 0 0.25rem;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  @media (min-width: 640px) {
+    .sheet-handle {
+      display: none;
+    }
+  }
+
+  .sheet-handle span {
+    width: 2.75rem;
+    height: 0.3rem;
+    border-radius: 999px;
+    background: var(--color-base-300);
+  }
+
+  .sheet-footer {
+    border-top: 1px solid var(--color-base-300);
+    background: var(--color-base-100);
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 640px) {
+    .sheet-footer {
+      padding-inline: 1.5rem;
+    }
+  }
+</style>

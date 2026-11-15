@@ -10,6 +10,9 @@
 
 import type { APIContext } from "astro";
 import { getApiBaseUrl } from "../config";
+import { clientIdentityHeaders } from "./upstream-headers";
+import { locationHeaders } from "./location";
+import { resolveClientIp } from "./client-identity";
 
 const DEFAULT_BODY_LIMIT_BYTES = 64 * 1024; // 64 KiB
 const MAX_BODY_LIMIT_BYTES = 10 * 1024 * 1024; // 10 MiB
@@ -44,10 +47,8 @@ function logSecurityEvent(
   details: Record<string, unknown>,
 ): void {
   const requestId = crypto.randomUUID();
-  const clientIp =
-    context.request.headers.get("x-forwarded-for") ??
-    context.request.headers.get("cf-connecting-ip") ??
-    "unknown";
+  // Same trusted source as the rate-limit header (never client-set XFF).
+  const clientIp = resolveClientIp(context.request) ?? "unknown";
 
   const safeDetails: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(details)) {
@@ -164,19 +165,46 @@ export async function forwardUpstreamJson(
       } catch {
         data = response.ok
           ? { message: trimmedText || "OK" }
-          : { error: trimmedText || "Request failed" };
+          : upstreamErrorBody(trimmedText, response.status);
       }
     } else {
       data = response.ok
         ? { message: trimmedText || "OK" }
-        : { error: trimmedText || "Request failed" };
+        : upstreamErrorBody(trimmedText, response.status);
     }
   }
 
   return new Response(JSON.stringify(data), {
     status: response.status,
-    headers: { "Content-Type": "application/json" },
+    // Order and tracking replies carry customer names and phones.
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
   });
+}
+
+/**
+ * Error body for a non-JSON upstream reply (Go panic text, proxy HTML, ...):
+ * the client gets a generic message; the detail stays in the server log.
+ */
+function upstreamErrorBody(
+  text: string,
+  status: number,
+): { error: string; code: string } {
+  if (text) {
+    console.error(
+      `[bff] non-JSON upstream error ${status}:`,
+      text.slice(0, 300),
+    );
+  }
+  return {
+    error:
+      status >= 500
+        ? "El servicio no está disponible. Intenta de nuevo en un momento."
+        : "No se pudo completar la solicitud.",
+    code: "UPSTREAM_ERROR",
+  };
 }
 
 export async function proxyToBackend(
@@ -204,6 +232,8 @@ export async function proxyToBackend(
   }
 
   const headers: Record<string, string> = {
+    ...clientIdentityHeaders(context),
+    ...locationHeaders(context),
     Authorization: `Bearer ${token}`,
     ...options.headers,
   };
@@ -279,12 +309,12 @@ export async function proxyToBackend(
         } catch {
           data = response.ok
             ? { message: trimmedText || "OK" }
-            : { error: trimmedText || "Request failed" };
+            : upstreamErrorBody(trimmedText, response.status);
         }
       } else {
         data = response.ok
           ? { message: trimmedText || "OK" }
-          : { error: trimmedText || "Request failed" };
+          : upstreamErrorBody(trimmedText, response.status);
       }
     }
 
@@ -346,6 +376,8 @@ export async function proxyToBackendStream(
   }
 
   const headers: Record<string, string> = {
+    ...clientIdentityHeaders(context),
+    ...locationHeaders(context),
     Authorization: `Bearer ${token}`,
     ...options.headers,
   };

@@ -6,11 +6,8 @@
     createInactivityTracking,
     getAdminLocalSettings,
     saveAdminRowsPerTable,
-    saveAdminStoreSettings,
     saveAdminTabOrder,
     setCurrentAdminContext,
-    getAdminStoreSettings,
-    updateAdminStoreSettings,
     getOrderArchiveConfig,
     updateOrderArchiveConfig,
     runArchive,
@@ -18,7 +15,6 @@
     updateAdminPanelConfig,
     type RowsPerTableConfig,
     type PanelConfigValues,
-    type StoreOfferItem,
     type OrderArchiveConfig,
     DEFAULT_PANEL_CONFIG,
     DEFAULT_ROWS_PER_TABLE_CONFIG,
@@ -27,6 +23,7 @@
     type TabKey,
   } from "@features/admin-management";
   import SettingsTab from "../../admin-management/components/SettingsTab.svelte";
+  import LocationsSettings from "./LocationsSettings.svelte";
   import { trackAction, trackError } from "@shared/utils/analytics";
 
   type Session = {
@@ -34,15 +31,19 @@
     email: string;
     name: string;
     phone: string;
-    role: "admin" | "employee";
+    role: "admin" | "manager" | "employee";
     active?: boolean;
+    location_name?: string | null;
+
+    /** Admin's "Logout por inactividad" (seconds), sent to every staff role. */
+    inactivity_logout_seconds?: number;
   };
 
   const SEARCH_ITEMS = [
     {
       id: "navegacion-panel",
-      title: "Navegacion del panel",
-      description: "Orden global de pestanas del equipo",
+      title: "Navegación del panel",
+      description: "Orden global de pestañas del equipo",
       icon: "lucide:panel-top",
       keywords: ["pestanas", "tabs", "orden", "navegacion", "global"],
     },
@@ -62,13 +63,6 @@
       ],
     },
     {
-      id: "proximas-personalizaciones",
-      title: "Proximas personalizaciones",
-      description: "Branding, widgets y atajos futuros",
-      icon: "lucide:sparkles",
-      keywords: ["branding", "widgets", "atajos", "personalizar", "proximo"],
-    },
-    {
       id: "filas-tablas",
       title: "Filas por tabla",
       description: "Cantidad default de filas por tabla en el panel",
@@ -77,22 +71,27 @@
     },
     {
       id: "operacion-tienda",
-      title: "Operacion de tienda",
-      description: "Pausar o reactivar pedidos publicos",
+      title: "Sucursales",
+      description:
+        "Horario, órdenes, pedidos en línea y datos de cada sucursal",
       icon: "lucide:store",
       keywords: [
-        "ofertas",
+        "sucursal",
+        "sucursales",
+        "horario",
         "tienda",
         "pedidos",
         "pausar",
         "activar",
+        "whatsapp",
+        "mapa",
         "kill switch",
       ],
     },
     {
       id: "archivo-ordenes",
-      title: "Archivo de ordenes",
-      description: "Archivar automaticamente ordenes antiguas",
+      title: "Archivo de órdenes",
+      description: "Archivar automáticamente órdenes antiguas",
       icon: "lucide:archive",
       keywords: ["archivo", "archivar", "ordenes", "auto archive", "historial"],
     },
@@ -109,8 +108,6 @@
   let rowsPerTable = $state<RowsPerTableConfig>({
     ...DEFAULT_ROWS_PER_TABLE_CONFIG,
   });
-  let storeOrdersEnabled = $state(true);
-  let storeOffers = $state<StoreOfferItem[]>([]);
   const DEFAULT_ARCHIVE_CONFIG: OrderArchiveConfig = {
     enabled: true,
     age_days: 7,
@@ -150,7 +147,10 @@
     getTimeoutSeconds: () => {
       if (!session) return null;
       return (
-        panelConfig.inactivity_logout_seconds ||
+        (session.role === "admin"
+          ? panelConfig.inactivity_logout_seconds
+          : session.inactivity_logout_seconds) ||
+        session.inactivity_logout_seconds ||
         DEFAULT_PANEL_CONFIG.inactivity_logout_seconds
       );
     },
@@ -210,7 +210,45 @@
     searchDialog?.close();
   }
 
+  // Section menu: same entries as the search, in page order.
+  const NAV_ORDER = [
+    "operacion-tienda",
+    "navegacion-panel",
+    "seguridad-panel",
+    "filas-tablas",
+    "archivo-ordenes",
+  ];
+  const NAV_ITEMS = NAV_ORDER.map((id) =>
+    SEARCH_ITEMS.find((item) => item.id === id),
+  ).filter((item): item is (typeof SEARCH_ITEMS)[number] => !!item);
+  let activeSection = $state(NAV_ORDER[0]);
+
+  // Highlight the section being read.
+  $effect(() => {
+    if (!session || session.role !== "admin" || loading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) activeSection = visible[0].target.id;
+      },
+      { rootMargin: "-20% 0px -70% 0px" },
+    );
+    const timer = setTimeout(() => {
+      for (const id of NAV_ORDER) {
+        const el = document.getElementById(id);
+        if (el) observer.observe(el);
+      }
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  });
+
   function navigateTo(id: string) {
+    activeSection = id;
     closeSearch();
     requestAnimationFrame(() => {
       document
@@ -260,13 +298,16 @@
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload?.error || "Sesion invalida");
+        throw new Error(payload?.error || "Sesión inválida");
       }
 
       const currentSession = payload as Session;
-      if (currentSession.role !== "admin") {
+      if (
+        currentSession.role !== "admin" &&
+        currentSession.role !== "manager"
+      ) {
         throw new Error(
-          "Solo administradores pueden acceder a esta configuracion",
+          "Solo administradores y managers pueden acceder a esta configuración",
         );
       }
 
@@ -274,14 +315,15 @@
       trackAction("admin_settings_session_loaded", {
         role: currentSession.role,
       });
-      await loadSettings();
+      // Managers only edit their location (hours and orders switch).
+      if (currentSession.role === "admin") await loadSettings();
       inactivityTracking.start();
     } catch (requestError) {
       trackError(requestError, "AdminSettingsPage.loadPage");
       sessionError =
         requestError instanceof Error
           ? requestError.message
-          : "Sesion invalida";
+          : "Sesión inválida";
     } finally {
       loading = false;
     }
@@ -295,8 +337,6 @@
       tabOrder = [...DEFAULT_TAB_ORDER];
       panelConfig = { ...DEFAULT_PANEL_CONFIG };
       rowsPerTable = { ...DEFAULT_ROWS_PER_TABLE_CONFIG };
-      storeOrdersEnabled = true;
-      storeOffers = [];
       busy = false;
       return;
     }
@@ -313,16 +353,6 @@
     }
 
     try {
-      const storeSettings = await getAdminStoreSettings();
-      storeOrdersEnabled = storeSettings.orders_enabled;
-      storeOffers = storeSettings.offers ?? [];
-      saveAdminStoreSettings(session.id, storeSettings);
-    } catch {
-      storeOrdersEnabled = settings.store_settings.orders_enabled;
-      storeOffers = settings.store_settings.offers ?? [];
-    }
-
-    try {
       archiveConfig = await getOrderArchiveConfig();
     } catch {
       archiveConfig = { ...DEFAULT_ARCHIVE_CONFIG };
@@ -336,7 +366,7 @@
     moduleError = "";
     try {
       if (!session?.id) {
-        throw new Error("No se pudo identificar la sesion de administrador");
+        throw new Error("No se pudo identificar la sesión de administrador");
       }
       tabOrder = saveAdminTabOrder(session.id, nextTabOrder as TabKey[]);
       setNotice("Orden del panel actualizada");
@@ -361,10 +391,10 @@
     moduleError = "";
     try {
       if (!session?.id) {
-        throw new Error("No se pudo identificar la sesion de administrador");
+        throw new Error("No se pudo identificar la sesión de administrador");
       }
       panelConfig = await updateAdminPanelConfig(nextPanelConfig);
-      setNotice("Configuracion de seguridad actualizada");
+      setNotice("Configuración de seguridad actualizada");
       trackAction(
         "admin_settings_panel_config_saved",
         panelConfig as unknown as Record<string, unknown>,
@@ -378,39 +408,7 @@
       moduleError =
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo guardar la configuracion de seguridad";
-    } finally {
-      busy = false;
-    }
-  }
-
-  async function handleToggleStoreOrders(enabled: boolean) {
-    busy = true;
-    moduleError = "";
-
-    try {
-      if (!session?.id) {
-        throw new Error("No se pudo identificar la sesion de administrador");
-      }
-      const response = await updateAdminStoreSettings({
-        orders_enabled: enabled,
-        offers: storeOffers,
-      });
-      storeOrdersEnabled = response.orders_enabled;
-      storeOffers = response.offers ?? [];
-      saveAdminStoreSettings(session.id, response);
-      setNotice(
-        enabled ? "Pedidos publicos activados" : "Pedidos publicos pausados",
-      );
-      trackAction("admin_settings_store_orders_toggled", { enabled });
-    } catch (requestError) {
-      trackError(requestError, "AdminSettingsPage.handleToggleStoreOrders", {
-        enabled,
-      });
-      moduleError =
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo actualizar la operacion de tienda";
+          : "No se pudo guardar la configuración de seguridad";
     } finally {
       busy = false;
     }
@@ -421,7 +419,7 @@
     moduleError = "";
     try {
       if (!session?.id) {
-        throw new Error("No se pudo identificar la sesion de administrador");
+        throw new Error("No se pudo identificar la sesión de administrador");
       }
       rowsPerTable = saveAdminRowsPerTable(session.id, nextRowsPerTable);
       setCurrentAdminContext(session.id, rowsPerTable.default);
@@ -447,7 +445,7 @@
     moduleError = "";
     try {
       archiveConfig = await updateOrderArchiveConfig(nextConfig);
-      setNotice("Configuracion de archivo actualizada");
+      setNotice("Configuración de archivo actualizada");
       trackAction("admin_settings_archive_config_saved", {
         ...archiveConfig,
       });
@@ -458,7 +456,7 @@
       moduleError =
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo guardar la configuracion de archivo";
+          : "No se pudo guardar la configuración de archivo";
     } finally {
       busy = false;
     }
@@ -470,7 +468,7 @@
     try {
       const result = await runArchive();
       setNotice(
-        `Archivo ejecutado: ${result.archived ?? 0} ordenes archivadas`,
+        `Archivo ejecutado: ${result.archived ?? 0} órdenes archivadas`,
       );
       trackAction("admin_settings_archive_run", {
         archived: result.archived ?? 0,
@@ -551,12 +549,13 @@
         <div class="flex items-center gap-2">
           <ThemeToggle />
           <button
-            class="btn btn-outline btn-sm"
+            class="btn btn-outline btn-sm min-h-11"
             type="button"
+            aria-label="Cerrar sesión"
             onclick={handleLogout}
           >
             <Icon icon="lucide:log-out" class="h-4 w-4" />
-            <span class="hidden sm:inline">Cerrar sesion</span>
+            <span class="hidden sm:inline">Cerrar sesión</span>
           </button>
         </div>
       </div>
@@ -567,12 +566,15 @@
       >
         <div>
           <h1
-            class="text-2xl font-bold tracking-tight text-base-content/90 sm:text-3xl"
+            class="font-display text-4xl font-bold leading-none text-base-content sm:text-5xl"
           >
             Configuraciones
           </h1>
           <p class="mt-1 text-sm text-base-content/70">
-            Administrador, <strong>{session.name}</strong>
+            {session.role === "admin" ? "Administrador" : "Manager"},
+            <strong>{session.name}</strong>{session.location_name
+              ? ` · ${session.location_name}`
+              : ""}
           </p>
         </div>
 
@@ -582,8 +584,8 @@
           onclick={openSearch}
           title="Buscar ajuste (Ctrl+K)"
         >
-          <Icon icon="lucide:search" class="h-4 w-4 text-base-content/50" />
-          <span class="text-sm text-base-content/50">Buscar ajuste...</span>
+          <Icon icon="lucide:search" class="h-4 w-4 text-ink-muted" />
+          <span class="text-sm text-ink-muted">Buscar ajuste...</span>
           <kbd class="kbd kbd-sm ml-auto hidden sm:inline">Ctrl K</kbd>
         </button>
       </div>
@@ -606,71 +608,61 @@
       </div>
     {/if}
 
-    <!-- Settings forms -->
-    <div class="space-y-6">
-      <SettingsTab
-        {tabOrder}
-        {panelConfig}
-        rowsPerTable={rowsPerTable as unknown as any}
-        {storeOrdersEnabled}
-        {archiveConfig}
-        {busy}
-        {moduleError}
-        onSave={handleSaveTabOrder}
-        onSavePanelConfig={handleSavePanelConfig}
-        onToggleStoreOrders={handleToggleStoreOrders}
-        onSaveRowsPerTable={(rows) =>
-          void handleSaveRowsPerTable(rows as unknown as RowsPerTableConfig)}
-        onSaveArchiveConfig={handleSaveArchiveConfig}
-        onRunArchive={handleRunArchive}
-      />
-
-      <section id="proximas-personalizaciones" class="card bg-base-100 shadow">
-        <div class="card-body space-y-4">
-          <div>
-            <h2 class="card-title">Proximas personalizaciones</h2>
-            <p class="text-sm text-base-content/70">
-              Esta pagina queda preparada para crecer nuevas opciones sin tocar
-              la operacion diaria.
-            </p>
-          </div>
-          <div class="grid gap-4 md:grid-cols-3">
-            <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
-              <div class="flex items-center gap-3">
-                <span class="rounded-xl bg-info/10 p-2 text-info">
-                  <Icon icon="lucide:palette" class="h-5 w-5" />
-                </span>
-                <h3 class="font-semibold">Branding del panel</h3>
-              </div>
-              <p class="mt-3 text-sm text-base-content/70">
-                Logo, colores y nombre visible para el equipo.
-              </p>
-            </article>
-            <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
-              <div class="flex items-center gap-3">
-                <span class="rounded-xl bg-success/10 p-2 text-success">
-                  <Icon icon="lucide:layout-dashboard" class="h-5 w-5" />
-                </span>
-                <h3 class="font-semibold">Widgets de inicio</h3>
-              </div>
-              <p class="mt-3 text-sm text-base-content/70">
-                Define que resumenes aparecen primero al entrar al panel.
-              </p>
-            </article>
-            <article class="rounded-2xl border border-base-300 bg-base-50 p-5">
-              <div class="flex items-center gap-3">
-                <span class="rounded-xl bg-warning/10 p-2 text-warning">
-                  <Icon icon="lucide:rocket" class="h-5 w-5" />
-                </span>
-                <h3 class="font-semibold">Atajos de operacion</h3>
-              </div>
-              <p class="mt-3 text-sm text-base-content/70">
-                Accesos rapidos para procesos frecuentes del equipo.
-              </p>
-            </article>
-          </div>
-        </div>
-      </section>
+    <!-- Settings forms, with a section menu for admins -->
+    <div
+      class={session.role === "admin"
+        ? "lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start lg:gap-6"
+        : ""}
+    >
+      {#if session.role === "admin"}
+        <nav
+          aria-label="Secciones de configuración"
+          class="mb-4 lg:sticky lg:top-4 lg:mb-0"
+        >
+          <ul
+            class="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1 lg:overflow-visible"
+          >
+            {#each NAV_ITEMS as item (item.id)}
+              <li class="shrink-0">
+                <a
+                  href={`#${item.id}`}
+                  class={`flex items-center gap-2 rounded-field px-3 py-2 text-sm transition-colors ${activeSection === item.id ? "bg-primary/10 font-semibold text-primary" : "text-base-content/75 hover:bg-base-200"}`}
+                  aria-current={activeSection === item.id ? "true" : undefined}
+                  onclick={(event) => {
+                    event.preventDefault();
+                    navigateTo(item.id);
+                  }}
+                >
+                  <Icon icon={item.icon} class="h-4 w-4 shrink-0" />
+                  {item.title}
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </nav>
+      {/if}
+      <div class="min-w-0 space-y-6">
+        {#if session.role !== "admin"}
+          <LocationsSettings isAdmin={false} />
+        {:else}
+          <SettingsTab
+            {tabOrder}
+            {panelConfig}
+            rowsPerTable={rowsPerTable as unknown as any}
+            {archiveConfig}
+            {busy}
+            {moduleError}
+            onSave={handleSaveTabOrder}
+            onSavePanelConfig={handleSavePanelConfig}
+            onSaveRowsPerTable={(rows) =>
+              void handleSaveRowsPerTable(
+                rows as unknown as RowsPerTableConfig,
+              )}
+            onSaveArchiveConfig={handleSaveArchiveConfig}
+            onRunArchive={handleRunArchive}
+          />
+        {/if}
+      </div>
     </div>
   </div>
 
@@ -685,10 +677,7 @@
     <div class="modal-box max-w-lg overflow-hidden rounded-2xl p-0">
       <!-- Input row -->
       <div class="flex items-center gap-3 border-b border-base-300 px-4 py-3">
-        <Icon
-          icon="lucide:search"
-          class="h-5 w-5 shrink-0 text-base-content/40"
-        />
+        <Icon icon="lucide:search" class="h-5 w-5 shrink-0 text-ink-muted" />
         <input
           bind:this={searchInput}
           bind:value={searchQuery}
@@ -711,7 +700,7 @@
       <!-- Results -->
       <div class="max-h-64 overflow-y-auto">
         {#if filteredItems.length === 0}
-          <p class="px-4 py-8 text-center text-sm text-base-content/50">
+          <p class="px-4 py-8 text-center text-sm text-ink-muted">
             Sin resultados para "{searchQuery}"
           </p>
         {:else}
@@ -732,7 +721,7 @@
               </span>
               <span>
                 <span class="block font-medium">{item.title}</span>
-                <span class="block text-sm text-base-content/60"
+                <span class="block text-sm text-ink-muted"
                   >{item.description}</span
                 >
               </span>
@@ -743,7 +732,7 @@
 
       <!-- Keyboard hints -->
       <div
-        class="flex items-center gap-4 border-t border-base-300 px-4 py-2.5 text-xs text-base-content/40"
+        class="flex items-center gap-4 border-t border-base-300 px-4 py-2.5 text-xs text-ink-muted"
       >
         <span class="flex items-center gap-1">
           <kbd class="kbd kbd-xs">↑</kbd><kbd class="kbd kbd-xs">↓</kbd>

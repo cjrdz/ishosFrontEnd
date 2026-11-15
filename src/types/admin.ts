@@ -39,6 +39,8 @@ interface AdminModuleErrors {
 
 interface TabPanelSharedProps {
   isAdmin: boolean;
+  /** Admins and location managers handle stock. */
+  canManageStock: boolean;
   activeTab: TabKey;
   busy: AdminBusyState;
   moduleErrors: AdminModuleErrors;

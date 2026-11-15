@@ -14,7 +14,7 @@
 
   let {
     open,
-    title = "Confirmar accion",
+    title = "Confirmar acción",
     message,
     busy = false,
     variant = "primary",
