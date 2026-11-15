@@ -25,6 +25,13 @@ export const GET: APIRoute = async (context) => {
     );
   }
 
+  if (trackingToken.length > 128) {
+    return new Response(JSON.stringify({ error: "Invalid tracking token" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   if (!ORDER_NUMBER_RE.test(orderNumber)) {
     return new Response(
       JSON.stringify({ error: "Invalid order number format" }),

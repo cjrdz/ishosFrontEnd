@@ -216,7 +216,7 @@
         </table>
       </div>
     {:else}
-      <div class="text-center py-4 text-base-content/50">
+      <div class="text-center py-4 text-ink-muted">
         No hay tipos de recipiente registrados
       </div>
     {/if}

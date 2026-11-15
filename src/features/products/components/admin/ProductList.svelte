@@ -284,7 +284,7 @@
     <ul class="space-y-2 md:hidden" aria-label="Productos">
       {#if filteredProducts.length === 0}
         <li
-          class="rounded-box border border-base-300 p-6 text-center text-base-content/60"
+          class="rounded-box border border-base-300 p-6 text-center text-ink-muted"
         >
           No hay productos
         </li>
@@ -295,7 +295,7 @@
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <p class="font-semibold leading-tight">{product.name}</p>
-              <p class="text-sm text-base-content/65">
+              <p class="text-sm text-ink-muted">
                 {product.category_name || "Sin categoría"} · {formatCurrency(
                   product.price,
                 )}
@@ -308,7 +308,7 @@
               {/if}
             </div>
             <label class="flex shrink-0 items-center gap-2 text-sm">
-              <span class={product.is_available ? "" : "text-base-content/60"}>
+              <span class={product.is_available ? "" : "text-ink-muted"}>
                 {product.is_available ? "Disponible" : "Agotado"}
               </span>
               <input
@@ -378,7 +378,7 @@
         <tbody>
           {#if filteredProducts.length === 0}
             <tr
-              ><td colspan="6" class="text-center py-6 text-base-content/50"
+              ><td colspan="6" class="text-center py-6 text-ink-muted"
                 >No hay productos</td
               ></tr
             >
@@ -403,7 +403,7 @@
                     </span>
                   {:else}
                     <span
-                      class="inline-flex items-center gap-1.5 text-sm text-base-content/60"
+                      class="inline-flex items-center gap-1.5 text-sm text-ink-muted"
                     >
                       <span class="w-2 h-2 rounded-full bg-error"></span>
                       Inactiva
@@ -470,7 +470,7 @@
     <div
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
-      <span class="text-sm text-base-content/60">
+      <span class="text-sm text-ink-muted">
         {filteredTotal === 0
           ? "0 resultados"
           : `${startItem}-${endItem} de ${filteredTotal}`}
@@ -487,7 +487,7 @@
           <Icon icon="lucide:chevron-left" class="h-4 w-4" />
         </button>
 
-        <span class="text-sm text-base-content/60">
+        <span class="text-sm text-ink-muted">
           Página {currentPage} de {totalPages}
         </span>
 

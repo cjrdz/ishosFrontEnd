@@ -34,6 +34,9 @@
     role: "admin" | "manager" | "employee";
     active?: boolean;
     location_name?: string | null;
+
+    /** Admin's "Logout por inactividad" (seconds), sent to every staff role. */
+    inactivity_logout_seconds?: number;
   };
 
   const SEARCH_ITEMS = [
@@ -144,7 +147,10 @@
     getTimeoutSeconds: () => {
       if (!session) return null;
       return (
-        panelConfig.inactivity_logout_seconds ||
+        (session.role === "admin"
+          ? panelConfig.inactivity_logout_seconds
+          : session.inactivity_logout_seconds) ||
+        session.inactivity_logout_seconds ||
         DEFAULT_PANEL_CONFIG.inactivity_logout_seconds
       );
     },
@@ -543,8 +549,9 @@
         <div class="flex items-center gap-2">
           <ThemeToggle />
           <button
-            class="btn btn-outline btn-sm"
+            class="btn btn-outline btn-sm min-h-11"
             type="button"
+            aria-label="Cerrar sesión"
             onclick={handleLogout}
           >
             <Icon icon="lucide:log-out" class="h-4 w-4" />
@@ -577,8 +584,8 @@
           onclick={openSearch}
           title="Buscar ajuste (Ctrl+K)"
         >
-          <Icon icon="lucide:search" class="h-4 w-4 text-base-content/50" />
-          <span class="text-sm text-base-content/50">Buscar ajuste...</span>
+          <Icon icon="lucide:search" class="h-4 w-4 text-ink-muted" />
+          <span class="text-sm text-ink-muted">Buscar ajuste...</span>
           <kbd class="kbd kbd-sm ml-auto hidden sm:inline">Ctrl K</kbd>
         </button>
       </div>
@@ -670,10 +677,7 @@
     <div class="modal-box max-w-lg overflow-hidden rounded-2xl p-0">
       <!-- Input row -->
       <div class="flex items-center gap-3 border-b border-base-300 px-4 py-3">
-        <Icon
-          icon="lucide:search"
-          class="h-5 w-5 shrink-0 text-base-content/40"
-        />
+        <Icon icon="lucide:search" class="h-5 w-5 shrink-0 text-ink-muted" />
         <input
           bind:this={searchInput}
           bind:value={searchQuery}
@@ -696,7 +700,7 @@
       <!-- Results -->
       <div class="max-h-64 overflow-y-auto">
         {#if filteredItems.length === 0}
-          <p class="px-4 py-8 text-center text-sm text-base-content/50">
+          <p class="px-4 py-8 text-center text-sm text-ink-muted">
             Sin resultados para "{searchQuery}"
           </p>
         {:else}
@@ -717,7 +721,7 @@
               </span>
               <span>
                 <span class="block font-medium">{item.title}</span>
-                <span class="block text-sm text-base-content/60"
+                <span class="block text-sm text-ink-muted"
                   >{item.description}</span
                 >
               </span>
@@ -728,7 +732,7 @@
 
       <!-- Keyboard hints -->
       <div
-        class="flex items-center gap-4 border-t border-base-300 px-4 py-2.5 text-xs text-base-content/40"
+        class="flex items-center gap-4 border-t border-base-300 px-4 py-2.5 text-xs text-ink-muted"
       >
         <span class="flex items-center gap-1">
           <kbd class="kbd kbd-xs">↑</kbd><kbd class="kbd kbd-xs">↓</kbd>

@@ -3,6 +3,7 @@
   import Icon from "@shared/components/AppIcon.svelte";
   import ProductCard from "./shared/ProductCard.svelte";
   import ProductModal from "./shared/ProductModal.svelte";
+  import StoreCartBar from "./StoreCartBar.svelte";
   import { toSafeImageUrl } from "@shared/utils/formatters";
   import { flyTo, motionMs } from "@shared/motion/motion";
   import { fade } from "svelte/transition";
@@ -207,48 +208,52 @@
   }
 </script>
 
-<div class="menu-page mx-auto max-w-7xl px-4 pb-20 pt-6 md:pt-8">
-  <header class="mb-4">
-    <h1 class="font-display font-bold text-6xl leading-none md:text-7xl">
-      Menú
-    </h1>
-    <p class="mt-1 text-base-content/70">
-      Helados, bowls y bebidas hechos al momento.
+<div class="menu-page mx-auto max-w-7xl px-4 pb-28 pt-6 md:pb-20 md:pt-8">
+  <header class="menu-hero rays rays--paper">
+    <h1 class="menu-hero__title">El <span class="marker">menú</span></h1>
+    <p class="menu-hero__lead">
+      Gelatos, sorbetes, bowls y bebidas. El mismo menú y los mismos precios en
+      todas nuestras sucursales.
     </p>
   </header>
 
   {#if !loading && status.detail && !status.canOrder}
     <div
-      class="mb-4 flex items-start gap-3 rounded-box border border-warning/50 bg-warning/15 p-4"
+      class={`menu-notice ${status.inStoreOnly ? "menu-notice--store" : "menu-notice--closed"}`}
       role="status"
     >
       <Icon
-        icon="lucide:clock"
+        icon={status.inStoreOnly ? "lucide:store" : "lucide:clock"}
         class="mt-0.5 size-5 shrink-0"
         aria-hidden="true"
       />
       <div>
-        <p class="font-semibold">{status.detail}</p>
-        <p class="text-sm text-base-content/70">
-          {#if status.inStoreOnly}
-            Mira el menú y visítanos:
-            <a href="/about#sucursales" class="link text-primary"
-              >ver sucursales y horarios</a
-            >.
-          {:else}
-            Puedes ver el menú mientras tanto.
-          {/if}
-        </p>
+        {#if status.inStoreOnly}
+          <p class="font-semibold">
+            Por ahora pedimos en la sucursal. Arma tu orden aquí y muéstrala en
+            caja.
+          </p>
+          <p class="text-sm">
+            <a
+              href="/about#sucursales"
+              class="font-bold underline underline-offset-4"
+              >Ver sucursales y horarios</a
+            >
+          </p>
+        {:else}
+          <p class="font-semibold">{status.detail}</p>
+          <p class="text-sm">Puedes ver el menú mientras tanto.</p>
+        {/if}
       </div>
     </div>
   {/if}
 
   <div class="menu-filters" class:menu-filters--ready={!loading}>
-    <label class="input w-full md:max-w-sm">
+    <label class="input menu-search w-full md:max-w-sm">
       <Icon icon="lucide:search" class="size-4 opacity-60" aria-hidden="true" />
       <input
         type="search"
-        placeholder="Buscar en el menú"
+        placeholder="Buscar: cono, bowl, mango…"
         aria-label="Buscar en el menú"
         autocomplete="off"
         enterkeyhint="search"
@@ -298,13 +303,13 @@
     <div class="mx-auto mt-10 max-w-md text-center" role="alert">
       <Icon
         icon="lucide:wifi-off"
-        class="mx-auto mb-3 size-10 text-base-content/50"
+        class="mx-auto mb-3 size-10 text-ink-muted"
         aria-hidden="true"
       />
       <p class="mb-4 font-medium">{loadingError}</p>
       <button
         type="button"
-        class="btn btn-primary"
+        class="btn btn-primary min-h-11 rounded-full"
         onclick={() => void loadStoreData()}>Reintentar</button
       >
     </div>
@@ -317,7 +322,7 @@
         </p>
         <button
           type="button"
-          class="btn btn-outline"
+          class="btn btn-outline min-h-11 rounded-full"
           onclick={() => {
             query = "";
             selectCategory(ALL);
@@ -336,14 +341,11 @@
           aria-labelledby={`cat-${section.category.id}`}
           in:fade={{ duration: motionMs(220) }}
         >
-          <div class="mb-3 flex items-baseline justify-between gap-3">
-            <h2
-              id={`cat-${section.category.id}`}
-              class="font-display font-bold text-4xl md:text-5xl"
-            >
+          <div class="mb-4 flex items-center gap-3">
+            <h2 id={`cat-${section.category.id}`} class="menu-bar">
               {section.category.name}
             </h2>
-            <span class="text-sm text-base-content/60"
+            <span class="shrink-0 text-sm font-medium text-ink-muted"
               >{section.items.length}
               {section.items.length === 1 ? "opción" : "opciones"}</span
             >
@@ -377,6 +379,8 @@
   {/if}
 </div>
 
+<StoreCartBar />
+
 <ProductModal
   product={selectedProduct}
   {ordersEnabled}
@@ -398,6 +402,57 @@
 />
 
 <style>
+  .menu-hero {
+    --rays-at: 88% 150%;
+    margin: 0 -1rem 1rem;
+    padding: 1.25rem 1rem 1rem;
+  }
+  @media (min-width: 768px) {
+    .menu-hero {
+      margin-inline: 0;
+      padding: 2rem 2rem 1.5rem;
+      border-radius: 1.5rem;
+    }
+  }
+  .menu-hero__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(3.5rem, 8vw, 5rem);
+    line-height: 1;
+    color: var(--brand-head);
+  }
+  .menu-hero__lead {
+    margin: 0.25rem 0 0;
+    max-width: 36rem;
+    color: var(--brand-ink-muted);
+  }
+  .menu-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.875rem 1rem;
+    border-radius: 0.875rem;
+  }
+  .menu-notice--store {
+    background: var(--brand-pink-tint);
+    color: var(--brand-head);
+  }
+  .menu-notice--closed {
+    background: var(--st-review);
+    color: var(--st-review-ink);
+  }
+  .menu-search {
+    min-height: 3rem;
+  }
+  .menu-search input {
+    font-size: 1rem;
+  }
+  .menu-bar {
+    flex: 1;
+    min-width: 0;
+  }
   .menu-filters {
     display: grid;
     gap: 0.75rem;
@@ -432,14 +487,14 @@
 
   .menu-chip {
     flex: none;
-    min-height: 2.5rem;
+    min-height: 2.75rem;
     padding: 0 1rem;
     border-radius: 999px;
     border: 1px solid var(--color-base-300);
     background: var(--color-base-100);
-    color: var(--color-base-content);
+    color: var(--brand-head);
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 700;
     white-space: nowrap;
     transition:
       background-color var(--dur-fast) var(--ease-out),
@@ -458,7 +513,7 @@
   }
 
   .menu-chip:focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 3px solid var(--color-primary);
     outline-offset: 2px;
   }
 

@@ -48,20 +48,20 @@
       return {
         text: "Buenos días",
         icon: "lucide:sun",
-        iconClass: "text-yellow-500",
+        iconClass: "text-st-review-ink",
       };
     }
     if (currentHour < 19) {
       return {
         text: "Buenas tardes",
         icon: "lucide:sun",
-        iconClass: "text-orange-500",
+        iconClass: "text-head",
       };
     }
     return {
       text: "Buenas noches",
       icon: "lucide:moon",
-      iconClass: "text-sky-500",
+      iconClass: "text-price",
     };
   });
 
@@ -76,7 +76,7 @@
 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <div>
     <h1
-      class="font-display font-bold text-4xl sm:text-5xl leading-none text-base-content"
+      class="font-display font-bold text-4xl sm:text-5xl leading-none text-head"
     >
       Panel administrativo
     </h1>
@@ -150,9 +150,11 @@
   class="admin-top-tabs overflow-x-auto pb-1"
   class:admin-top-tabs--with-bottom-nav={visibleTabs.length > 1}
 >
+  <!-- Native radios (daisyUI tabs): a labelled radiogroup, not a tablist. -->
   <div
-    role="tablist"
-    class="tabs tabs-box bg-base-100 border border-base-200 shadow-sm p-1 w-max min-w-full sm:w-fit sm:min-w-0"
+    role="radiogroup"
+    aria-label="Secciones del panel"
+    class="tabs tabs-box bg-base-100 border border-base-300 shadow-sm p-1 w-max min-w-full sm:w-fit sm:min-w-0"
   >
     {#each visibleTabs as tab}
       <input
@@ -197,7 +199,7 @@
     border-top: 1px solid var(--color-base-300);
     background: color-mix(in oklab, var(--color-base-100) 94%, transparent);
     backdrop-filter: blur(10px);
-    box-shadow: 0 -6px 20px rgb(0 0 0 / 0.08);
+    box-shadow: 0 -6px 20px rgb(var(--brand-shadow) / 0.1);
   }
 
   .admin-bottom-nav__item {

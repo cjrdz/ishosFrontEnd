@@ -3,7 +3,7 @@
   import type { PaginationInfo } from "@api-types/api";
   import Icon from "@shared/components/AppIcon.svelte";
   import { formatCurrency } from "@shared/utils/formatters";
-  import { isOrderEditable } from "../../lib/order-status";
+  import { isOrderEditable, statusIcons } from "../../lib/order-status";
 
   interface Props {
     orders: Order[];
@@ -207,7 +207,7 @@
         <tbody>
           {#if filteredOrders.length === 0}
             <tr
-              ><td colspan="5" class="text-center py-6 text-base-content/50"
+              ><td colspan="5" class="text-center py-6 text-ink-muted"
                 >No hay órdenes</td
               ></tr
             >
@@ -242,7 +242,12 @@
                   <div class="font-medium">{order.customer_name}</div>
                 </td>
                 <td class="text-center align-middle">
-                  <span class={`badge ${statusBadgeClass[order.status]}`}>
+                  <span class={statusBadgeClass[order.status]}>
+                    <Icon
+                      icon={statusIcons[order.status]}
+                      class="size-4"
+                      aria-hidden="true"
+                    />
                     {statusLabels[order.status]}
                   </span>
                 </td>
@@ -257,7 +262,7 @@
                   >
                     {#if order.status === "pendiente_revision"}
                       <button
-                        class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-success"
+                        class="btn btn-ghost btn-sm min-h-11 sm:btn-sm btn-square text-base-content/70 hover:text-success"
                         type="button"
                         onclick={(event: MouseEvent) => {
                           event.stopPropagation();
@@ -270,7 +275,7 @@
                         <Icon icon="lucide:check" class="h-4 w-4" />
                       </button>
                       <button
-                        class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-error"
+                        class="btn btn-ghost btn-sm min-h-11 sm:btn-sm btn-square text-base-content/70 hover:text-error"
                         type="button"
                         onclick={(event: MouseEvent) => {
                           event.stopPropagation();
@@ -285,7 +290,7 @@
                     {/if}
                     {#if isOrderEditable(order)}
                       <button
-                        class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-info"
+                        class="btn btn-ghost btn-sm min-h-11 sm:btn-sm btn-square text-base-content/70 hover:text-info"
                         type="button"
                         onclick={(event: MouseEvent) => {
                           event.stopPropagation();
@@ -299,7 +304,7 @@
                       </button>
                     {/if}
                     <button
-                      class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-info"
+                      class="btn btn-ghost btn-sm min-h-11 sm:btn-sm btn-square text-base-content/70 hover:text-info"
                       type="button"
                       onclick={(event: MouseEvent) => {
                         event.stopPropagation();
@@ -313,7 +318,7 @@
                     </button>
                     {#if order.is_archived}
                       <button
-                        class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-warning"
+                        class="btn btn-ghost btn-sm min-h-11 sm:btn-sm btn-square text-base-content/70 hover:text-warning"
                         type="button"
                         onclick={(event: MouseEvent) => {
                           event.stopPropagation();
@@ -327,7 +332,7 @@
                       </button>
                     {:else}
                       <button
-                        class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-warning"
+                        class="btn btn-ghost btn-sm min-h-11 sm:btn-sm btn-square text-base-content/70 hover:text-warning"
                         type="button"
                         onclick={(event: MouseEvent) => {
                           event.stopPropagation();
@@ -342,7 +347,7 @@
                     {/if}
                     {#if isAdmin}
                       <button
-                        class="btn btn-ghost btn-xs sm:btn-sm btn-square text-base-content/70 hover:text-error"
+                        class="btn btn-ghost btn-sm min-h-11 sm:btn-sm btn-square text-base-content/70 hover:text-error"
                         type="button"
                         onclick={(event: MouseEvent) => {
                           event.stopPropagation();
@@ -368,7 +373,7 @@
     <div
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
-      <span class="text-sm text-base-content/60">
+      <span class="text-sm text-ink-muted">
         {pagination.total === 0
           ? "0 resultados"
           : `${startItem}-${endItem} de ${pagination.total}`}
@@ -385,7 +390,7 @@
           <Icon icon="lucide:chevron-left" class="h-4 w-4" />
         </button>
 
-        <span class="text-sm text-base-content/60">
+        <span class="text-sm text-ink-muted">
           Página {pagination.page} de {pagination.totalPages}
         </span>
 

@@ -17,6 +17,7 @@
     type LocationPatch,
   } from "@features/admin-management/lib/bff";
   import StoreHoursEditor from "./StoreHoursEditor.svelte";
+  import PublicTrackingSetting from "./PublicTrackingSetting.svelte";
 
   interface Props {
     isAdmin: boolean;
@@ -212,6 +213,10 @@
       </p>
     </div>
 
+    {#if isAdmin}
+      <PublicTrackingSetting />
+    {/if}
+
     {#if loading}
       <div class="skeleton h-40 w-full"></div>
     {:else if loadError}
@@ -275,7 +280,7 @@
             >
               <span>
                 <span class="block font-medium">Recibe órdenes</span>
-                <span class="block text-sm text-base-content/60"
+                <span class="block text-sm text-ink-muted"
                   >Apágalo para pausar todas las órdenes de esta sucursal.</span
                 >
               </span>
@@ -299,7 +304,7 @@
               >
                 <span>
                   <span class="block font-medium">Pedidos en línea</span>
-                  <span class="block text-sm text-base-content/60"
+                  <span class="block text-sm text-ink-muted"
                     >Los clientes pueden pedir desde la página web.</span
                   >
                 </span>
@@ -448,7 +453,7 @@
           {/key}
         </section>
       {:else}
-        <p class="text-sm text-base-content/60">No hay sucursales.</p>
+        <p class="text-sm text-ink-muted">No hay sucursales.</p>
       {/each}
 
       {#if isAdmin}

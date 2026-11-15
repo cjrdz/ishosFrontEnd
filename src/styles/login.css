@@ -71,16 +71,16 @@
 
 .login-kicker {
   display: block;
-  font-family: "Amatic SC", cursive;
+  font-family: var(--font-display);
   font-size: clamp(1.35rem, 2.4vw, 1.7rem);
   line-height: 1;
   letter-spacing: 0.06em;
-  color: var(--ishos-teal);
+  color: var(--brand-price);
   margin-bottom: 2px;
 }
 
 .login-title {
-  font-family: "Amatic SC", cursive;
+  font-family: var(--font-display);
   font-size: clamp(2.15rem, 4.4vw, 3.05rem);
   font-weight: 700;
   line-height: 0.95;
@@ -132,7 +132,7 @@
 }
 
 .login-input-wrap:focus-within {
-  border-color: var(--ishos-teal);
+  border-color: var(--color-primary);
   background: color-mix(in oklab, var(--color-base-100) 98%, transparent);
   box-shadow: 0 0 0 3px var(--focus-ring);
   transform: translateY(-1px);
@@ -186,7 +186,7 @@
 }
 
 .login-eye-btn:focus-visible {
-  outline: 2px solid var(--ishos-teal);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
   color: var(--color-base-content);
   background: color-mix(in oklab, var(--color-base-300) 44%, transparent);
@@ -247,8 +247,7 @@
     transform 0.18s var(--motion-smooth),
     box-shadow 0.25s var(--motion-smooth),
     opacity 0.2s ease;
-  background: var(--ishos-teal);
-  /* Theme-aware: white on light-mode teal, dark ink on dark-mode teal. */
+  background: var(--color-primary);
   color: var(--color-primary-content);
   box-shadow:
     0 2px 0 0 rgb(255 255 255 / 0.08) inset,
@@ -282,7 +281,7 @@
 }
 
 .login-submit-btn:focus-visible {
-  outline: 2px solid var(--ishos-teal);
+  outline: 2px solid var(--color-primary);
   outline-offset: 3px;
 }
 
@@ -301,13 +300,13 @@
   overflow: hidden;
   min-height: 520px;
   background:
-    radial-gradient(circle at 12% 84%, rgb(0 153 144 / 0.3), transparent 45%),
+    radial-gradient(circle at 12% 84%, rgb(99 0 31 / 0.18), transparent 45%),
     radial-gradient(
       circle at 78% 16%,
       rgb(255 255 255 / 0.08),
       transparent 34%
     ),
-    var(--ishos-teal);
+    var(--brand-rays-a);
   flex-direction: column;
   align-items: stretch;
   justify-content: stretch;
@@ -319,27 +318,27 @@
   pointer-events: none;
   background: conic-gradient(
     from 180deg at 50% 115%,
-    var(--ishos-teal-deep) 0deg,
-    #00c8be 9deg,
-    var(--ishos-teal-deep) 18deg,
-    #00c8be 27deg,
-    var(--ishos-teal-deep) 36deg,
-    #00c8be 45deg,
-    var(--ishos-teal-deep) 54deg,
-    #00c8be 63deg,
-    var(--ishos-teal-deep) 72deg,
-    #00c8be 81deg,
-    var(--ishos-teal-deep) 90deg,
-    #00c8be 99deg,
-    var(--ishos-teal-deep) 108deg,
-    #00c8be 117deg,
-    var(--ishos-teal-deep) 126deg,
-    #00c8be 135deg,
-    var(--ishos-teal-deep) 144deg,
-    #00c8be 153deg,
-    var(--ishos-teal-deep) 162deg,
-    #00c8be 171deg,
-    var(--ishos-teal-deep) 180deg
+    var(--brand-rays-a) 0deg,
+    var(--brand-rays-b) 9deg,
+    var(--brand-rays-a) 18deg,
+    var(--brand-rays-b) 27deg,
+    var(--brand-rays-a) 36deg,
+    var(--brand-rays-b) 45deg,
+    var(--brand-rays-a) 54deg,
+    var(--brand-rays-b) 63deg,
+    var(--brand-rays-a) 72deg,
+    var(--brand-rays-b) 81deg,
+    var(--brand-rays-a) 90deg,
+    var(--brand-rays-b) 99deg,
+    var(--brand-rays-a) 108deg,
+    var(--brand-rays-b) 117deg,
+    var(--brand-rays-a) 126deg,
+    var(--brand-rays-b) 135deg,
+    var(--brand-rays-a) 144deg,
+    var(--brand-rays-b) 153deg,
+    var(--brand-rays-a) 162deg,
+    var(--brand-rays-b) 171deg,
+    var(--brand-rays-a) 180deg
   );
   opacity: 0.5;
 }

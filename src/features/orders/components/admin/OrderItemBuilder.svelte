@@ -378,9 +378,7 @@
         class="flex items-start justify-between gap-3 border-b border-base-300 p-4"
       >
         <div class="min-w-0">
-          <p
-            class="text-xs font-medium uppercase tracking-wide text-base-content/60"
-          >
+          <p class="text-xs font-medium uppercase tracking-wide text-ink-muted">
             {draftItemEditIndex !== null
               ? `Editando producto ${draftItemEditIndex + 1}`
               : "Configurar"}
@@ -552,7 +550,7 @@
           >
             <Icon
               icon="lucide:pointer"
-              class="size-8 text-base-content/40"
+              class="size-8 text-ink-muted"
               aria-hidden="true"
             />
             <p class="text-sm font-medium">Toca un producto para empezar</p>

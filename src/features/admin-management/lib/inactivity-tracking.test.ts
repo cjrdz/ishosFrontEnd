@@ -37,4 +37,35 @@ describe("createInactivityTracking", () => {
     expect(onWarningChange).toHaveBeenLastCalledWith(null);
     tracking.stop();
   });
+
+  it("logs out on return when the device slept past the timeout", () => {
+    const onTimeout = vi.fn();
+    const tracking = createInactivityTracking({
+      getTimeoutSeconds: () => 60,
+      onTimeout,
+    });
+    tracking.start();
+    // Timers do not run while asleep, but the clock moves on.
+    vi.setSystemTime(Date.now() + 5 * 60_000);
+    expect(onTimeout).not.toHaveBeenCalled();
+    window.dispatchEvent(new Event("focus"));
+    expect(onTimeout).toHaveBeenCalledOnce();
+    tracking.stop();
+  });
+
+  it("activity restarts the countdown", () => {
+    const onTimeout = vi.fn();
+    const tracking = createInactivityTracking({
+      getTimeoutSeconds: () => 60,
+      onTimeout,
+    });
+    tracking.start();
+    vi.advanceTimersByTime(50_000);
+    window.dispatchEvent(new Event("keydown"));
+    vi.advanceTimersByTime(50_000);
+    expect(onTimeout).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(11_000);
+    expect(onTimeout).toHaveBeenCalledOnce();
+    tracking.stop();
+  });
 });

@@ -36,7 +36,7 @@
     variant = "menu",
     clickable = false,
     showSeasonalBadge = false,
-    seasonalLabel = "De temporada",
+    seasonalLabel = "★ Con sabores de temporada",
     showSelectButton = false,
     countdown,
     note,
@@ -127,7 +127,11 @@
 
     {#if countdown && !soldOut}
       <span class="pc-countdown" aria-label={`Termina en ${countdown}`}>
-        <Icon icon="lucide:clock-3" class="size-3" />{countdown}
+        <Icon
+          icon="lucide:clock-3"
+          class="size-3"
+          aria-hidden="true"
+        />{countdown}
       </span>
     {/if}
   </figure>
@@ -138,7 +142,7 @@
       <p class="pc-note">{note}</p>
     {:else if showSeasonalBadge}
       <p class="pc-note pc-note--season">
-        <Icon icon="lucide:leaf" class="size-3.5" />{seasonalLabel}
+        {seasonalLabel}
       </p>
     {/if}
     <div class="pc-foot">
@@ -160,7 +164,7 @@
           title={actionLabel}
           onclick={handleAction}
         >
-          <Icon icon="lucide:plus" class="size-5" />
+          <Icon icon="lucide:plus" class="size-5" aria-hidden="true" />
         </button>
       {/if}
     </div>
@@ -184,8 +188,8 @@
     color: var(--color-base-content);
     text-decoration: none;
     box-shadow:
-      0 1px 2px rgb(16 40 38 / 0.05),
-      0 4px 14px rgb(16 40 38 / 0.05);
+      0 1px 2px rgb(var(--brand-shadow) / 0.05),
+      0 4px 14px rgb(var(--brand-shadow) / 0.06);
     transition:
       transform var(--dur-panel) var(--ease-out),
       box-shadow var(--dur-panel) var(--ease-out),
@@ -194,7 +198,7 @@
   @media (hover: hover) {
     .pc-root:not(.pc-root--sold-out) .pc-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 12px 28px rgb(16 40 38 / 0.12);
+      box-shadow: 0 12px 28px rgb(var(--brand-shadow) / 0.14);
       border-color: color-mix(
         in oklab,
         var(--color-primary) 35%,
@@ -267,12 +271,12 @@
     color: var(--color-secondary-content);
   }
   .pc-badge--muted {
-    background: var(--color-neutral);
-    color: var(--color-neutral-content);
+    background: var(--st-late);
+    color: var(--st-late-ink);
   }
   .pc-badge--warn {
-    background: var(--color-warning);
-    color: var(--color-warning-content);
+    background: var(--st-review);
+    color: var(--st-review-ink);
   }
   .pc-countdown {
     position: absolute;
@@ -311,17 +315,14 @@
   .pc-note {
     margin: 0;
     font-size: 0.78rem;
-    color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+    color: var(--brand-ink-muted);
     display: inline-flex;
     align-items: center;
     gap: 4px;
   }
   .pc-note--season {
-    color: color-mix(
-      in oklab,
-      var(--color-success) 90%,
-      var(--color-base-content)
-    );
+    color: var(--st-review-ink);
+    font-weight: 500;
   }
   .pc-foot {
     margin-top: auto;
@@ -339,13 +340,13 @@
     font-variant-numeric: tabular-nums;
   }
   .pc-price-now {
-    font-weight: 700;
-    font-size: 1.02rem;
-    color: var(--color-primary);
+    font-weight: 900;
+    font-size: 1.05rem;
+    color: var(--brand-price);
   }
   .pc-price-was {
     font-size: 0.8rem;
-    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    color: var(--brand-ink-muted);
   }
   .pc-add {
     position: relative;
@@ -366,7 +367,7 @@
     transform: scale(0.92);
   }
   .pc-add:focus-visible {
-    outline: 3px solid var(--color-secondary);
+    outline: 3px solid var(--brand-price);
     outline-offset: 2px;
   }
 </style>

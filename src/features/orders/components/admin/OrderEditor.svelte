@@ -292,7 +292,7 @@
       if (!isStepValid("products")) return false;
       return (
         orderForm.customer_name.trim().length > 0 &&
-        orderForm.customer_phone.trim().length > 0 &&
+        phoneLooksValid(orderForm.customer_phone) &&
         orderForm.order_type.trim().length > 0 &&
         (orderForm.order_type !== "en_local" ||
           (orderForm.table_number !== "" && Number(orderForm.table_number) > 0))
@@ -313,6 +313,12 @@
     step = target;
   }
 
+  /** Counter orders may skip the phone; one that is typed must be real. */
+  function phoneLooksValid(phone: string): boolean {
+    const digits = phone.replace(/\D/g, "").length;
+    return phone.trim() === "" || (digits >= 7 && digits <= 15);
+  }
+
   function getStepError(target: EditorStep): string {
     if (target === "customer" && !isStepValid("products")) {
       return "Agrega al menos un producto completo antes de continuar.";
@@ -320,6 +326,9 @@
     if (target === "summary") {
       if (!isStepValid("products")) {
         return "Agrega al menos un producto completo antes de continuar.";
+      }
+      if (!phoneLooksValid(orderForm.customer_phone)) {
+        return "El teléfono debe tener entre 7 y 15 dígitos, o déjalo vacío.";
       }
       if (!isStepValid("customer")) {
         return "Completa los datos del cliente antes de continuar.";
@@ -452,7 +461,7 @@
                   type="button"
                   role="radio"
                   aria-checked={autoPrint === option.value}
-                  class={`btn btn-xs join-item ${autoPrint === option.value ? "btn-primary" : "btn-ghost border-base-300"}`}
+                  class={`btn btn-sm min-h-11 join-item ${autoPrint === option.value ? "btn-primary" : "btn-ghost border-base-300"}`}
                   onclick={() => onAutoPrintChange?.(option.value)}
                   >{option.label}</button
                 >
@@ -634,8 +643,7 @@
             </label>
             <label class="form-control">
               <span class="label-text mb-1 text-sm"
-                >Teléfono <span class="text-error" aria-hidden="true">*</span
-                ></span
+                >Teléfono <span class="text-ink-muted">(opcional)</span></span
               >
               <input
                 id="order-customer-phone"
@@ -645,13 +653,11 @@
                 placeholder="7000-0000"
                 autocomplete="off"
                 bind:value={orderForm.customer_phone}
-                required
               />
             </label>
             <label class="form-control sm:col-span-2">
               <span class="label-text mb-1 text-sm"
-                >Correo <span class="text-base-content/60">(opcional)</span
-                ></span
+                >Correo <span class="text-ink-muted">(opcional)</span></span
               >
               <input
                 id="order-customer-email"
@@ -721,7 +727,7 @@
               {#if isEditing}
                 <span class="text-error">(obligatoria al editar)</span>
               {:else}
-                <span class="text-base-content/60">(opcional)</span>
+                <span class="text-ink-muted">(opcional)</span>
               {/if}
             </span>
             <textarea
@@ -749,7 +755,7 @@
                   {orderForm.customer_name || "Cliente"}
                 </p>
                 <p class="text-sm text-base-content/70">
-                  {orderForm.customer_phone}
+                  {orderForm.customer_phone || "Sin teléfono"}
                   {#if orderForm.customer_email}· {orderForm.customer_email}{/if}
                 </p>
               </div>
@@ -863,7 +869,7 @@
                   <div
                     class="input input-bordered input-lg flex w-full items-center gap-2 bg-base-100"
                   >
-                    <span class="text-2xl text-base-content/60">$</span>
+                    <span class="text-2xl text-ink-muted">$</span>
                     <input
                       bind:this={receivedRef}
                       type="number"
@@ -916,7 +922,7 @@
                     {cashError ? "Faltan" : "Cambio"}
                   </span>
                   <span
-                    class={`text-4xl font-bold tabular-nums ${cashError ? "" : roundedChange != null ? "text-success" : "text-base-content/40"}`}
+                    class={`text-4xl font-bold tabular-nums ${cashError ? "" : roundedChange != null ? "text-success" : "text-ink-muted"}`}
                   >
                     {roundedChange == null
                       ? "—"

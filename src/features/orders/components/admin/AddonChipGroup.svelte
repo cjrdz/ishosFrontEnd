@@ -132,7 +132,7 @@
       {#if canClear}
         <button
           type="button"
-          class="btn btn-ghost btn-xs btn-square text-error ml-1"
+          class="btn btn-ghost btn-sm btn-square size-11 text-error ml-1"
           aria-label={`Borrar ${label.toLowerCase()}`}
           title={`Borrar ${label.toLowerCase()}`}
           onclick={clearSelection}

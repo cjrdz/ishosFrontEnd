@@ -329,6 +329,8 @@ export interface StoreHoursStatus {
 
 export interface StorePublicSettings {
   orders_enabled: boolean;
+  /** Public "Seguir mi orden" page; off until the admin enables it. */
+  tracking_enabled?: boolean;
   offers: StoreOfferItem[];
   /** Absent from older backends: treat as "no schedule, always open". */
   hours?: StoreHoursStatus;

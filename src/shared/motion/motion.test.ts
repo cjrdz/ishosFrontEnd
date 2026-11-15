@@ -2,11 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { bump, celebrate, enter, safeAnimate } from "./motion";
 
 function setReducedMotion(reduce: boolean) {
-  window.matchMedia = vi
-    .fn()
-    .mockReturnValue({
-      matches: reduce,
-    }) as unknown as typeof window.matchMedia;
+  window.matchMedia = vi.fn().mockReturnValue({
+    matches: reduce,
+  }) as unknown as typeof window.matchMedia;
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -32,12 +30,10 @@ describe("safeAnimate", () => {
     setReducedMotion(false);
     const el = document.createElement("div");
     const cancel = vi.fn();
-    el.animate = vi
-      .fn()
-      .mockReturnValue({
-        finished: Promise.reject(new DOMException("aborted", "AbortError")),
-        cancel,
-      }) as unknown as typeof el.animate;
+    el.animate = vi.fn().mockReturnValue({
+      finished: Promise.reject(new DOMException("aborted", "AbortError")),
+      cancel,
+    }) as unknown as typeof el.animate;
     await bump(el);
     expect(el.style.transform).toBe("scale(1)");
     expect(cancel).toHaveBeenCalled();

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { currentChartTheme } from "@shared/theme/chart-colors";
+  import { statusLabels } from "@features/orders/lib/order-status";
   import { onMount } from "svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import { Chart } from "svelte-echarts";
@@ -55,12 +57,13 @@
   let endDate = $state("");
   let useCustomRange = $state(false);
   let quickRange = $state<"7d" | "30d" | "90d" | "1y">("30d");
-  let chartTextColor = $state("#d1d5db");
-  let chartMutedTextColor = $state("#9ca3af");
-  let chartGridColor = $state("rgba(148, 163, 184, 0.25)");
-  let chartTooltipBackground = $state("#111827");
-  let chartTooltipBorder = $state("rgba(148, 163, 184, 0.35)");
-  let chartTooltipTextColor = $state("#f8fafc");
+  const initialChart = currentChartTheme();
+  let chartTextColor = $state(initialChart.text);
+  let chartMutedTextColor = $state(initialChart.muted);
+  let chartGridColor = $state(initialChart.grid);
+  let chartTooltipBackground = $state(initialChart.tooltipBackground);
+  let chartTooltipBorder = $state(initialChart.tooltipBorder);
+  let chartTooltipTextColor = $state(initialChart.tooltipText);
 
   let overview = $state<AnalyticsOverview | null>(null);
   /** Same-length period just before the selected one, for the KPI deltas. */
@@ -77,29 +80,12 @@
   let ordersOverTime = $state<AnalyticsTimelinePoint[]>([]);
   let topProducts = $state<AnalyticsTopProduct[]>([]);
 
-  // Categorical order validated for colour-blind separation (dataviz
-  // validate_palette.js) on light and dark surfaces; brand teal first.
-  const CATEGORICAL_LIGHT = [
-    "#00968c",
-    "#eb6834",
-    "#2a78d6",
-    "#eda100",
-    "#e87ba4",
-    "#6250d6",
-  ];
-  const CATEGORICAL_DARK = [
-    "#14a095",
-    "#d95926",
-    "#3987e5",
-    "#c98500",
-    "#d55181",
-    "#9085e9",
-  ];
-  let CHART_COLORS = $state<string[]>(CATEGORICAL_LIGHT);
+  let CHART_COLORS = $state<string[]>(initialChart.categorical);
+  let STATUS_COLORS = $state<Record<string, string>>(initialChart.status);
   /** Single-series marks (orders and revenue over time). */
-  let chartSeriesColor = $state("#00968c");
+  let chartSeriesColor = $state(initialChart.series);
   /** Card surface behind the charts (slice gaps are drawn in it). */
-  let chartSurfaceColor = $state("#ffffff");
+  let chartSurfaceColor = $state(initialChart.surface);
 
   function withAlpha(hex: string, alpha: number): string {
     const n = Number.parseInt(hex.slice(1), 16);
@@ -115,14 +101,7 @@
     "entregada",
     "cancelada",
   ];
-  const STATUS_NAMES: Record<string, string> = {
-    pendiente_revision: "Por revisar",
-    recibida: "Aceptada",
-    en_proceso: "Preparando",
-    lista: "Lista",
-    entregada: "Entregada",
-    cancelada: "Rechazada",
-  };
+  const STATUS_NAMES: Record<string, string> = statusLabels;
 
   const quickRangeConfig: Record<
     "7d" | "30d" | "90d" | "1y",
@@ -187,30 +166,17 @@
 
   function syncChartThemeColors() {
     if (typeof window === "undefined") return;
-    const isDark =
-      (document.documentElement.getAttribute("data-theme") || "night") ===
-      "night";
-    if (isDark) {
-      chartTextColor = "#e9eeed";
-      chartMutedTextColor = "#b4c0be";
-      chartGridColor = "rgba(180, 192, 190, 0.18)";
-      chartTooltipBackground = "rgba(29, 35, 34, 0.97)";
-      chartTooltipBorder = "rgba(180, 192, 190, 0.3)";
-      chartTooltipTextColor = "#f1f5f4";
-      CHART_COLORS = CATEGORICAL_DARK;
-      chartSeriesColor = "#14a095";
-      chartSurfaceColor = "#1d2322";
-    } else {
-      chartTextColor = "#15302e";
-      chartMutedTextColor = "#4b5f5c";
-      chartGridColor = "rgba(21, 48, 46, 0.12)";
-      chartTooltipBackground = "rgba(21, 48, 46, 0.96)";
-      chartTooltipBorder = "rgba(21, 48, 46, 0.5)";
-      chartTooltipTextColor = "#f3f7f6";
-      CHART_COLORS = CATEGORICAL_LIGHT;
-      chartSeriesColor = "#00968c";
-      chartSurfaceColor = "#ffffff";
-    }
+    const theme = currentChartTheme();
+    chartTextColor = theme.text;
+    chartMutedTextColor = theme.muted;
+    chartGridColor = theme.grid;
+    chartTooltipBackground = theme.tooltipBackground;
+    chartTooltipBorder = theme.tooltipBorder;
+    chartTooltipTextColor = theme.tooltipText;
+    CHART_COLORS = theme.categorical;
+    STATUS_COLORS = theme.status;
+    chartSeriesColor = theme.series;
+    chartSurfaceColor = theme.surface;
   }
 
   // Shared donut style
@@ -270,9 +236,11 @@
       ).map((key) => ({
         name: STATUS_NAMES[key],
         value: Number(overview?.status_breakdown?.[key] ?? 0),
-        itemStyle: { color: CHART_COLORS[STATUS_ORDER.indexOf(key)] },
+        itemStyle: { color: STATUS_COLORS[key] },
       })),
-      CHART_COLORS,
+      STATUS_ORDER.filter(
+        (key) => (overview?.status_breakdown ?? {})[key] != null,
+      ).map((key) => STATUS_COLORS[key]),
     ),
   });
 
@@ -630,7 +598,7 @@
       {#if useCustomRange}
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label class="flex items-center gap-3">
-            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60"
+            <span class="w-24 shrink-0 text-sm font-medium text-ink-muted"
               >Fecha inicio</span
             >
             <input
@@ -641,7 +609,7 @@
             />
           </label>
           <label class="flex items-center gap-3">
-            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60"
+            <span class="w-24 shrink-0 text-sm font-medium text-ink-muted"
               >Fecha fin</span
             >
             <input
@@ -666,7 +634,7 @@
         </div>
       {:else}
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div class="stat bg-base-200/30 rounded-box py-3">
+          <div class="stat rounded-box border-0 bg-base-200 py-3">
             <div class="stat-title text-xs">Órdenes</div>
             <div class="stat-value text-2xl tabular-nums">
               {overview?.total_orders ?? 0}
@@ -674,7 +642,7 @@
             <div class="stat-desc text-xs">{getActivePeriodDescription()}</div>
             {@render deltaLine(ordersDelta)}
           </div>
-          <div class="stat bg-base-200/30 rounded-box py-3">
+          <div class="stat rounded-box border-0 bg-base-200 py-3">
             <div class="stat-title text-xs">Ingresos</div>
             <div class="stat-value text-2xl tabular-nums">
               {formatCurrency(overview?.total_revenue ?? 0)}
@@ -682,7 +650,7 @@
             <div class="stat-desc text-xs">Sin órdenes canceladas</div>
             {@render deltaLine(revenueDelta)}
           </div>
-          <div class="stat bg-base-200/30 rounded-box py-3">
+          <div class="stat rounded-box border-0 bg-base-200 py-3">
             <div class="stat-title text-xs">Ticket promedio</div>
             <div class="stat-value text-2xl tabular-nums">
               {formatCurrency(overview?.avg_order_value ?? 0)}
@@ -719,15 +687,12 @@
           <div
             class="w-16 h-16 rounded-full bg-base-300/50 flex items-center justify-center"
           >
-            <Icon
-              icon="lucide:bar-chart-2"
-              class="h-8 w-8 text-base-content/30"
-            />
+            <Icon icon="lucide:bar-chart-2" class="h-8 w-8 text-ink-muted" />
           </div>
-          <p class="font-medium text-base-content/60">
+          <p class="font-medium text-ink-muted">
             Sin datos para el periodo seleccionado
           </p>
-          <p class="text-sm text-base-content/40 max-w-xs">
+          <p class="text-sm text-ink-muted max-w-xs">
             Cambia el rango de fechas o espera a que se registren nuevas
             órdenes.
           </p>
@@ -774,7 +739,7 @@
               </h4>
               {#if topProducts.length === 0}
                 <div
-                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                  class="h-72 flex items-center justify-center text-sm text-ink-muted"
                 >
                   Sin datos de productos
                 </div>
@@ -795,7 +760,7 @@
               </h4>
               {#if !overview?.status_breakdown || Object.keys(overview.status_breakdown).length === 0}
                 <div
-                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                  class="h-72 flex items-center justify-center text-sm text-ink-muted"
                 >
                   Sin datos de estados
                 </div>
@@ -816,7 +781,7 @@
               </h4>
               {#if !overview?.payment_method_breakdown || Object.keys(overview.payment_method_breakdown).length === 0}
                 <div
-                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                  class="h-72 flex items-center justify-center text-sm text-ink-muted"
                 >
                   Sin datos de métodos de pago
                 </div>
@@ -842,7 +807,7 @@
               </h4>
               {#if topProducts.length === 0}
                 <div
-                  class="h-72 flex items-center justify-center text-sm text-base-content/40"
+                  class="h-72 flex items-center justify-center text-sm text-ink-muted"
                 >
                   Sin datos de productos
                 </div>
@@ -862,7 +827,7 @@
 {#snippet deltaLine(change: Delta | null)}
   {#if change}
     <div
-      class={`stat-desc mt-1 flex items-center gap-1 text-xs font-medium ${change.direction === "up" ? "text-success" : change.direction === "down" ? "text-error" : "text-base-content/60"}`}
+      class={`stat-desc mt-1 flex items-center gap-1 text-xs font-medium ${change.direction === "up" ? "text-success" : change.direction === "down" ? "text-error" : "text-ink-muted"}`}
     >
       <Icon
         icon={change.direction === "up"

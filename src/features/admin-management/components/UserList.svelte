@@ -222,7 +222,7 @@
         <tbody>
           {#if filteredUsers.length === 0}
             <tr
-              ><td colspan="6" class="text-center py-6 text-base-content/50"
+              ><td colspan="6" class="text-center py-6 text-ink-muted"
                 >No hay usuarios</td
               ></tr
             >
@@ -232,7 +232,7 @@
                 <td>
                   {user.name}
                   <!-- Phones: phone number under the name instead of its own column. -->
-                  <span class="block text-xs text-base-content/60 sm:hidden"
+                  <span class="block text-xs text-ink-muted sm:hidden"
                     >{user.phone}</span
                   >
                 </td>
@@ -304,7 +304,7 @@
     <div
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
-      <span class="text-sm text-base-content/60">
+      <span class="text-sm text-ink-muted">
         {filteredUsers.length === 0
           ? "0 resultados"
           : `${startItem}-${endItem} de ${filteredUsers.length}`}
@@ -321,7 +321,7 @@
           <Icon icon="lucide:chevron-left" class="h-4 w-4" />
         </button>
 
-        <span class="text-sm text-base-content/60">
+        <span class="text-sm text-ink-muted">
           Página {currentPage} de {totalPages}
         </span>
 

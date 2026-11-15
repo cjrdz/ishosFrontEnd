@@ -1,26 +1,54 @@
 ---
-// Static logo: both variants are rendered and CSS shows the one matching
-// <html data-theme> (see .logo-variant in navbar.css), so theme switches need
-// no hydrated component.
+// Static logo: the wine wordmark by day, the cream one at night. Both are
+// rendered and CSS shows the one for <html data-theme> (.art-day/.art-night in
+// brand.css), so theme switches need no hydrated component.
 ---
 
-<a
-  href="/"
-  class="btn btn-ghost normal-case text-xl font-bold group"
-  aria-label="Inicio"
->
+<a href="/" class="store-logo" aria-label="Isho's, inicio">
   <img
-    src="/images/blackicon.webp"
-    alt="Isho's"
-    width="86"
-    height="86"
-    class="logo-img logo-variant logo-variant--light group-hover:scale-110 transition-transform duration-200"
+    src="/images/brand/logo-wine.webp"
+    alt=""
+    width="320"
+    height="170"
+    class="art-day"
   />
   <img
-    src="/images/whiteicon.webp"
+    src="/images/brand/logo-cream.webp"
     alt=""
-    width="86"
-    height="86"
-    class="logo-img logo-variant logo-variant--dark group-hover:scale-110 transition-transform duration-200"
+    width="320"
+    height="170"
+    class="art-night"
   />
 </a>
+
+<style>
+  .store-logo {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 2px 4px;
+    border-radius: 0.75rem;
+  }
+  .store-logo:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  .store-logo img {
+    height: 34px;
+    width: auto;
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .store-logo:hover img {
+    transform: rotate(-3deg) scale(1.04);
+  }
+  @media (min-width: 768px) {
+    .store-logo img {
+      height: 40px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .store-logo img {
+      transition: none;
+    }
+  }
+</style>

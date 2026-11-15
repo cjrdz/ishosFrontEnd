@@ -4,9 +4,15 @@
   themeWindow.__ishosThemeSyncBound = true;
 
   const resolveTheme = () => {
-    const savedTheme =
-      localStorage.getItem("ishos_theme_store") ??
-      localStorage.getItem("theme");
+    // Storage can throw (blocked site data, some private modes).
+    let savedTheme = null;
+    try {
+      savedTheme =
+        localStorage.getItem("ishos_theme_store") ??
+        localStorage.getItem("theme");
+    } catch {
+      savedTheme = null;
+    }
     const prefersDark = window.matchMedia(
       "(prefers-color-scheme: dark)",
     ).matches;

@@ -69,6 +69,10 @@
   let submitting = $state(false);
   let message = $state("");
   let error = $state("");
+  /** Public "Seguir mi orden" (admin switch); off until enabled. */
+  let trackingEnabled = $state(false);
+  /** Set after an order when tracking is off: shown instead of redirecting. */
+  let placedOrderNumber = $state<string | null>(null);
   // Mirrors the admin "orders enabled" switch. Defaults to open if settings
   // cannot be loaded; the backend still rejects orders when the store is closed.
   let ordersEnabled = $state(true);
@@ -181,6 +185,7 @@
       closedDetail = status.canOrder ? null : status.detail;
       inStoreOnly = !!status.inStoreOnly;
       offers = settingsResult.value.offers ?? [];
+      trackingEnabled = Boolean(settingsResult.value.tracking_enabled);
     } else {
       // The backend still enforces a closed store.
       ordersEnabled = true;
@@ -539,11 +544,15 @@
         getIdempotencyKey(),
       );
 
-      saveTracking(created.order_number, created.tracking_token);
       clearCartItems();
       clearIdempotencyKey();
       items = [];
-      window.location.href = "/order/tracking";
+      if (trackingEnabled) {
+        saveTracking(created.order_number, created.tracking_token);
+        window.location.href = "/order/tracking";
+      } else {
+        placedOrderNumber = created.order_number;
+      }
     } catch (requestError: unknown) {
       error = orderErrorMessage(requestError);
     } finally {
@@ -574,19 +583,21 @@
       </div>
       <div class="flex gap-2">
         <a href="/menu" class="btn btn-ghost rounded-full">Seguir comprando</a>
-        <a href="/order/tracking" class="btn btn-outline rounded-full"
-          >Mis pedidos</a
-        >
+        {#if trackingEnabled}
+          <a href="/order/tracking" class="btn btn-outline rounded-full"
+            >Mis pedidos</a
+          >
+        {/if}
       </div>
     </header>
 
     {#if !ordersEnabled}
       <div
-        class="mb-6 flex items-start gap-3 rounded-box border border-warning/50 bg-warning/15 p-4"
+        class={`mb-6 flex items-start gap-3 rounded-box p-4 ${inStoreOnly ? "bg-pink-tint text-head" : "bg-st-review text-st-review-ink"}`}
         role="status"
       >
         <Icon
-          icon="lucide:clock"
+          icon={inStoreOnly ? "lucide:store" : "lucide:clock"}
           class="mt-0.5 size-5 shrink-0"
           aria-hidden="true"
         />
@@ -595,7 +606,7 @@
             {closedDetail ?? "No estamos recibiendo pedidos en este momento."}
           </p>
           {#if inStoreOnly}
-            <p class="mb-3 text-sm text-base-content/70">
+            <p class="mb-3 text-sm">
               Tu carrito queda guardado: muéstralo en caja o pídelo por WhatsApp
               a tu sucursal.
             </p>
@@ -610,13 +621,37 @@
       </div>
     {/if}
 
-    {#if items.length === 0}
+    {#if placedOrderNumber}
+      <div
+        class="mx-auto max-w-lg rounded-box border border-base-300 bg-base-100 px-6 py-14 text-center"
+        role="status"
+      >
+        <Icon
+          icon="lucide:check-check"
+          class="mx-auto mb-4 size-12 text-success"
+          aria-hidden="true"
+        />
+        <h2 class="mb-2 font-display font-bold text-4xl">¡Orden recibida!</h2>
+        <p class="mx-auto mb-2 max-w-sm text-base-content/80">
+          Tu número de orden es
+          <strong class="text-head"
+            >#{placedOrderNumber.split("-").pop()}</strong
+          >.
+        </p>
+        <p class="mx-auto mb-6 max-w-sm text-ink-muted">
+          La sucursal la revisará y te contactará al teléfono que dejaste.
+        </p>
+        <a href="/menu" class="btn btn-primary btn-lg rounded-full px-10"
+          >Volver al menú</a
+        >
+      </div>
+    {:else if items.length === 0}
       <div
         class="mx-auto max-w-lg rounded-box border border-base-300 bg-base-100 px-6 py-14 text-center"
       >
         <Icon
           icon="lucide:shopping-cart"
-          class="mx-auto mb-4 size-12 text-base-content/40"
+          class="mx-auto mb-4 size-12 text-ink-muted"
           aria-hidden="true"
         />
         <h2 class="mb-2 font-display font-bold text-4xl">
@@ -640,7 +675,7 @@
               </span>
               <button
                 type="button"
-                class="btn btn-sm btn-ghost"
+                class="btn btn-sm min-h-11 btn-ghost"
                 onclick={() => void loadCatalog()}>Reintentar</button
               >
             </div>
@@ -713,7 +748,7 @@
                           >No disponible</span
                         >
                       {/if}
-                      <p class="text-sm text-base-content/65">
+                      <p class="text-sm text-ink-muted">
                         {item.quantity} x {formatCurrency(item.unit_price)}
                       </p>
                       {#if summary.length > 0}
@@ -744,7 +779,7 @@
                     aria-label={`Cantidad de ${item.name}`}
                   >
                     <button
-                      class="btn btn-ghost btn-circle btn-sm"
+                      class="btn btn-ghost btn-circle btn-sm size-11"
                       type="button"
                       aria-label={item.quantity <= 1
                         ? `Quitar ${item.name}`
@@ -766,7 +801,7 @@
                       >{item.quantity}</span
                     >
                     <button
-                      class="btn btn-ghost btn-circle btn-sm"
+                      class="btn btn-ghost btn-circle btn-sm size-11"
                       type="button"
                       aria-label="Aumentar cantidad"
                       onclick={() => updateQty(item, item.quantity + 1)}
@@ -783,7 +818,7 @@
                     {#if !isItemUnavailable(item)}
                       <button
                         type="button"
-                        class="btn btn-outline btn-sm rounded-full"
+                        class="btn btn-outline btn-sm min-h-11 rounded-full"
                         onclick={() => openEditModal(item)}
                       >
                         Editar
@@ -791,7 +826,7 @@
                     {/if}
                     <button
                       type="button"
-                      class="btn btn-ghost btn-sm rounded-full"
+                      class="btn btn-ghost btn-sm min-h-11 rounded-full"
                       onclick={() => removeItem(item)}
                     >
                       Quitar
@@ -865,7 +900,7 @@
               <h2 class="text-xl font-bold">Tus datos</h2>
               <button
                 type="button"
-                class="btn btn-ghost btn-sm rounded-full"
+                class="btn btn-ghost btn-sm min-h-11 rounded-full"
                 onclick={() => (step = "cart")}>Volver al carrito</button
               >
             </div>
@@ -938,7 +973,7 @@
                   {:else}
                     <span
                       id="checkout-phone-hint"
-                      class="text-base-content/60 text-xs mt-1 ml-1"
+                      class="text-ink-muted text-xs mt-1 ml-1"
                       >Te avisaremos por WhatsApp cuando tu pedido esté listo.</span
                     >
                   {/if}

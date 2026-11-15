@@ -251,7 +251,7 @@
         <tbody>
           {#if filteredEmployees.length === 0}
             <tr
-              ><td colspan="5" class="text-center py-6 text-base-content/50"
+              ><td colspan="5" class="text-center py-6 text-ink-muted"
                 >No hay empleados</td
               ></tr
             >
@@ -261,7 +261,7 @@
                 <td class="max-w-[11rem] break-words sm:max-w-none">
                   {employee.email}
                   <!-- Phones: name and role under the email instead of in columns. -->
-                  <span class="block text-xs text-base-content/60 sm:hidden"
+                  <span class="block text-xs text-ink-muted sm:hidden"
                     >{employee.name || "-"} · {roleText(employee)}</span
                   >
                 </td>
@@ -320,7 +320,7 @@
     <div
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
-      <span class="text-sm text-base-content/60">
+      <span class="text-sm text-ink-muted">
         {filteredEmployees.length === 0
           ? "0 resultados"
           : `${startItem}-${endItem} de ${filteredEmployees.length}`}
@@ -337,7 +337,7 @@
           <Icon icon="lucide:chevron-left" class="h-4 w-4" />
         </button>
 
-        <span class="text-sm text-base-content/60">
+        <span class="text-sm text-ink-muted">
           Página {currentPage} de {totalPages}
         </span>
 

@@ -50,10 +50,19 @@ const MANAGER_ALLOWED_API_PREFIXES = [
 ];
 
 const DEFAULT_JSON_BODY_LIMIT_BYTES = 64 * 1024; // 64 KiB
+// Public writes (checkout): a 50-item order is a few KiB.
+const STORE_API_PREFIX = "/api/store/";
+const STORE_JSON_BODY_LIMIT_BYTES = 32 * 1024; // 32 KiB
 const BYTES_PER_MB = 1024 * 1024;
 
+/** True for the route itself or anything below it, never for a sibling
+ *  that merely starts with the same letters ("/api/admin/ordersX"). */
+export function matchesRoute(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 function isAuthExempt(pathname: string): boolean {
-  return AUTH_EXEMPT_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return AUTH_EXEMPT_PREFIXES.some((prefix) => matchesRoute(pathname, prefix));
 }
 
 function isAdminApiRoute(pathname: string): boolean {
@@ -68,13 +77,13 @@ function isAdminPageRoute(pathname: string): boolean {
 
 function isStaffAllowedApiRoute(pathname: string): boolean {
   return STAFF_ALLOWED_API_PREFIXES.some((prefix) =>
-    pathname.startsWith(prefix),
+    matchesRoute(pathname, prefix),
   );
 }
 
 function isManagerAllowedApiRoute(pathname: string): boolean {
   return MANAGER_ALLOWED_API_PREFIXES.some((prefix) =>
-    pathname.startsWith(prefix),
+    matchesRoute(pathname, prefix),
   );
 }
 
@@ -104,6 +113,9 @@ function isImageUploadRoute(pathname: string): boolean {
 }
 
 function getBodySizeLimitBytes(pathname: string): number {
+  if (pathname.startsWith(STORE_API_PREFIX)) {
+    return STORE_JSON_BODY_LIMIT_BYTES;
+  }
   if (isImageUploadRoute(pathname)) {
     return getAdminImageUploadMaxMB() * BYTES_PER_MB;
   }
@@ -362,8 +374,22 @@ async function verifyCookie(
   return valid ? value : null;
 }
 
+/**
+ * How long a cached session is trusted before the backend is asked again.
+ * The signed payload carries its issue time: the cookie's maxAge is only a
+ * browser hint, so a replayed value must also expire on the server, and the
+ * cache is re-issued only after a fresh backend check (never on a cache hit),
+ * so a deactivated or demoted staff member loses access within this window.
+ */
+const SESSION_CACHE_TTL_SECONDS = 60;
+
+function nowSeconds(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
 function serializeSession(session: Session, fingerprint: string): string {
   return JSON.stringify({
+    iat: nowSeconds(),
     id: session.id,
     email: session.email,
     name: session.name,
@@ -378,8 +404,12 @@ function serializeSession(session: Session, fingerprint: string): string {
 function parseSession(value: string, fingerprint: string): Session | null {
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
+    const age =
+      typeof parsed.iat === "number" ? nowSeconds() - parsed.iat : Infinity;
     if (
       parsed.tf === fingerprint &&
+      age >= -5 &&
+      age <= SESSION_CACHE_TTL_SECONDS &&
       typeof parsed.id === "string" &&
       typeof parsed.email === "string" &&
       typeof parsed.name === "string" &&
@@ -463,7 +493,7 @@ async function setCachedSession(
     httpOnly: true,
     sameSite: "strict",
     secure: import.meta.env.PROD,
-    maxAge: 60,
+    maxAge: SESSION_CACHE_TTL_SECONDS,
   });
 }
 
@@ -537,6 +567,13 @@ async function handleRequest(
 ): Promise<Response> {
   const { pathname } = context.url;
 
+  // Public store API: no session, but cap request bodies before the route
+  // reads them (Astro's checkOrigin already covers cross-site form posts).
+  if (pathname.startsWith(STORE_API_PREFIX)) {
+    const bodySizeError = checkBodySize(context.request, pathname);
+    return bodySizeError ?? next();
+  }
+
   // Skip non-admin routes (public pages, static assets, etc.)
   if (!isAdminApiRoute(pathname) && !isAdminPageRoute(pathname)) {
     return next();
@@ -562,6 +599,7 @@ async function handleRequest(
     }
 
     let session: Session | null = await getCachedSession(context, token);
+    const fromCache = session !== null;
     if (!session) {
       try {
         session = await getSession(token);
@@ -589,8 +627,12 @@ async function handleRequest(
     // Expose session on locals for downstream routes/pages.
     context.locals.session = session;
 
-    // Refresh the short-lived signed session cache cookie.
-    await setCachedSession(context, session, token);
+    // Cache a freshly checked session for a short while. A cache hit is not
+    // re-signed, so the entry expires SESSION_CACHE_TTL_SECONDS after the
+    // backend last confirmed it.
+    if (!fromCache) {
+      await setCachedSession(context, session, token);
+    }
   }
 
   return next();

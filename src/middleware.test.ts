@@ -152,6 +152,93 @@ describe("session cache", () => {
     expect(getSession).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
   });
+
+  it("is not re-signed on a cache hit", async () => {
+    getSession.mockResolvedValue(ADMIN);
+    const first = context("/api/admin/employees", {
+      auth_token: "admin-token",
+    });
+    await run(first);
+    const hit = context("/api/admin/employees", {
+      auth_token: "admin-token",
+      ishos_session_cache: first.setCookies.get("ishos_session_cache")!,
+    });
+    await run(hit);
+    expect(hit.setCookies.has("ishos_session_cache")).toBe(false);
+  });
+
+  it("expires 60 seconds after the backend check, even if replayed", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-11-14T12:00:00Z"));
+      getSession.mockResolvedValue(ADMIN);
+      const first = context("/api/admin/employees", {
+        auth_token: "admin-token",
+      });
+      await run(first);
+      const cache = first.setCookies.get("ishos_session_cache")!;
+
+      // The admin is demoted; the old cache must stop working after 60 s.
+      vi.setSystemTime(new Date("2026-11-14T12:01:01Z"));
+      getSession.mockClear();
+      getSession.mockResolvedValue(STAFF);
+      const { response } = await run(
+        context("/api/admin/employees", {
+          auth_token: "admin-token",
+          ishos_session_cache: cache,
+        }),
+      );
+      expect(getSession).toHaveBeenCalledWith("admin-token");
+      expect(response.status).toBe(403);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("public store API", () => {
+  it("rejects order bodies over 32 KiB before the route reads them", async () => {
+    const { response, next } = await run(
+      context(
+        "/api/store/orders",
+        {},
+        {
+          method: "POST",
+          headers: { "Content-Length": String(40 * 1024) },
+        },
+      ),
+    );
+    expect(response.status).toBe(413);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("lets normal checkout bodies and reads through", async () => {
+    const small = await run(
+      context(
+        "/api/store/orders",
+        {},
+        {
+          method: "POST",
+          headers: { "Content-Length": "900" },
+        },
+      ),
+    );
+    expect(small.next).toHaveBeenCalled();
+    const read = await run(context("/api/store/products"));
+    expect(read.next).toHaveBeenCalled();
+  });
+});
+
+describe("route matching", () => {
+  it("matches whole path segments only", async () => {
+    const { allowedRolesFor, matchesRoute } = await import("./middleware");
+    expect(matchesRoute("/api/admin/orders", "/api/admin/orders")).toBe(true);
+    expect(matchesRoute("/api/admin/orders/1", "/api/admin/orders")).toBe(true);
+    expect(matchesRoute("/api/admin/ordersX", "/api/admin/orders")).toBe(false);
+    // A look-alike route falls back to admin-only instead of staff access.
+    expect(allowedRolesFor("/api/admin/ordersexport")).toEqual(["admin"]);
+    expect(allowedRolesFor("/api/admin/orders/abc")).toContain("employee");
+  });
 });
 
 describe("security headers", () => {

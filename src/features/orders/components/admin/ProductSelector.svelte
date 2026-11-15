@@ -78,7 +78,7 @@
   <label class="input input-bordered flex w-full shrink-0 items-center gap-2">
     <Icon
       icon="lucide:search"
-      class="size-4 text-base-content/60"
+      class="size-4 text-ink-muted"
       aria-hidden="true"
     />
     <input
@@ -93,7 +93,7 @@
     {#if productSearch}
       <button
         type="button"
-        class="btn btn-ghost btn-xs btn-circle"
+        class="btn btn-ghost btn-sm btn-circle size-11"
         onclick={() => {
           productSearch = "";
           searchRef?.focus();
@@ -136,7 +136,7 @@
       {#each recentProducts as product (product.id)}
         <button
           type="button"
-          class="btn btn-xs gap-1 rounded-full btn-ghost border-base-300"
+          class="btn btn-sm min-h-11 gap-1 rounded-full btn-ghost border-base-300"
           onclick={() => onPick(product.id)}
         >
           <Icon icon="lucide:history" class="size-3" aria-hidden="true" />
@@ -188,7 +188,7 @@
                 >
                   <Icon
                     icon="lucide:ice-cream-cone"
-                    class="size-5 text-base-content/40"
+                    class="size-5 text-ink-muted"
                     aria-hidden="true"
                   />
                 </span>

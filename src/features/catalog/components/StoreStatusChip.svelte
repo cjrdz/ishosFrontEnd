@@ -50,25 +50,21 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
+    padding: 5px 12px;
     border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 600;
+    font-size: 0.8125rem;
+    font-weight: 700;
     white-space: nowrap;
-    background: color-mix(in oklab, var(--color-success) 14%, transparent);
-    color: color-mix(
-      in oklab,
-      var(--color-success) 80%,
-      var(--color-base-content)
-    );
+    background: var(--st-ready);
+    color: var(--st-ready-ink);
   }
   .store-status--closing {
-    background: color-mix(in oklab, var(--color-warning) 30%, transparent);
-    color: var(--color-warning-content);
+    background: var(--st-review);
+    color: var(--st-review-ink);
   }
   .store-status--closed {
-    background: var(--color-base-300);
-    color: var(--color-base-content);
+    background: var(--st-done);
+    color: var(--st-done-ink);
   }
   .dot {
     width: 7px;

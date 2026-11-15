@@ -368,7 +368,7 @@
             <div
               class="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-base-300/70 p-4 text-center"
             >
-              <span class="text-sm text-base-content/60">
+              <span class="text-sm text-ink-muted">
                 No hay imagen seleccionada.
               </span>
             </div>

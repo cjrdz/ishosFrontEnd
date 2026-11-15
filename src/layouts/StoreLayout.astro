@@ -1,6 +1,5 @@
 ---
 import "../styles/global.css";
-import "../styles/variables.css";
 import { ClientRouter } from "astro:transitions";
 import StoreNavbar from "@shared/components/StoreNavbar.astro";
 import StoreFooter from "@shared/components/StoreFooter.astro";
@@ -22,7 +21,7 @@ const storeThemeScript = await inlineScript(Astro, storeThemeSource);
 <!doctype html>
 <html
   lang="es"
-  data-theme="night"
+  data-theme="fantasy"
   class="bg-base-200"
   transition:name="store-root"
   transition:animate="none"
@@ -31,10 +30,26 @@ const storeThemeScript = await inlineScript(Astro, storeThemeSource);
     <meta charset="UTF-8" />
     <meta
       name="description"
-      content="Isho's Gelatos & Sorbetes - Tienda en línea"
+      content="Isho's · Gelatos artesanales y sorbetes naturales con la receta de la familia, en Ahuachapán, El Salvador."
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="theme-color"
+      content="#fff8ec"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#1b0b10"
+      media="(prefers-color-scheme: dark)"
+    />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="preload"
+      as="image"
+      href="/images/brand/logo-wine.webp"
+      type="image/webp"
+    />
     <title>{title}</title>
     <ClientRouter />
     <script is:inline set:html={storeThemeScript} />
@@ -94,7 +109,5 @@ const storeThemeScript = await inlineScript(Astro, storeThemeSource);
         });
       }
     </script>
-
-    <style is:global></style>
   </body>
 </html>

@@ -105,41 +105,48 @@
     onSave(localOrder);
   }
 
+  // Same bounds as the backend; out-of-range values are brought into range
+  // (and shown back in the form) instead of failing the save.
+  const LIMITS = {
+    session: { min: 1, max: 720 },
+    tracking: { min: 1, max: 2160 },
+    inactivity: { min: 60, max: 86400 },
+  } as const;
+
   function handleSavePanelConfig() {
-    onSavePanelConfig({
-      auth_cookie_ttl_hours: normalizeHours(
+    const next = {
+      auth_cookie_ttl_hours: clampValue(
         localPanelConfig.auth_cookie_ttl_hours,
         panelConfig.auth_cookie_ttl_hours,
+        LIMITS.session,
       ),
-      auth_token_ttl_hours: normalizeHours(
+      auth_token_ttl_hours: clampValue(
         localPanelConfig.auth_token_ttl_hours,
         panelConfig.auth_token_ttl_hours,
+        LIMITS.session,
       ),
-      tracking_token_ttl_hours: normalizeHours(
+      tracking_token_ttl_hours: clampValue(
         localPanelConfig.tracking_token_ttl_hours,
         panelConfig.tracking_token_ttl_hours,
+        LIMITS.tracking,
       ),
-      inactivity_logout_seconds: normalizeSeconds(
+      inactivity_logout_seconds: clampValue(
         localPanelConfig.inactivity_logout_seconds,
         panelConfig.inactivity_logout_seconds,
+        LIMITS.inactivity,
       ),
-    });
+    };
+    localPanelConfig = { ...localPanelConfig, ...next };
+    onSavePanelConfig(next);
   }
 
-  function normalizeHours(value: number, fallback: number): number {
-    if (!Number.isFinite(value) || value <= 0) {
-      return fallback;
-    }
-
-    return Math.round(value);
-  }
-
-  function normalizeSeconds(value: number, fallback: number): number {
-    if (!Number.isFinite(value) || value <= 0) {
-      return fallback;
-    }
-
-    return Math.round(value);
+  function clampValue(
+    value: number,
+    fallback: number,
+    limits: { min: number; max: number },
+  ): number {
+    const n = Number.isFinite(value) && value > 0 ? value : fallback;
+    return Math.min(limits.max, Math.max(limits.min, Math.round(n)));
   }
 
   function handleMoveTab(tab: string, direction: "up" | "down") {
@@ -223,9 +230,7 @@
           <div
             class="inline-flex items-center gap-2 rounded-lg border border-base-300 bg-base-100 px-3 py-1.5 shadow-sm"
           >
-            <span class="text-xs font-medium text-base-content/50"
-              >{index + 1}</span
-            >
+            <span class="text-xs font-medium text-ink-muted">{index + 1}</span>
             <span class="text-sm font-medium">{TAB_LABELS[tab] ?? tab}</span>
             <div
               class="flex items-center gap-0.5 border-l border-base-300 pl-2"
@@ -270,7 +275,9 @@
       <div>
         <h2 class="card-title">Seguridad y sesiones</h2>
         <p class="text-sm text-base-content/70">
-          Configura sesiones, expiraciones y reglas de seguridad del panel.
+          Cuánto dura una sesión del panel y cuándo se cierra sola. Los cambios
+          aplican al siguiente inicio de sesión; la inactividad aplica de
+          inmediato.
         </p>
       </div>
 
@@ -283,12 +290,14 @@
             class="input input-bordered input-sm w-full mt-1"
             type="number"
             min="1"
+            max="720"
             step="1"
             bind:value={localPanelConfig.auth_cookie_ttl_hours}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Usado por el backend para cookie HttpOnly.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Tiempo máximo de una sesión en el navegador (1–720 h). Al vencer,
+            hay que iniciar sesión de nuevo.</span
           >
         </label>
 
@@ -300,12 +309,14 @@
             class="input input-bordered input-sm w-full mt-1"
             type="number"
             min="1"
+            max="720"
             step="1"
             bind:value={localPanelConfig.auth_token_ttl_hours}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >JWT de empleados para iniciar sesión.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Validez del token del personal (1–720 h). La sesión dura el menor
+            de estos dos valores.</span
           >
         </label>
 
@@ -317,12 +328,13 @@
             class="input input-bordered input-sm w-full mt-1"
             type="number"
             min="1"
+            max="2160"
             step="1"
             bind:value={localPanelConfig.tracking_token_ttl_hours}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Token público para rastreo de órdenes.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Cuánto tiempo puede un cliente seguir su orden (1–2160 h).</span
           >
         </label>
 
@@ -333,13 +345,16 @@
           <input
             class="input input-bordered input-sm w-full mt-1"
             type="number"
-            min="1"
+            min="60"
+            max="86400"
             step="1"
             bind:value={localPanelConfig.inactivity_logout_seconds}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
-            >Cierra sesión automáticamente sin actividad.</span
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
+            >Cierra la sesión de todo el personal tras este tiempo sin uso
+            (60–86400 s; 900 = 15 min). En modo mostrador la tablet no cierra
+            sesión mientras el panel está abierto.</span
           >
         </label>
       </div>
@@ -489,7 +504,7 @@
               ? "Archivo automático activo"
               : "Archivo automático pausado"}
           </p>
-          <p class="text-sm text-base-content/60">
+          <p class="text-sm text-ink-muted">
             {localArchiveConfig.enabled
               ? `Las órdenes entregadas o canceladas se archivan después de ${localArchiveConfig.age_days} días.`
               : "Las órdenes no se archivan automáticamente."}
@@ -525,7 +540,7 @@
             bind:value={localArchiveConfig.age_days}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
             >Días desde que la orden quedó en estado terminal.</span
           >
         </label>
@@ -542,7 +557,7 @@
             bind:value={localArchiveConfig.interval_minutes}
             disabled={busy}
           />
-          <span class="label-text-alt text-xs text-base-content/60 mt-1"
+          <span class="label-text-alt text-xs text-ink-muted mt-1"
             >Cada cuánto el servidor busca órdenes candidatas.</span
           >
         </label>

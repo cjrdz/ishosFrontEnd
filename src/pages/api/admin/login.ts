@@ -9,6 +9,7 @@
  * backend Set-Cookie header and sets its own same-origin HttpOnly cookie.
  */
 
+import { toSpanishMessage } from "@core/errors/messages";
 import type { APIRoute } from "astro";
 import { LoginSchema } from "@features/admin-management";
 import { getApiBaseUrl } from "@core/config";
@@ -101,9 +102,9 @@ function isTrustedRequestOrigin(request: Request, requestUrl: URL): boolean {
 }
 
 function getSafeError(value: unknown): string {
-  if (typeof value !== "string") return "Login failed";
+  if (typeof value !== "string") return "";
   const sanitized = value.replace(/[\u0000-\u001F\u007F]/g, "").trim();
-  return sanitized.slice(0, 180) || "Login failed";
+  return sanitized.slice(0, 180);
 }
 
 function getRetryAfterSeconds(
@@ -135,7 +136,8 @@ export const POST: APIRoute = async (context) => {
     if (!isTrustedRequestOrigin(context.request, context.url)) {
       return new Response(
         JSON.stringify({
-          error: "Forbidden",
+          error:
+            "Solicitud no permitida. Recarga la página e intenta de nuevo.",
           code: "FORBIDDEN_ORIGIN",
         }),
         {
@@ -192,7 +194,10 @@ export const POST: APIRoute = async (context) => {
         upstreamPayload,
       );
       const status = upstreamResponse.status;
-      const error = getSafeError(upstreamPayload.error);
+      const error = toSpanishMessage(
+        getSafeError(upstreamPayload.error),
+        status,
+      );
       const code = status === 429 ? "RATE_LIMITED" : "LOGIN_ERROR";
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -228,7 +233,7 @@ export const POST: APIRoute = async (context) => {
     if (!token || !employee) {
       return new Response(
         JSON.stringify({
-          error: "Invalid login response",
+          error: "No se pudo iniciar sesión. Intenta de nuevo.",
           code: "LOGIN_ERROR",
         }),
         {
@@ -241,10 +246,18 @@ export const POST: APIRoute = async (context) => {
       );
     }
 
-    const ttlSeconds = resolveCookieTTLSeconds(token);
+    // The cookie lives as long as the token, capped by the admin's
+    // "Cookie de sesión" setting (sent by the backend).
+    const sessionMaxAge = Number(upstreamPayload.session_max_age_seconds);
+    const ttlSeconds =
+      Number.isFinite(sessionMaxAge) && sessionMaxAge > 0
+        ? Math.min(resolveCookieTTLSeconds(token), Math.floor(sessionMaxAge))
+        : resolveCookieTTLSeconds(token);
 
     const forwardedProto = context.request.headers.get("x-forwarded-proto");
+    // Production is always HTTPS; locally follow the request scheme.
     const isSecure =
+      import.meta.env.PROD ||
       (forwardedProto ?? context.url.protocol.replace(":", "")) === "https";
 
     // Set same-origin HttpOnly cookie so Astro middleware can validate /admin routes.
@@ -282,9 +295,8 @@ export const POST: APIRoute = async (context) => {
       ) {
         return new Response(
           JSON.stringify({
-            error: "Validation error",
+            error: "Revisa el correo y la contraseña.",
             code: "VALIDATION_ERROR",
-            message: error.message,
           }),
           {
             status: 400,
@@ -296,9 +308,11 @@ export const POST: APIRoute = async (context) => {
         );
       }
 
+      // Network/runtime details stay in the server log, not the response.
+      console.error("[login] failed:", error.message);
       return new Response(
         JSON.stringify({
-          error: error.message || "Login failed",
+          error: "No se pudo iniciar sesión. Intenta de nuevo.",
           code: "LOGIN_ERROR",
         }),
         {
@@ -313,7 +327,7 @@ export const POST: APIRoute = async (context) => {
 
     return new Response(
       JSON.stringify({
-        error: "Internal server error",
+        error: "Ocurrió un error inesperado. Intenta de nuevo.",
         code: "SERVER_ERROR",
       }),
       { status: 500, headers: { "Content-Type": "application/json" } },

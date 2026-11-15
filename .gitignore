@@ -44,3 +44,8 @@ skills-lock.json
 # >>> githints (managed)
 .githints/
 # <<< githints (managed)
+
+# Playwright
+test-results/
+playwright-report/
+coverage/

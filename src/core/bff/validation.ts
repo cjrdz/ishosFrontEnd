@@ -71,9 +71,21 @@ export const addonCreateSchema = z.object({
 
 export const addonUpdateSchema = addonCreateSchema.partial();
 
+/** Staff orders: the phone is optional; a typed one needs 7–15 digits. */
+const optionalPhoneSchema = z
+  .string()
+  .trim()
+  .max(25)
+  .refine((value) => {
+    const digits = value.replace(/\D/g, "").length;
+    return value === "" || (digits >= 7 && digits <= 15);
+  }, "El teléfono debe tener entre 7 y 15 dígitos")
+  .optional()
+  .default("");
+
 export const orderCreateSchema = z.object({
   customer_name: z.string().trim().min(1).max(120),
-  customer_phone: z.string().trim().min(7).max(25),
+  customer_phone: optionalPhoneSchema,
   customer_email: z.email().optional(),
   payment_method: z.enum(["efectivo", "tarjeta", "transferencia", "otro"]),
   amount_received: z.number().nonnegative().optional(),
@@ -148,14 +160,16 @@ const offerItemSchema = z.object({
   label: z.string().trim().min(1).max(200),
   note: z.string().trim().max(500).optional(),
   discount_price: z.number().nonnegative().optional(),
-  flavor_id: z.string().trim().optional(),
-  flavor_ids: z.array(z.string().trim()).optional(),
-  expires_at: z.string().trim().min(1),
+  flavor_id: z.string().trim().max(64).optional(),
+  flavor_ids: z.array(z.string().trim().max(64)).max(20).optional(),
+  expires_at: z.string().trim().min(1).max(64),
 });
 
 export const storeSettingsUpdateSchema = z.object({
   orders_enabled: z.boolean(),
   offers: z.array(offerItemSchema).max(50),
+  /** Public "Seguir mi orden" page; omitted keeps the saved value. */
+  tracking_enabled: z.boolean().optional(),
 });
 
 // Weekly opening hours. Shape only; the backend checks order and overlaps.
@@ -202,19 +216,40 @@ export const locationAvailabilitySchema = z.object({
 
 export const archiveConfigUpdateSchema = z.object({
   enabled: z.boolean(),
-  age_days: z.number().int().nonnegative(),
-  interval_minutes: z.number().int().nonnegative(),
+  age_days: z.number().int().nonnegative().max(3650),
+  interval_minutes: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(60 * 24 * 30),
 });
 
+// Same bounds as the backend (services.ValidateTokenTTLConfig).
 export const panelConfigUpdateSchema = z.object({
-  auth_cookie_ttl_hours: z.number().int().positive(),
-  auth_token_ttl_hours: z.number().int().positive(),
-  tracking_token_ttl_hours: z.number().int().positive(),
-  inactivity_logout_seconds: z.number().int().nonnegative(),
+  auth_cookie_ttl_hours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 30),
+  auth_token_ttl_hours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 30),
+  tracking_token_ttl_hours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 90),
+  inactivity_logout_seconds: z
+    .number()
+    .int()
+    .min(60)
+    .max(60 * 60 * 24),
 });
 
 export const tabsSettingsSchema = z.object({
-  tab_order: z.array(z.string().trim().min(1)).min(1),
+  tab_order: z.array(z.string().trim().min(1).max(40)).min(1).max(20),
 });
 
 // Container types
@@ -239,6 +274,20 @@ export const inventoryEntrySchema = z.object({
 
 export const inventoryUnitEntrySchema = z.object({
   quantity: z.number().int().positive(),
+});
+
+/** Minimum below which an item shows as "Stock bajo" (backend bound). */
+const lowStockThresholdSchema = z.number().int().min(0).max(100000);
+
+export const inventoryThresholdSchema = z.object({
+  low_stock_threshold: lowStockThresholdSchema,
+});
+
+/** Start tracking a unit product (at every location). */
+export const inventoryUnitProductSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  product_id: z.uuid(),
+  low_stock_threshold: lowStockThresholdSchema,
 });
 
 export const inventoryAdjustmentSchema = z.object({

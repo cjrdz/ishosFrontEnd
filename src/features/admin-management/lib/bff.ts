@@ -1012,8 +1012,12 @@ export type LocationPatch = Partial<
 
 export interface SoldOutItems {
   location_id: string;
+  /** Marked "Agotado" by staff. */
   products: string[];
   flavors: string[];
+  /** Tracked in inventory with no stock left (clears on the next entry). */
+  out_of_stock_products?: string[];
+  out_of_stock_flavors?: string[];
 }
 
 /** Locations the signed-in user works with (all for admins, own for staff). */
@@ -1053,23 +1057,32 @@ export async function setLocationAvailability(
   });
 }
 
-export async function getAdminStoreSettings() {
-  return bffRequest<{ orders_enabled: boolean; offers: StoreOfferItem[] }>(
-    "/api/admin/settings/store",
-  );
-}
-
-export async function updateAdminStoreSettings(payload: {
+export interface AdminStoreSettings {
   orders_enabled: boolean;
   offers: StoreOfferItem[];
-}) {
-  return bffRequest<{ orders_enabled: boolean; offers: StoreOfferItem[] }>(
-    "/api/admin/settings/store",
-    {
-      method: "PATCH",
-      body: payload,
-    },
-  );
+  /** Public "Seguir mi orden" page and links. */
+  tracking_enabled?: boolean;
+}
+
+export async function getAdminStoreSettings() {
+  return bffRequest<AdminStoreSettings>("/api/admin/settings/store");
+}
+
+export async function updateAdminStoreSettings(payload: AdminStoreSettings) {
+  return bffRequest<AdminStoreSettings>("/api/admin/settings/store", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+/** Turns public order tracking on or off, keeping the other store settings. */
+export async function setPublicTracking(enabled: boolean) {
+  const current = await getAdminStoreSettings();
+  return updateAdminStoreSettings({
+    orders_enabled: current.orders_enabled,
+    offers: current.offers ?? [],
+    tracking_enabled: enabled,
+  });
 }
 
 // ── Order Archive Settings ───────────────────────────────────────────
@@ -1228,6 +1241,29 @@ export async function getInventoryMovements(
 
 export async function getInventoryStats() {
   return bffRequest<InventoryStats>("/api/admin/inventory/stats");
+}
+
+/** Sets the minimum below which an item shows as "Stock bajo". */
+export async function updateInventoryThreshold(
+  inventoryId: string,
+  lowStockThreshold: number,
+) {
+  return bffRequest<InventoryItem>(`/api/admin/inventory/${inventoryId}`, {
+    method: "PATCH",
+    body: { low_stock_threshold: lowStockThreshold },
+  });
+}
+
+/** Starts tracking a unit product at every location (admin). */
+export async function trackUnitProduct(payload: {
+  name: string;
+  product_id: string;
+  low_stock_threshold: number;
+}) {
+  return bffRequest<InventoryItem>("/api/admin/inventory/unit-products", {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export async function recordUnitInventoryEntry(

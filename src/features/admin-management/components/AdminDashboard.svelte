@@ -84,6 +84,9 @@
     /** Location the employee works at; null for admins. */
     location_id?: string | null;
     location_name?: string | null;
+
+    /** Admin's "Logout por inactividad" (seconds), sent to every staff role. */
+    inactivity_logout_seconds?: number;
   };
   type LazyTabKey = Exclude<TabKey, "ordenes" | "analitica">;
 
@@ -387,8 +390,13 @@
   const inactivityTracking = createInactivityTracking({
     getTimeoutSeconds: () => {
       if (!session || counterModeActive) return null;
+      // Admins read the panel config (fresh after a save); other roles get
+      // the same value with their session.
       return (
-        panelConfig.inactivity_logout_seconds ||
+        (isAdmin
+          ? panelConfig.inactivity_logout_seconds
+          : session.inactivity_logout_seconds) ||
+        session.inactivity_logout_seconds ||
         DEFAULT_PANEL_CONFIG.inactivity_logout_seconds
       );
     },

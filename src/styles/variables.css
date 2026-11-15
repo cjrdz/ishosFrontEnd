@@ -24,29 +24,5 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
 
-  /* ── IshosFactory brand tokens ──────────────────────── */
-  /* Teal follows the theme primary so text and buttons keep WCAG contrast
-     (the original #00b2a9 with white text was ~2.6:1) in light and dark. */
-  --ishos-teal: var(--color-primary);
-  --ishos-teal-deep: color-mix(in oklab, var(--color-primary) 85%, black);
-  --ishos-maroon: #63001f;
-  --ishos-mint: #91e2d6;
-  --ishos-pink: #f9b4da;
-  --ishos-yellow: #f9e9a9;
-
-  --brand-gradient: linear-gradient(
-    135deg,
-    var(--ishos-teal),
-    var(--ishos-teal-deep),
-    var(--ishos-maroon)
-  );
-}
-
-[data-theme="night"] {
-  --brand-gradient: linear-gradient(
-    135deg,
-    var(--ishos-teal),
-    var(--ishos-pink),
-    var(--ishos-yellow)
-  );
+  /* Brand colours live in global.css (daisyUI themes + --brand-* tokens). */
 }

@@ -187,7 +187,7 @@
         >
           <h2 class="card-title shrink-0 mr-1">Exportación y mantenimiento</h2>
           <span
-            class="h-4 w-4 text-base-content/40 transition-transform duration-200 flex items-center"
+            class="h-4 w-4 text-ink-muted transition-transform duration-200 flex items-center"
             class:rotate-180={!isCollapsed}
           >
             <Icon icon="lucide:chevron-down" />
@@ -237,7 +237,7 @@
         <!-- Date pickers -->
         <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <label class="flex items-center gap-3">
-            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60"
+            <span class="w-24 shrink-0 text-sm font-medium text-ink-muted"
               >Fecha inicio</span
             >
             <input
@@ -248,7 +248,7 @@
             />
           </label>
           <label class="flex items-center gap-3">
-            <span class="w-24 shrink-0 text-sm font-medium text-base-content/60"
+            <span class="w-24 shrink-0 text-sm font-medium text-ink-muted"
               >Fecha fin</span
             >
             <input
@@ -262,7 +262,7 @@
 
         <!-- Range summary chip -->
         {#if startDate && endDate}
-          <div class="flex items-center gap-2 text-sm text-base-content/60">
+          <div class="flex items-center gap-2 text-sm text-ink-muted">
             <Icon icon="lucide:calendar" class="h-4 w-4 shrink-0" />
             <span
               >{formatDateDisplay(startDate)} – {formatDateDisplay(
@@ -316,7 +316,7 @@
               Eliminar exportadas
             </button>
             {#if !hasExportForCurrentRange() && startDate && endDate}
-              <span class="text-xs text-base-content/40"
+              <span class="text-xs text-ink-muted"
                 >Exporta primero este rango</span
               >
             {/if}
@@ -335,7 +335,7 @@
   widthClass="max-w-lg"
   onClose={() => {}}
 >
-  <p class="text-xs text-base-content/55">
+  <p class="text-xs text-ink-muted">
     {formatDateDisplay(startDate)} – {formatDateDisplay(endDate)} · Esta acción no
     se puede deshacer
   </p>
@@ -356,7 +356,7 @@
               (e.currentTarget as HTMLInputElement).checked,
             )}
         />
-        <Icon icon={opt.icon} class="h-4 w-4 text-base-content/40 shrink-0" />
+        <Icon icon={opt.icon} class="h-4 w-4 text-ink-muted shrink-0" />
         <span class="text-sm">{opt.label}</span>
       </label>
     {/each}

@@ -29,15 +29,40 @@ export const statusLabels: Record<Order["status"], string> = {
   cancelada: "Rechazada",
 };
 
-// daisyUI's *-content colours keep each badge readable in both themes.
-export const statusBadgeClass: Record<Order["status"], string> = {
-  pendiente_revision: "badge-warning font-semibold",
-  recibida: "badge-success font-semibold",
-  en_proceso: "badge-info font-semibold",
-  lista: "badge-accent font-semibold",
-  entregada: "badge-primary font-semibold",
-  cancelada: "badge-error font-semibold",
+/** Board column titles (plural). */
+export const statusPluralLabels: Record<Order["status"], string> = {
+  pendiente_revision: "Por revisar",
+  recibida: "Aceptadas",
+  en_proceso: "Preparando",
+  lista: "Listas",
+  entregada: "Entregadas",
+  cancelada: "Rechazadas",
 };
+
+/** Each state also has its own icon, so staff never rely on colour alone.
+ *  (Icons, not glyphs: Roboto lacks ◐ and fallbacks render it clipped.) */
+export const statusIcons: Record<Order["status"], string> = {
+  pendiente_revision: "lucide:circle-dot",
+  recibida: "lucide:check",
+  en_proceso: "lucide:chef-hat",
+  lista: "lucide:bell",
+  entregada: "lucide:check-check",
+  cancelada: "lucide:x",
+};
+
+/** Chip colours from the --st-* tokens (brand.css); AA in both themes. */
+export const statusChipClass: Record<Order["status"], string> = {
+  pendiente_revision: "status-chip status-chip--review",
+  recibida: "status-chip status-chip--accepted",
+  en_proceso: "status-chip status-chip--preparing",
+  lista: "status-chip status-chip--ready",
+  entregada: "status-chip status-chip--done",
+  cancelada: "status-chip status-chip--rejected",
+};
+
+// Kept for callers that prefix "badge": the chip classes override its colours.
+export const statusBadgeClass: Record<Order["status"], string> =
+  statusChipClass;
 
 export const statusStepIconsActive: Record<LinearOrderStatus, string> = {
   pendiente_revision: "line-md:watch-loop",
@@ -76,7 +101,7 @@ export function kitchenBadge(
   if (order.status === "recibida") {
     return {
       text: "Nueva orden",
-      className: "badge badge-success badge-outline",
+      className: "status-chip status-chip--sm status-chip--accepted",
     };
   }
   return null;

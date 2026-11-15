@@ -235,7 +235,7 @@
         <tbody>
           {#if filteredCategories.length === 0}
             <tr
-              ><td colspan="5" class="text-center py-6 text-base-content/50"
+              ><td colspan="5" class="text-center py-6 text-ink-muted"
                 >No hay categorías</td
               ></tr
             >
@@ -251,7 +251,7 @@
                 <td>
                   <div class="font-medium">{category.name}</div>
                   {#if category.description}
-                    <div class="text-xs text-base-content/60 line-clamp-2">
+                    <div class="text-xs text-ink-muted line-clamp-2">
                       {category.description}
                     </div>
                   {/if}
@@ -333,7 +333,7 @@
     <div
       class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300/50 pt-3"
     >
-      <span class="text-sm text-base-content/60">
+      <span class="text-sm text-ink-muted">
         {filteredCategories.length === 0
           ? "0 resultados"
           : `${startItem}-${endItem} de ${filteredCategories.length}`}
@@ -350,7 +350,7 @@
           <Icon icon="lucide:chevron-left" class="h-4 w-4" />
         </button>
 
-        <span class="text-sm text-base-content/60">
+        <span class="text-sm text-ink-muted">
           Página {currentPage} de {totalPages}
         </span>
 

@@ -5,6 +5,7 @@
     linearStatuses,
     statusLabels,
     statusBadgeClass,
+    statusIcons,
     statusStepIconsActive,
     statusStepIconsStatic,
     kitchenBadge,
@@ -190,10 +191,15 @@
 <div class="flex flex-col gap-5 text-sm">
   <!-- Header: the number staff call out, its state, and when it came in. -->
   <header class="flex flex-wrap items-center gap-x-3 gap-y-2">
-    <span class="font-display text-5xl font-bold leading-none"
+    <span class="font-display text-5xl font-bold leading-none text-head"
       >{shortNumber}</span
     >
-    <span class={`badge ${statusBadgeClass[selectedOrder.status]}`}>
+    <span class={statusBadgeClass[selectedOrder.status]}>
+      <Icon
+        icon={statusIcons[selectedOrder.status]}
+        class="size-4"
+        aria-hidden="true"
+      />
       {statusLabels[selectedOrder.status]}
     </span>
     <span class="badge badge-ghost">
@@ -205,16 +211,16 @@
         : ""}
     </span>
     {#if selectedOrder.created_at}
-      <span class="text-base-content/65"
+      <span class="text-ink-muted"
         >{formatAdminDate(selectedOrder.created_at)}</span
       >
     {/if}
     <span class="ml-auto flex items-center gap-1">
-      <span class="hidden text-xs text-base-content/60 sm:inline"
+      <span class="hidden text-xs text-ink-muted sm:inline"
         >{selectedOrder.order_number}</span
       >
       <button
-        class="btn btn-ghost btn-xs btn-square"
+        class="btn btn-ghost btn-sm btn-square size-11"
         type="button"
         title="Copiar número de orden"
         aria-label="Copiar número de orden"
@@ -227,7 +233,7 @@
       </button>
       {#if trackingLink}
         <button
-          class="btn btn-ghost btn-xs btn-square"
+          class="btn btn-ghost btn-sm btn-square size-11"
           type="button"
           title="Copiar enlace de seguimiento"
           aria-label="Copiar enlace de seguimiento"
@@ -255,7 +261,7 @@
         Productos
       </h4>
       {#if !selectedOrder.items || selectedOrder.items.length === 0}
-        <p class="px-4 py-6 text-center text-base-content/60">Sin productos</p>
+        <p class="px-4 py-6 text-center text-ink-muted">Sin productos</p>
       {:else}
         <ul class="divide-y divide-base-300">
           {#each selectedOrder.items as item (item.id ?? `${item.product_name}-${item.quantity}`)}
@@ -360,7 +366,7 @@
             >
             {#if whatsappLink}
               <a
-                class="btn btn-ghost btn-xs gap-1"
+                class="btn btn-ghost btn-sm min-h-11 gap-1"
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -374,7 +380,7 @@
             {/if}
           </div>
         {/if}
-        <p class="mt-2 text-base-content/65">
+        <p class="mt-2 text-ink-muted">
           Creada por {createdByLabel(selectedOrder, employeeById)}
         </p>
       </section>
@@ -405,7 +411,7 @@
           {#if selectedOrder.status === "cancelada"}
             {#if isAdmin}
               <button
-                class="btn btn-xs btn-soft btn-success"
+                class="btn btn-sm min-h-11 btn-soft btn-success"
                 type="button"
                 onclick={() => onOpenReactivate(selectedOrder.id)}
               >
@@ -414,7 +420,7 @@
             {/if}
           {:else if (selectedOrder.status === "recibida" || selectedOrder.status === "pendiente_revision") && isAdmin}
             <button
-              class="btn btn-xs btn-soft btn-error"
+              class="btn btn-sm min-h-11 btn-soft btn-error"
               type="button"
               onclick={() => onOpenReject(selectedOrder.id)}
             >
@@ -432,7 +438,7 @@
               </p>
             {/if}
             {#if stepTimestamp("cancelada")}
-              <p class="text-xs text-base-content/60">
+              <p class="text-xs text-ink-muted">
                 {stepTimestamp("cancelada")}
               </p>
             {/if}
@@ -479,16 +485,16 @@
                 </button>
                 <div class="min-w-0">
                   <p
-                    class={`font-semibold ${current ? "text-primary" : reached ? "" : "text-base-content/50"}`}
+                    class={`font-semibold ${current ? "text-primary" : reached ? "" : "text-ink-muted"}`}
                   >
                     {statusLabels[stepStatus]}
                     {#if isHint && canChange}<span
-                        class="ml-1 text-xs font-medium text-base-content/60"
+                        class="ml-1 text-xs font-medium text-ink-muted"
                         >· siguiente</span
                       >{/if}
                   </p>
                   {#if stepTimestamp(stepStatus)}
-                    <p class="text-xs text-base-content/60">
+                    <p class="text-xs text-ink-muted">
                       {stepTimestamp(stepStatus)}
                     </p>
                   {/if}
@@ -514,7 +520,7 @@
           >
           <div class="mt-3 space-y-2">
             {#if selectedOrder.tracking_token_expires_at}
-              <p class="text-xs text-base-content/60">
+              <p class="text-xs text-ink-muted">
                 El enlace vence el {new Date(
                   selectedOrder.tracking_token_expires_at,
                 ).toLocaleDateString("es-SV", { dateStyle: "medium" })}
@@ -529,7 +535,7 @@
                   : "\u2022".repeat(24)}
               </code>
               <button
-                class="btn btn-ghost btn-xs btn-square"
+                class="btn btn-ghost btn-sm btn-square size-11"
                 type="button"
                 title={tokenVisible ? "Ocultar token" : "Revelar token"}
                 aria-label={tokenVisible ? "Ocultar token" : "Revelar token"}
@@ -541,7 +547,7 @@
                 />
               </button>
               <button
-                class="btn btn-ghost btn-xs btn-square"
+                class="btn btn-ghost btn-sm btn-square size-11"
                 type="button"
                 title="Copiar token"
                 aria-label="Copiar token"

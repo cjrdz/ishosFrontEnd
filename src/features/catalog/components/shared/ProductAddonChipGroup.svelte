@@ -87,7 +87,7 @@
     {#if canClear}
       <button
         type="button"
-        class="btn btn-ghost btn-xs btn-square"
+        class="btn btn-ghost btn-sm btn-square size-11"
         aria-label={`Borrar ${label.toLowerCase()}`}
         title={`Borrar ${label.toLowerCase()}`}
         onclick={clearSelection}
@@ -140,7 +140,7 @@
   </div>
 
   {#if helperText}
-    <p class="text-xs text-base-content/60">{helperText}</p>
+    <p class="text-xs text-ink-muted">{helperText}</p>
   {/if}
 
   {#if remainingFree > 0 && items.length > 0}

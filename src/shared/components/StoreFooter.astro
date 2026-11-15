@@ -1,33 +1,157 @@
 ---
 import Icon from "@shared/components/AppIcon.svelte";
+import {
+  BRAND_PHONE_DISPLAY,
+  BRAND_SOCIALS,
+  BRAND_WHATSAPP_URL,
+} from "@shared/lib/brand";
 ---
 
-<footer class="bg-base-200 text-base-content border-t border-base-300/60">
-  <aside
-    class="mx-auto flex w-full max-w-4xl flex-col items-center gap-2 px-6 py-10 text-center"
-  >
-    <p class="font-display text-3xl font-bold">Isho's Factory</p>
-    <p class="text-sm text-base-content/80">
-      © {new Date().getFullYear()} Todos los derechos reservados.
-    </p>
+<footer class="store-footer">
+  <div class="scallops scallops--rise" aria-hidden="true"></div>
+  <div class="patron store-footer__field">
+    <div class="store-footer__inner">
+      <a href="/" class="store-footer__logo" aria-label="Isho's, inicio">
+        <img
+          src="/images/brand/logo-full-white.webp"
+          alt=""
+          width="480"
+          height="297"
+          class="art-day"
+        />
+        <img
+          src="/images/brand/logo-full-cream.webp"
+          alt=""
+          width="480"
+          height="297"
+          class="art-night"
+        />
+      </a>
 
-    <p class="mt-1 inline-flex items-center gap-2 text-sm text-base-content/85">
-      <Icon
-        icon="proicons:code"
-        class="h-5 w-5 text-primary"
-        aria-hidden="true"
-      />
-      <span>
-        Creado por
+      <ul class="store-footer__links" aria-label="Redes y contacto">
+        {
+          BRAND_SOCIALS.map((social) => (
+            <li>
+              <a
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="store-footer__chip"
+              >
+                <Icon icon={social.icon} class="size-5" aria-hidden="true" />
+                <span>
+                  {social.label}
+                  <span class="sr-only"> {social.handle}</span>
+                </span>
+              </a>
+            </li>
+          ))
+        }
+        <li>
+          <a
+            href={BRAND_WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="store-footer__chip"
+          >
+            <Icon icon="mdi:whatsapp" class="size-5" aria-hidden="true" />
+            <span>WhatsApp {BRAND_PHONE_DISPLAY}</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="store-footer__legal">
+      <p>
+        © {new Date().getFullYear()} Isho's · Gelatos &amp; Sorbetes · Ahuachapán,
+        El Salvador
+      </p>
+      <p>
+        Hecho por{" "}
         <a
           href="https://jrdz.dev/about/"
           target="_blank"
-          rel="noopener noreferrer"
-          class="link link-hover link-primary font-medium"
+          rel="noopener noreferrer">jrdz.dev</a
         >
-          jrdz.dev
-        </a>
-      </span>
-    </p>
-  </aside>
+      </p>
+    </div>
+  </div>
 </footer>
+
+<style>
+  .store-footer {
+    margin-top: 2rem;
+    color: var(--brand-foot-ink);
+  }
+  .store-footer__field {
+    background-color: var(--brand-foot-bg);
+  }
+  .store-footer__inner {
+    max-width: 75rem;
+    margin: 0 auto;
+    padding: 2.5rem 1rem 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+  .store-footer__logo {
+    display: inline-flex;
+    border-radius: 0.75rem;
+  }
+  .store-footer__logo img {
+    height: 72px;
+    width: auto;
+  }
+  .store-footer__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .store-footer__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1rem;
+    border-radius: 999px;
+    background: var(--brand-foot-chip);
+    color: var(--brand-foot-ink);
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .store-footer__chip:hover {
+    transform: translateY(-1px);
+  }
+  .store-footer a:focus-visible {
+    outline: 3px solid var(--brand-foot-ink);
+    outline-offset: 2px;
+  }
+  .store-footer__legal {
+    max-width: 75rem;
+    margin: 0 auto;
+    padding: 1rem 1rem 1.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-top: 1px solid
+      color-mix(in oklab, var(--brand-foot-ink) 20%, transparent);
+  }
+  .store-footer__legal p {
+    margin: 0;
+  }
+  .store-footer__legal a {
+    color: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+</style>

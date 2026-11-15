@@ -15,6 +15,11 @@
   import { fly } from "svelte/transition";
   import { flip } from "svelte/animate";
   import { undoableAction } from "@shared/toast/toast";
+  import {
+    statusChipClass,
+    statusPluralLabels,
+    statusIcons,
+  } from "@features/orders/lib/order-status";
 
   type ActiveStatus =
     "pendiente_revision" | "recibida" | "en_proceso" | "lista";
@@ -53,12 +58,24 @@
   const COLUMNS: { status: ActiveStatus; title: string; empty: string }[] = [
     {
       status: "pendiente_revision",
-      title: "Por revisar",
+      title: statusPluralLabels.pendiente_revision,
       empty: "Sin pedidos nuevos",
     },
-    { status: "recibida", title: "Aceptadas", empty: "Nada en espera" },
-    { status: "en_proceso", title: "Preparando", empty: "Nada en preparación" },
-    { status: "lista", title: "Listas", empty: "Nada por entregar" },
+    {
+      status: "recibida",
+      title: statusPluralLabels.recibida,
+      empty: "Nada en espera",
+    },
+    {
+      status: "en_proceso",
+      title: statusPluralLabels.en_proceso,
+      empty: "Nada en preparación",
+    },
+    {
+      status: "lista",
+      title: statusPluralLabels.lista,
+      empty: "Nada por entregar",
+    },
   ];
   const NEXT: Record<
     ActiveStatus,
@@ -179,11 +196,11 @@
       : `${hours} h ${minutes % 60} min`;
   }
 
-  /** Neutral under 10 min, amber from 10, red from 20. */
+  /** Green under 10 min, amber from 10, red from 20. */
   function waitTone(minutes: number): string {
-    if (minutes >= 20) return "bg-error/15 text-error";
-    if (minutes >= 10) return "bg-warning/25 text-base-content";
-    return "bg-base-200 text-base-content/70";
+    if (minutes >= 20) return "status-chip--late";
+    if (minutes >= 10) return "status-chip--review";
+    return "status-chip--ready";
   }
 
   function itemSummary(order: Order): string {
@@ -232,8 +249,10 @@
 {#if loadError}
   <div class="alert alert-warning mb-3">
     <span>{loadError}</span>
-    <button type="button" class="btn btn-sm" onclick={() => void load()}
-      >Reintentar</button
+    <button
+      type="button"
+      class="btn btn-sm min-h-11 rounded-full"
+      onclick={() => void load()}>Reintentar</button
     >
   </div>
 {/if}
@@ -249,14 +268,18 @@
   ></button>
   <div class="flex items-start justify-between gap-2">
     <div class="min-w-0">
-      <p class="font-bold tabular-nums">{shortNumber(order)}</p>
-      <p class="truncate text-sm">{order.customer_name || "Cliente"}</p>
+      <p class="board-number tabular-nums">{shortNumber(order)}</p>
+      <p class="truncate text-[0.95rem] font-bold">
+        {order.customer_name || "Cliente"}
+      </p>
     </div>
-    <span class={`badge badge-sm border-0 tabular-nums ${waitTone(minutes)}`}>
+    <span
+      class={`status-chip status-chip--sm tabular-nums ${waitTone(minutes)}`}
+    >
       {formatWait(minutes)}
     </span>
   </div>
-  <p class="mt-1 text-xs text-base-content/70">
+  <p class="mt-1 text-[0.8125rem] text-ink-muted">
     {order.order_type === "en_local"
       ? order.table_number
         ? `Mesa ${order.table_number}`
@@ -273,14 +296,14 @@
     <p class="mt-1 line-clamp-2 text-sm">{itemSummary(order)}</p>
   {/if}
   {#if order.notes}
-    <p class="mt-1 line-clamp-2 text-xs italic text-base-content/70">
+    <p class="mt-1 line-clamp-2 text-xs italic text-ink-muted">
       “{order.notes}”
     </p>
   {/if}
   <div class="relative z-[1] mt-3 flex items-center gap-1.5">
     <button
       type="button"
-      class="btn btn-primary btn-sm flex-1 rounded-full"
+      class="btn btn-primary min-h-11 flex-1 rounded-full"
       onclick={() => advance(order)}
     >
       <Icon icon={next.icon} class="size-4" aria-hidden="true" />
@@ -289,7 +312,7 @@
     {#if status === "pendiente_revision"}
       <button
         type="button"
-        class="btn btn-ghost btn-sm rounded-full"
+        class="btn btn-ghost min-h-11 rounded-full"
         onclick={() => onRequestReject(order.id)}
       >
         Rechazar
@@ -297,7 +320,7 @@
     {/if}
     <button
       type="button"
-      class="btn btn-ghost btn-sm btn-circle"
+      class="btn btn-circle size-11 border-base-300 bg-transparent"
       onclick={() => onPrintKitchen(order)}
       aria-label={`Imprimir comanda de ${shortNumber(order)}`}
       title="Imprimir comanda"
@@ -307,14 +330,28 @@
   </div>
 {/snippet}
 
-<div class="orders-board" aria-busy={loading}>
+<!-- Scrolls sideways on phones: focusable so keyboard users can scroll it. -->
+<div
+  class="orders-board"
+  aria-busy={loading}
+  role="region"
+  aria-label="Tablero de órdenes"
+  tabindex="0"
+>
   {#each columns as column (column.status)}
     <section class="board-column" aria-labelledby={`col-${column.status}`}>
-      <header class="mb-2 flex items-center justify-between px-1">
-        <h3 id={`col-${column.status}`} class="font-semibold">
+      <header class="mb-3 flex items-center justify-between gap-2 px-1">
+        <h3 id={`col-${column.status}`} class={statusChipClass[column.status]}>
+          <Icon
+            icon={statusIcons[column.status]}
+            class="size-4"
+            aria-hidden="true"
+          />
           {column.title}
         </h3>
-        <span class="badge badge-ghost tabular-nums">{column.count}</span>
+        <span class="font-black tabular-nums text-ink-muted"
+          ><span class="sr-only">Órdenes: </span>{column.count}</span
+        >
       </header>
 
       <div class="board-column-body space-y-2">
@@ -322,7 +359,7 @@
           <div class="skeleton h-28 w-full rounded-box"></div>
         {:else if column.count === 0}
           <p
-            class="rounded-box border border-dashed border-base-300 p-4 text-center text-sm text-base-content/60"
+            class="rounded-box border border-dashed border-base-300 p-4 text-center text-sm text-ink-muted"
           >
             {column.empty}
           </p>
@@ -345,13 +382,14 @@
         {#if column.older.length > 0}
           <details class="board-older">
             <summary
-              class="flex cursor-pointer items-center justify-between gap-2 rounded-field px-2 py-1.5 text-sm text-base-content/80 hover:bg-base-100"
+              class="flex min-h-11 cursor-pointer items-center justify-between gap-2 rounded-field px-2 py-1.5 text-sm hover:bg-base-100"
             >
               <span class="flex items-center gap-1.5">
                 <Icon icon="lucide:history" class="size-4" aria-hidden="true" />
                 De días anteriores
               </span>
-              <span class="badge badge-sm badge-warning tabular-nums"
+              <span
+                class="status-chip status-chip--sm status-chip--review tabular-nums"
                 >{column.older.length}</span
               >
             </summary>
@@ -403,11 +441,10 @@
     scroll-snap-align: start;
     min-width: 0;
     padding: 0.75rem;
-    border-radius: var(--radius-box);
-    border: 1px solid var(--color-base-300);
+    border-radius: 1.25rem;
     background: color-mix(
       in oklab,
-      var(--color-base-200) 70%,
+      var(--color-base-200) 72%,
       var(--color-base-300)
     );
   }
@@ -435,10 +472,20 @@
 
   .board-card {
     position: relative;
-    padding: 0.75rem;
-    border-radius: calc(var(--radius-box) * 0.75);
+    padding: 0.875rem;
+    border-radius: 1rem;
     border: 1px solid var(--color-base-300);
     background: var(--color-base-100);
+    box-shadow: 0 2px 0 var(--color-base-300);
+  }
+
+  .board-number {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 2.125rem;
+    line-height: 0.9;
+    color: var(--brand-head);
   }
 
   /* Whole card opens the detail; the action buttons sit above this layer. */
@@ -449,7 +496,7 @@
   }
 
   .board-card-open:focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 3px solid var(--color-primary);
     outline-offset: 2px;
   }
 </style>

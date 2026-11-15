@@ -109,7 +109,7 @@
   <div class="flex flex-wrap items-start justify-between gap-2">
     <div>
       <p class="font-medium">Horario de atención</p>
-      <p class="text-sm text-base-content/60">
+      <p class="text-sm text-ink-muted">
         {configured
           ? "Fuera de este horario la tienda muestra «Cerrado» y no acepta pedidos en línea."
           : "Sin horario: la tienda acepta pedidos mientras el interruptor de pedidos esté activo."}
@@ -164,7 +164,7 @@
 
         <div class="space-y-2">
           {#if ranges.length === 0}
-            <p class="flex min-h-10 items-center text-sm text-base-content/60">
+            <p class="flex min-h-10 items-center text-sm text-ink-muted">
               Cerrado
             </p>
           {/if}
@@ -180,7 +180,7 @@
                 aria-label={`${day.label}: abre`}
                 bind:value={range.open}
               />
-              <span class="text-sm text-base-content/60">a</span>
+              <span class="text-sm text-ink-muted">a</span>
               <input
                 type="time"
                 step="900"
@@ -219,7 +219,7 @@
 
   <div class="flex flex-wrap items-center justify-end gap-2">
     {#if dirty}
-      <span class="text-sm text-base-content/60">Cambios sin guardar</span>
+      <span class="text-sm text-ink-muted">Cambios sin guardar</span>
       <button
         type="button"
         class="btn btn-ghost btn-sm"

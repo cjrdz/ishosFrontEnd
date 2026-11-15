@@ -197,7 +197,7 @@
               {@const available = isAvailable("flavor", flavor.id)}
               <li class="flex items-center justify-between gap-3 px-3 py-2">
                 <span
-                  class={`min-w-0 truncate ${available ? "" : "text-base-content/60"}`}
+                  class={`min-w-0 truncate ${available ? "" : "text-ink-muted"}`}
                 >
                   {flavor.name}
                   {#if !available}
@@ -241,7 +241,7 @@
               {@const available = isAvailable("product", product.id)}
               <li class="flex items-center justify-between gap-3 px-3 py-2">
                 <span
-                  class={`min-w-0 truncate ${available ? "" : "text-base-content/60"}`}
+                  class={`min-w-0 truncate ${available ? "" : "text-ink-muted"}`}
                 >
                   {product.name}
                   {#if !available}
@@ -270,7 +270,7 @@
         </section>
       {:else}
         {#if visibleFlavors.length === 0}
-          <p class="text-center text-sm text-base-content/60">
+          <p class="text-center text-sm text-ink-muted">
             No hay productos ni sabores que coincidan.
           </p>
         {/if}

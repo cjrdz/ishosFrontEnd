@@ -350,7 +350,7 @@
         <option value="manager">{ROLE_LABELS.manager}</option>
         <option value="admin">{ROLE_LABELS.admin}</option>
       </select>
-      <span class="mt-1 text-xs text-base-content/60">
+      <span class="mt-1 text-xs text-ink-muted">
         {#if form.role === "admin"}
           Ve y administra todas las sucursales.
         {:else if form.role === "manager"}
@@ -441,7 +441,7 @@
       </select>
     </div>
 
-    <p class="text-xs text-base-content/60">
+    <p class="text-xs text-ink-muted">
       Por seguridad, los identificadores sensibles del empleado no se muestran
       aqui.
     </p>

@@ -76,7 +76,7 @@
       </table>
     </div>
   {:else}
-    <div class="text-center py-6 text-base-content/50">
+    <div class="text-center py-6 text-ink-muted">
       No hay movimientos registrados
     </div>
   {/if}

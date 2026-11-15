@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { currentChartTheme } from "@shared/theme/chart-colors";
   import { onMount } from "svelte";
   import Icon from "@shared/components/AppIcon.svelte";
   import { Chart } from "svelte-echarts";
@@ -17,6 +18,9 @@
     recordInventoryEntry,
     recordUnitInventoryEntry,
     recordInventoryAdjustment,
+    updateInventoryThreshold,
+    trackUnitProduct,
+    listProducts,
     getInventoryMovements,
     listContainerTypes,
     createContainerType,
@@ -32,6 +36,10 @@
   import InventoryAdjustmentDialog from "./InventoryAdjustmentDialog.svelte";
   import ContainerTypesDialog from "./ContainerTypesDialog.svelte";
   import InventoryMovementsDialog from "./InventoryMovementsDialog.svelte";
+  import InventoryThresholdDialog from "./InventoryThresholdDialog.svelte";
+  import TrackProductDialog from "./TrackProductDialog.svelte";
+  import { showToast } from "@shared/toast/toast";
+  import { ApiError } from "@core/errors";
   import GlobalFlavorsManager from "@features/products/components/admin/GlobalFlavorsManager.svelte";
   import GlobalAddonsManager from "@features/products/components/admin/GlobalAddonsManager.svelte";
   import { resolveWorkingLocation } from "@features/admin-management/lib/location-selection";
@@ -126,6 +134,25 @@
   let showAdjustment = $state(false);
   let showMovements = $state(false);
   let showContainerTypes = $state(false);
+  let showThreshold = $state(false);
+  let entrySubmitting = $state(false);
+  /** Products sold by unit (for the entry dialog), loaded when it opens. */
+  let unitProducts = $state<{ id: string; name: string }[]>([]);
+  let unitProductsLoaded = false;
+
+  async function loadUnitProducts() {
+    if (unitProductsLoaded) return;
+    unitProductsLoaded = true;
+    try {
+      const { products } = await listProducts({ all: true });
+      unitProducts = (products ?? [])
+        .filter((p) => !p.ball_based)
+        .map((p) => ({ id: p.id, name: p.name }));
+    } catch {
+      unitProductsLoaded = false;
+    }
+  }
+  let showTrackProduct = $state(false);
   let showGlobalFlavors = $state(false);
   let showGlobalAddons = $state(false);
   let tableFilter = $state<InventoryStockFilter>("all");
@@ -238,34 +265,26 @@
     openEntry();
   }
 
-  // Chart theme colors
-  let chartTextColor = $state("#d1d5db");
-  let chartMutedTextColor = $state("#9ca3af");
-  let chartGridColor = $state("rgba(148, 163, 184, 0.25)");
-  let chartTooltipBackground = $state("#111827");
-  let chartTooltipBorder = $state("rgba(148, 163, 184, 0.35)");
-  let chartTooltipTextColor = $state("#f8fafc");
+  // Chart theme colors (ECharts can't read CSS variables).
+  const initialChart = currentChartTheme();
+  let chartTextColor = $state(initialChart.text);
+  let chartMutedTextColor = $state(initialChart.muted);
+  let chartGridColor = $state(initialChart.grid);
+  let chartTooltipBackground = $state(initialChart.tooltipBackground);
+  let chartTooltipBorder = $state(initialChart.tooltipBorder);
+  let chartTooltipTextColor = $state(initialChart.tooltipText);
+  let stockColors = $state(initialChart.stock);
 
   function syncChartThemeColors() {
     if (typeof window === "undefined") return;
-    const isDark =
-      (document.documentElement.getAttribute("data-theme") || "night") ===
-      "night";
-    if (isDark) {
-      chartTextColor = "#e5e7eb";
-      chartMutedTextColor = "#cbd5e1";
-      chartGridColor = "rgba(148, 163, 184, 0.28)";
-      chartTooltipBackground = "rgba(15, 23, 42, 0.96)";
-      chartTooltipBorder = "rgba(148, 163, 184, 0.45)";
-      chartTooltipTextColor = "#f8fafc";
-    } else {
-      chartTextColor = "#111827";
-      chartMutedTextColor = "#374151";
-      chartGridColor = "rgba(156, 163, 175, 0.32)";
-      chartTooltipBackground = "rgba(17, 24, 39, 0.96)";
-      chartTooltipBorder = "rgba(31, 41, 55, 0.55)";
-      chartTooltipTextColor = "#f9fafb";
-    }
+    const theme = currentChartTheme();
+    chartTextColor = theme.text;
+    chartMutedTextColor = theme.muted;
+    chartGridColor = theme.grid;
+    chartTooltipBackground = theme.tooltipBackground;
+    chartTooltipBorder = theme.tooltipBorder;
+    chartTooltipTextColor = theme.tooltipText;
+    stockColors = theme.stock;
   }
 
   // Chart data
@@ -329,9 +348,9 @@
 
   const statusBreakdown = $derived(() => {
     const result = [
-      { name: "Agotado", value: 0, color: "#ef4444" },
-      { name: "Stock bajo", value: 0, color: "#f59e0b" },
-      { name: "OK", value: 0, color: "#22c55e" },
+      { name: "Agotado", value: 0, color: stockColors.out },
+      { name: "Stock bajo", value: 0, color: stockColors.low },
+      { name: "OK", value: 0, color: stockColors.ok },
     ];
     for (const item of allItems) {
       const s = getStockStatus(item);
@@ -428,9 +447,9 @@
           color: (params: any) => {
             const item = sortedItemsByStock[params.dataIndex];
             const status = getStockStatus(item);
-            if (status.label === "Agotado") return "#ef4444";
-            if (status.label === "Stock bajo") return "#f59e0b";
-            return "#22c55e";
+            if (status.label === "Agotado") return stockColors.out;
+            if (status.label === "Stock bajo") return stockColors.low;
+            return stockColors.ok;
           },
         },
         data: sortedItemsByStock.map((i) => i.current_stock ?? 0),
@@ -484,8 +503,11 @@
     quantity_containers?: number;
     balls_per_container?: number;
     inventory_item_id?: string;
+    new_product?: { id: string; name: string };
     quantity?: number;
   }) {
+    if (entrySubmitting) return;
+    entrySubmitting = true;
     try {
       if (payload.type === "flavor" && payload.flavor_id) {
         await recordInventoryEntry(payload.flavor_id, {
@@ -493,15 +515,87 @@
           quantity_containers: payload.quantity_containers ?? 0,
           balls_per_container: payload.balls_per_container,
         });
+      } else if (payload.type === "unit" && payload.new_product) {
+        // First entry of a product without inventory: start tracking it at
+        // every location, then add the entry to this one.
+        const productId = payload.new_product.id;
+        try {
+          await trackUnitProduct({
+            name: payload.new_product.name,
+            product_id: productId,
+            low_stock_threshold: 10,
+          });
+        } catch (e) {
+          // 409: it is already tracked (e.g. a retry after a failed entry).
+          if (!(e instanceof ApiError && e.status === 409)) throw e;
+        }
+        // Use this location's row, not whichever one the create returned.
+        await loadInventory();
+        const item = unitItems.find((i) => i.product_id === productId);
+        if (!item)
+          throw new Error("No se encontró el producto en esta sucursal.");
+        await recordUnitInventoryEntry(item.id, {
+          quantity: payload.quantity ?? 0,
+        });
       } else if (payload.type === "unit" && payload.inventory_item_id) {
         await recordUnitInventoryEntry(payload.inventory_item_id, {
           quantity: payload.quantity ?? 0,
         });
       }
       showEntryDialog = false;
+      showToast("Entrada registrada", { tone: "success" });
       await loadInventory();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Error registrando entrada";
+      // The dialog is modal: errors must show above it, not behind it.
+      showToast(
+        e instanceof Error ? e.message : "No se pudo registrar la entrada.",
+        { tone: "error" },
+      );
+      await loadInventory();
+    } finally {
+      entrySubmitting = false;
+    }
+  }
+
+  function openThreshold(item: InventoryItem) {
+    selectedItem = item;
+    showThreshold = true;
+  }
+
+  async function handleThreshold(threshold: number) {
+    if (!selectedItem) return;
+    const name = selectedItem.name;
+    try {
+      await updateInventoryThreshold(selectedItem.id, threshold);
+      showThreshold = false;
+      showToast(`Mínimo de ${name}: ${threshold}`, { tone: "success" });
+      await loadInventory();
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "No se pudo guardar el mínimo.",
+        { tone: "error" },
+      );
+    }
+  }
+
+  async function handleTrackProduct(payload: {
+    name: string;
+    product_id: string;
+    low_stock_threshold: number;
+  }) {
+    try {
+      await trackUnitProduct(payload);
+      showTrackProduct = false;
+      unitProductsLoaded = false;
+      showToast(`${payload.name} ya lleva inventario`, { tone: "success" });
+      await loadInventory();
+    } catch (e) {
+      showToast(
+        e instanceof Error
+          ? e.message
+          : "No se pudo empezar a llevar inventario.",
+        { tone: "error" },
+      );
     }
   }
 
@@ -515,7 +609,10 @@
       showAdjustment = false;
       await loadInventory();
     } catch (e) {
-      error = e instanceof Error ? e.message : "Error registrando ajuste";
+      showToast(
+        e instanceof Error ? e.message : "No se pudo registrar el ajuste.",
+        { tone: "error" },
+      );
     }
   }
 
@@ -540,6 +637,7 @@
     if (containerTypes.length === 0) {
       loadContainerTypes();
     }
+    void loadUnitProducts();
     showEntryDialog = true;
   }
 
@@ -578,7 +676,8 @@
     if (stock <= 0) {
       return { label: "Agotado", class: "badge-error" };
     }
-    if (stock <= threshold) {
+    // Same rule as the backend: at the minimum is still OK.
+    if (stock < threshold) {
       return { label: "Stock bajo", class: "badge-warning" };
     }
     return { label: "OK", class: "badge-success" };
@@ -663,11 +762,11 @@
           <h2 class="card-title flex-wrap">
             Inventario
             {#if workingLocation}
-              <span class="font-normal text-base-content/60"
+              <span class="font-normal text-ink-muted"
                 >· {workingLocation.name}</span
               >
             {:else if isAllView}
-              <span class="font-normal text-base-content/60"
+              <span class="font-normal text-ink-muted"
                 >· Todas las sucursales</span
               >
             {/if}
@@ -677,8 +776,8 @@
               Existencias de cada sucursal. Elige una sucursal arriba para
               registrar entradas o ajustes.
             {:else}
-              Registra lo que llega con «Nueva entrada»; las ventas descuentan
-              solas al pasar una orden a Preparando.
+              Registra con <strong>Nueva entrada</strong> lo que recibes. Cada
+              orden descuenta su stock al pasar a <em>Preparando</em>.
             {/if}
           </p>
         </div>
@@ -728,6 +827,16 @@
                   <button type="button" onclick={openContainerTypes}>
                     <Icon icon="lucide:container" class="h-4 w-4" />
                     Contenedores
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onclick={() => (showTrackProduct = true)}
+                    disabled={isAllView}
+                  >
+                    <Icon icon="lucide:package-plus" class="h-4 w-4" />
+                    Llevar inventario de un producto
                   </button>
                 </li>
               </ul>
@@ -835,7 +944,7 @@
                 <tr>
                   <td>
                     <span class="font-medium">{row.name}</span>
-                    <span class="ml-1 text-xs text-base-content/60"
+                    <span class="ml-1 text-xs text-ink-muted"
                       >{row.type === "ball_based" ? "Sabor" : "Unitario"}</span
                     >
                   </td>
@@ -856,7 +965,7 @@
                             : ""}</span
                         >
                       {:else}
-                        <span class="text-base-content/40" title="Sin registro"
+                        <span class="text-ink-muted" title="Sin registro"
                           >—</span
                         >
                       {/if}
@@ -867,7 +976,7 @@
                 <tr>
                   <td
                     colspan={allLocations.length + 1}
-                    class="py-6 text-center text-base-content/60"
+                    class="py-6 text-center text-ink-muted"
                     >Aún no hay inventario registrado.</td
                   >
                 </tr>
@@ -877,7 +986,7 @@
         </div>
       {:else if visibleItems.length === 0}
         <p
-          class="rounded-box border border-dashed border-base-300 py-8 text-center text-sm text-base-content/60"
+          class="rounded-box border border-dashed border-base-300 py-8 text-center text-sm text-ink-muted"
         >
           {allItems.length === 0
             ? "Aún no hay inventario. Registra la primera entrada."
@@ -892,15 +1001,20 @@
             >
               <div class="min-w-0 flex-1 basis-40">
                 <p class="truncate font-medium">{item.name}</p>
-                <p class="text-xs text-base-content/60">
-                  {item.type === "ball_based" ? "Sabor" : "Unitario"} · mínimo {item.low_stock_threshold}
+                <p class="text-xs text-ink-muted">
+                  {item.type === "ball_based" ? "Sabor" : "Unitario"}
+                  {#if isTracked(item)}
+                    · mínimo {item.low_stock_threshold}
+                  {:else}
+                    · sin entradas aún
+                  {/if}
                 </p>
               </div>
               <div class="w-full basis-full sm:w-48 sm:basis-auto">
                 <div class="flex items-baseline justify-between gap-2">
                   <span class="text-lg font-bold tabular-nums"
                     >{item.current_stock}<span
-                      class="ml-1 text-xs font-normal text-base-content/60"
+                      class="ml-1 text-xs font-normal text-ink-muted"
                       >{item.type === "ball_based" ? "bolas" : "uds."}</span
                     ></span
                   >
@@ -926,6 +1040,15 @@
                   <Icon icon="lucide:plus" class="h-4 w-4" /> Entrada
                 </button>
                 {#if isTracked(item)}
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm btn-square"
+                    onclick={() => openThreshold(item)}
+                    aria-label={`Mínimo de ${item.name}`}
+                    title="Mínimo (cuándo marcar «Stock bajo»)"
+                  >
+                    <Icon icon="lucide:gauge" class="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     class="btn btn-ghost btn-sm btn-square"
@@ -1006,11 +1129,35 @@
   {containerTypes}
   {flavorItems}
   {unitItems}
+  {unitProducts}
+  busy={entrySubmitting}
   onClose={() => (showEntryDialog = false)}
   onSubmit={handleEntry}
   onOpenContainerTypes={canEditCatalog ? openContainerTypes : undefined}
+  onTrackProduct={canEditCatalog
+    ? () => {
+        showEntryDialog = false;
+        showTrackProduct = true;
+      }
+    : undefined}
   preselect={entryPreselect}
 />
+
+<InventoryThresholdDialog
+  open={showThreshold}
+  item={selectedItem}
+  onClose={() => (showThreshold = false)}
+  onSubmit={handleThreshold}
+/>
+
+{#if canEditCatalog}
+  <TrackProductDialog
+    open={showTrackProduct}
+    trackedItems={unitItems}
+    onClose={() => (showTrackProduct = false)}
+    onSubmit={handleTrackProduct}
+  />
+{/if}
 
 <InventoryAdjustmentDialog
   open={showAdjustment}

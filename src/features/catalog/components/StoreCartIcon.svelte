@@ -38,7 +38,12 @@
 
   onMount(() => {
     window.addEventListener("storefront-cart-added", onCartAdded);
-    const persisted = localStorage.getItem("ishos_storefront_cart_count");
+    let persisted: string | null = null;
+    try {
+      persisted = localStorage.getItem("ishos_storefront_cart_count");
+    } catch {
+      persisted = null;
+    }
     if (persisted) {
       itemCount = Number(persisted) || 0;
       previousCount = itemCount;
@@ -61,13 +66,13 @@
 
 <a
   href="/order/cart"
-  class="btn btn-ghost btn-circle relative"
+  class="btn btn-ghost btn-circle relative min-h-11 min-w-11"
   aria-label={itemCount > 0
     ? `Ver carrito (${itemCount} productos)`
     : "Ver carrito"}
   data-cart-target
 >
-  <Icon icon="lucide:shopping-cart" class="h-6 w-6" />
+  <Icon icon="lucide:shopping-cart" class="h-6 w-6" aria-hidden="true" />
   {#if itemCount > 0}
     <span
       class={`badge badge-sm badge-primary absolute -top-1 -right-1 ${badgePop ? "cart-badge-pop" : ""}`}

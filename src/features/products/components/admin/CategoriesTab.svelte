@@ -268,7 +268,7 @@
         bind:value={form.description}
         aria-labelledby="category-description-label"
       ></textarea>
-      <p class="mt-1 text-xs text-base-content/60">
+      <p class="mt-1 text-xs text-ink-muted">
         El slug identifica la categoría en URLs y rutas internas.
       </p>
     </div>

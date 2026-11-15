@@ -60,10 +60,30 @@ export function cartItemsMatch(a: StoreCartItem, b: StoreCartItem): boolean {
   );
 }
 
+/** Storage can throw (blocked site data, quota, some private modes); the
+ *  cart then lasts for this page only instead of breaking "Agregar". */
+function readStorage(key: string): string | null | undefined {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return undefined; // unavailable, not empty
+  }
+}
+
+function writeStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Keep going with the in-memory copy.
+  }
+}
+
+let memoryCart: string | null = null;
+
 function syncCartCount(items: StoreCartItem[]) {
   if (typeof window === "undefined") return;
   const count = items.reduce((total, item) => total + item.quantity, 0);
-  localStorage.setItem(CART_COUNT_KEY, String(count));
+  writeStorage(CART_COUNT_KEY, String(count));
   window.dispatchEvent(
     new CustomEvent("storefront-cart-count", { detail: count }),
   );
@@ -83,7 +103,8 @@ function notifyCartAdded(item: StoreCartItem) {
 
 export function getCartItems(): StoreCartItem[] {
   if (typeof window === "undefined") return [];
-  const raw = localStorage.getItem(CART_KEY);
+  const stored = readStorage(CART_KEY);
+  const raw = stored === undefined ? memoryCart : stored;
   if (!raw) return [];
 
   try {
@@ -99,7 +120,8 @@ export function getCartItems(): StoreCartItem[] {
 
 export function setCartItems(items: StoreCartItem[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(CART_KEY, JSON.stringify(items));
+  memoryCart = JSON.stringify(items);
+  writeStorage(CART_KEY, memoryCart);
   syncCartCount(items);
 }
 

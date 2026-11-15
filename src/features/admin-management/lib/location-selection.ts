@@ -79,9 +79,14 @@ export async function loadWorkingSoldOut(): Promise<{
   const location = await resolveWorkingLocation();
   if (!location) return { location: null, products: [], flavors: [] };
   const items = await getLocationAvailability(location.id);
+  // Orders cannot use either kind: marked "Agotado" or tracked at 0 stock.
   return {
     location,
-    products: items.products ?? [],
-    flavors: items.flavors ?? [],
+    products: unique(items.products, items.out_of_stock_products),
+    flavors: unique(items.flavors, items.out_of_stock_flavors),
   };
+}
+
+function unique(...lists: (string[] | undefined)[]): string[] {
+  return [...new Set(lists.flatMap((list) => list ?? []))];
 }

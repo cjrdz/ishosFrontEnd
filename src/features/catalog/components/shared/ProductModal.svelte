@@ -179,12 +179,12 @@
 
   function chipClass(selected: boolean, variant: "base" | "required" = "base") {
     if (selected) {
-      return "btn btn-sm rounded-full border-primary bg-primary/10 text-primary hover:bg-primary/15";
+      return "btn btn-sm min-h-11 rounded-full border-primary bg-primary/10 text-primary hover:bg-primary/15";
     }
     if (variant === "required") {
-      return "btn btn-sm rounded-full btn-ghost border border-warning/40 text-base-content/75 hover:border-warning/60 hover:bg-warning/10";
+      return "btn btn-sm min-h-11 rounded-full btn-ghost border border-warning/40 text-base-content/75 hover:border-warning/60 hover:bg-warning/10";
     }
-    return "btn btn-sm rounded-full btn-ghost border border-base-300 text-base-content/80 hover:border-base-content/25 hover:bg-base-200/80";
+    return "btn btn-sm min-h-11 rounded-full btn-ghost border border-base-300 text-base-content/80 hover:border-base-content/25 hover:bg-base-200/80";
   }
 
   function increaseQty() {
@@ -416,7 +416,7 @@
       </div>
       <button
         type="button"
-        class="btn btn-circle btn-sm absolute right-3 top-3 z-10 border-base-300 bg-base-100/90"
+        class="btn btn-circle btn-sm size-11 absolute right-3 top-3 z-10 border-base-300 bg-base-100/90"
         aria-label="Cerrar"
         onclick={closeDialog}
       >
@@ -473,7 +473,7 @@
                   {@render requirement(flavorDone)}
                 </div>
                 {#if hasMixedFlavors}
-                  <p class="text-sm text-base-content/65">
+                  <p class="text-sm text-ink-muted">
                     Puedes repetir un sabor. {ballQuantity - remainingFlavors} de
                     {ballQuantity} elegidos.
                   </p>
@@ -547,7 +547,7 @@
                   <h3 id={`sheet-extra-${group.key}`} class="font-semibold">
                     {group.label}
                   </h3>
-                  <span class="text-sm text-base-content/60">Opcional</span>
+                  <span class="text-sm text-ink-muted">Opcional</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
                   {#each group.items as addon (addon.id)}
@@ -562,7 +562,7 @@
                     >
                       {addon.name}
                       {#if Number(addon.price ?? 0) > 0}
-                        <span class="text-base-content/65"
+                        <span class="text-ink-muted"
                           >+{formatCurrency(Number(addon.price))}</span
                         >
                       {/if}
@@ -592,7 +592,7 @@
           >
             <button
               type="button"
-              class="btn btn-ghost btn-circle btn-sm"
+              class="btn btn-ghost btn-circle btn-sm size-11"
               aria-label="Reducir cantidad"
               disabled={normalizeQuantity(draft.quantity) <= 1}
               onclick={decreaseQty}
@@ -605,7 +605,7 @@
             >
             <button
               type="button"
-              class="btn btn-ghost btn-circle btn-sm"
+              class="btn btn-ghost btn-circle btn-sm size-11"
               aria-label="Aumentar cantidad"
               onclick={increaseQty}
             >

@@ -114,7 +114,7 @@
               {flavor.name}
             </span>
           {:else}
-            <span class="text-base-content/40">—</span>
+            <span class="text-ink-muted">—</span>
           {/if}
         </button>
       {/each}
@@ -139,7 +139,7 @@
       <button
         type="button"
         data-chip
-        class={`btn btn-sm min-h-10 ${
+        class={`btn btn-sm min-h-11 ${
           selected
             ? "btn-primary"
             : "btn-outline btn-ghost border-base-300 hover:border-base-300"
@@ -174,10 +174,14 @@
 
   {#if mode === "fill"}
     <div class="flex items-center justify-between gap-2">
-      <p class="text-xs text-base-content/60">
+      <p class="text-xs text-ink-muted">
         Toca un sabor para llenar la bola activa (B{activeSlotIndex + 1}).
       </p>
-      <button type="button" class="btn btn-ghost btn-xs" onclick={clearSlots}>
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm min-h-11"
+        onclick={clearSlots}
+      >
         Limpiar
       </button>
     </div>
