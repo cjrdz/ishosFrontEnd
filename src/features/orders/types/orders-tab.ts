@@ -91,7 +91,12 @@ export interface OrdersTabProps {
   onOpenOrder: (id: string) => Promise<Order | null>;
   onClearSelectedOrder: () => void;
   onApprove: (id: string, reason?: string) => Promise<Order | null>;
-  onReject: (id: string, reason: string) => Promise<Order | null>;
+  /** restock: cancelling, how much of each item goes back to stock. */
+  onReject: (
+    id: string,
+    reason: string,
+    restock?: { inventory_item_id: string; quantity: number }[],
+  ) => Promise<Order | null>;
   onStatusChange: (
     id: string,
     status: "recibida" | "en_proceso" | "lista" | "entregada",

@@ -101,6 +101,16 @@ export const orderUpdateSchema = orderCreateSchema.partial().extend({
 
 export const orderRejectSchema = z.object({
   reason: z.string().trim().min(1).max(500),
+  /** Cancelling: how much of each item goes back to stock (rest is waste). */
+  restock: z
+    .array(
+      z.object({
+        inventory_item_id: z.uuid(),
+        quantity: z.number().int().min(0).max(100000),
+      }),
+    )
+    .max(200)
+    .optional(),
 });
 
 export const orderStatusSchema = z.object({

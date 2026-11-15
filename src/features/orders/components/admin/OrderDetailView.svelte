@@ -421,7 +421,7 @@
                 Reactivar
               </button>
             {/if}
-          {:else if canCancelOrders && ["pendiente_revision", "recibida", "en_proceso"].includes(selectedOrder.status)}
+          {:else if canCancelOrders && ["pendiente_revision", "recibida", "en_proceso", "lista"].includes(selectedOrder.status)}
             <!-- Pending online orders are rejected; accepted ones (also in
                  preparation) are cancelled and their stock goes back. -->
             <button

@@ -37,6 +37,12 @@
   let flavors = $state<Flavor[]>([]);
   /** Sold-out state by "type:id" (saved or pending). */
   let soldOut = $state<Record<string, boolean>>({});
+  /**
+   * Tracked in inventory with nothing left (0 stock, or all of it held by
+   * accepted orders) by "type:id". These are unavailable no matter the
+   * switch, and come back on their own with the next inventory entry.
+   */
+  let noStock = $state<Record<string, boolean>>({});
 
   $effect(() => {
     dialogRef?.showModal();
@@ -57,6 +63,12 @@
         for (const id of items.products ?? []) next[`product:${id}`] = true;
         for (const id of items.flavors ?? []) next[`flavor:${id}`] = true;
         soldOut = next;
+        const empty: Record<string, boolean> = {};
+        for (const id of items.out_of_stock_products ?? [])
+          empty[`product:${id}`] = true;
+        for (const id of items.out_of_stock_flavors ?? [])
+          empty[`flavor:${id}`] = true;
+        noStock = empty;
       } catch {
         loadError = "No se pudo cargar la disponibilidad. Intenta de nuevo.";
       } finally {
@@ -108,7 +120,13 @@
     return flavors.filter((f) => !term || normalize(f.name).includes(term));
   });
 
-  const soldOutCount = $derived(Object.values(soldOut).filter(Boolean).length);
+  // Same count as the "Agotados" button: marked or without stock.
+  const soldOutCount = $derived(
+    new Set([
+      ...Object.keys(soldOut).filter((k) => soldOut[k]),
+      ...Object.keys(noStock).filter((k) => noStock[k]),
+    ]).size,
+  );
 
   function toggle(
     type: ItemType,
@@ -141,6 +159,47 @@
     });
   }
 </script>
+
+{#snippet row(type: ItemType, id: string, name: string)}
+  {@const marked = !isAvailable(type, id)}
+  {@const empty = !!noStock[key(type, id)]}
+  <li class="flex items-center justify-between gap-3 px-3 py-2">
+    <span class={`min-w-0 ${marked || empty ? "text-ink-muted" : ""}`}>
+      <span class="truncate">{name}</span>
+      {#if marked}
+        <span class="badge badge-sm ml-1 border-0 bg-error/15 text-error"
+          >Agotado</span
+        >
+      {/if}
+      {#if empty}
+        <span
+          class="badge badge-sm ml-1 border-0 bg-st-review text-st-review-ink"
+          >Sin stock</span
+        >
+        <span class="block text-xs" id={`nostock-${type}-${id}`}
+          >Vuelve solo al registrar una entrada en Inventario.</span
+        >
+      {/if}
+    </span>
+    <!-- Without stock the item cannot be offered: the switch stays off and
+         only a manual "Agotado" mark can still be cleared. -->
+    <input
+      type="checkbox"
+      class="toggle toggle-primary"
+      checked={!marked && !empty}
+      disabled={empty && !marked}
+      aria-label={`${name} disponible`}
+      aria-describedby={empty ? `nostock-${type}-${id}` : undefined}
+      onchange={(event) =>
+        toggle(
+          type,
+          id,
+          name,
+          (event.currentTarget as HTMLInputElement).checked,
+        )}
+    />
+  </li>
+{/snippet}
 
 <AdminModalShell
   bind:dialogRef
@@ -194,33 +253,7 @@
             class="divide-y divide-base-300 rounded-box border border-base-300"
           >
             {#each visibleFlavors as flavor (flavor.id)}
-              {@const available = isAvailable("flavor", flavor.id)}
-              <li class="flex items-center justify-between gap-3 px-3 py-2">
-                <span
-                  class={`min-w-0 truncate ${available ? "" : "text-ink-muted"}`}
-                >
-                  {flavor.name}
-                  {#if !available}
-                    <span
-                      class="badge badge-sm ml-1 border-0 bg-error/15 text-error"
-                      >Agotado</span
-                    >
-                  {/if}
-                </span>
-                <input
-                  type="checkbox"
-                  class="toggle toggle-primary"
-                  checked={available}
-                  aria-label={`${flavor.name} disponible`}
-                  onchange={(event) =>
-                    toggle(
-                      "flavor",
-                      flavor.id,
-                      flavor.name,
-                      (event.currentTarget as HTMLInputElement).checked,
-                    )}
-                />
-              </li>
+              {@render row("flavor", flavor.id, flavor.name)}
             {/each}
           </ul>
         </section>
@@ -238,33 +271,7 @@
             class="divide-y divide-base-300 rounded-box border border-base-300"
           >
             {#each group.items as product (product.id)}
-              {@const available = isAvailable("product", product.id)}
-              <li class="flex items-center justify-between gap-3 px-3 py-2">
-                <span
-                  class={`min-w-0 truncate ${available ? "" : "text-ink-muted"}`}
-                >
-                  {product.name}
-                  {#if !available}
-                    <span
-                      class="badge badge-sm ml-1 border-0 bg-error/15 text-error"
-                      >Agotado</span
-                    >
-                  {/if}
-                </span>
-                <input
-                  type="checkbox"
-                  class="toggle toggle-primary"
-                  checked={available}
-                  aria-label={`${product.name} disponible`}
-                  onchange={(event) =>
-                    toggle(
-                      "product",
-                      product.id,
-                      product.name,
-                      (event.currentTarget as HTMLInputElement).checked,
-                    )}
-                />
-              </li>
+              {@render row("product", product.id, product.name)}
             {/each}
           </ul>
         </section>

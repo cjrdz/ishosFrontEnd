@@ -198,7 +198,11 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
     });
   }
 
-  async function handleReject(orderId: string, reason: string) {
+  async function handleReject(
+    orderId: string,
+    reason: string,
+    restock?: { inventory_item_id: string; quantity: number }[],
+  ) {
     if (!reason.trim()) {
       setOrderModuleError("Debes indicar el motivo de rechazo");
       return null;
@@ -209,13 +213,13 @@ export function createDashboardOrderHandlers(deps: OrderHandlerDeps) {
       analyticsAction: "admin_order_reject",
       errorMessage: "No se pudo rechazar orden",
       action: async () => {
-        const updated = await rejectOrder(orderId, reason);
+        const updated = await rejectOrder(orderId, reason, restock);
         mergeSelectedOrder(deps, orderId, updated);
         return updated;
       },
       defaultValue: null,
       onSuccess: async () => {
-        setNotice("Orden rechazada");
+        setNotice(restock ? "Orden cancelada" : "Orden rechazada");
         await loadOrders();
       },
     });

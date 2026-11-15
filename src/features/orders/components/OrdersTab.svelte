@@ -1233,6 +1233,7 @@
 
   /** Accepted orders are cancelled (stock returns); pending ones rejected. */
   let rejectMode = $state<"reject" | "cancel">("reject");
+  let rejectOrderStatus = $state<string | null>(null);
 
   function openReject(orderId: string) {
     const order =
@@ -1241,6 +1242,7 @@
         : orders.find((o) => o.id === orderId);
     rejectMode =
       order && order.status !== "pendiente_revision" ? "cancel" : "reject";
+    rejectOrderStatus = order?.status ?? null;
     rejectState = DialogState.openReject(orderId);
   }
 
@@ -1255,8 +1257,12 @@
     await onOpenOrder(orderId);
   }
 
-  async function rejectAndSync(orderId: string, reason: string) {
-    const updated = await onReject(orderId, reason);
+  async function rejectAndSync(
+    orderId: string,
+    reason: string,
+    restock?: { inventory_item_id: string; quantity: number }[],
+  ) {
+    const updated = await onReject(orderId, reason, restock);
     if (!updated) return;
     emitOrderStatusSync({
       orderId: updated.id,
@@ -1266,7 +1272,9 @@
     await onOpenOrder(orderId);
   }
 
-  function confirmReject() {
+  function confirmReject(
+    restock?: { inventory_item_id: string; quantity: number }[],
+  ) {
     if (!rejectState.targetId) return;
     if (!rejectState.reason.trim()) {
       rejectState.error =
@@ -1275,7 +1283,11 @@
           : "Debes indicar el motivo de rechazo";
       return;
     }
-    void rejectAndSync(rejectState.targetId, rejectState.reason.trim());
+    void rejectAndSync(
+      rejectState.targetId,
+      rejectState.reason.trim(),
+      restock,
+    );
     rejectState = DialogState.closeReject();
   }
 
@@ -1757,6 +1769,8 @@
   rejectReason={rejectState.reason}
   rejectError={rejectState.error}
   mode={rejectMode}
+  orderId={rejectState.targetId}
+  orderStatus={rejectOrderStatus}
   onRejectReasonChange={(value) => {
     rejectState.reason = value;
   }}

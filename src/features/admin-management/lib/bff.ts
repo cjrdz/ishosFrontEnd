@@ -438,12 +438,33 @@ export async function approveOrder(id: string) {
   });
 }
 
-export async function rejectOrder(id: string, reason: string) {
+export async function rejectOrder(
+  id: string,
+  reason: string,
+  restock?: { inventory_item_id: string; quantity: number }[],
+) {
+  const body: RejectOrderRequest & { restock?: typeof restock } = { reason };
+  if (restock) body.restock = restock;
   return bffRequest<LocalOrder>(`/api/admin/orders/${id}`, {
     method: "POST",
-    body: { reason } satisfies RejectOrderRequest,
+    body,
     query: { action: "reject" },
   });
+}
+
+/** What an order took from inventory and still holds (admins, managers). */
+export interface OrderStockLine {
+  inventory_item_id: string;
+  name: string;
+  type: "ball_based" | "unit_based";
+  quantity: number;
+}
+
+export async function getOrderStock(id: string) {
+  const res = await bffRequest<{ data?: OrderStockLine[] }>(
+    `/api/admin/orders/${id}/stock`,
+  );
+  return res.data ?? [];
 }
 
 export async function updateOrderStatus(id: string, status: string) {
@@ -1127,7 +1148,7 @@ export interface InventoryItem {
 export interface StockMovement {
   id: string;
   inventory_item_id: string;
-  type: "entry" | "sale" | "adjustment";
+  type: "entry" | "sale" | "adjustment" | "waste";
   quantity: number;
   quantity_containers?: number;
   container_type_id?: string;
