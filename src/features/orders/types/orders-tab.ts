@@ -67,6 +67,11 @@ export interface OrderFormState {
 
 export interface OrdersTabProps {
   isAdmin: boolean;
+  /**
+   * Admins and managers may cancel accepted orders (and those in
+   * preparation, giving their stock back). The backend enforces it too.
+   */
+  canCancelOrders?: boolean;
   orders: Order[];
   products: Product[];
   allProducts?: Product[];

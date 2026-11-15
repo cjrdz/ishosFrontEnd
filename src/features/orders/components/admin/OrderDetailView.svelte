@@ -20,6 +20,8 @@
   interface Props {
     selectedOrder: Order;
     isAdmin: boolean;
+    /** Admins and managers: reject or cancel (stock is given back). */
+    canCancelOrders?: boolean;
     employeeById: Record<string, string>;
     tokenVisible: boolean;
     tokenCopied: "" | "token" | "both" | "link";
@@ -35,6 +37,7 @@
   let {
     selectedOrder,
     isAdmin,
+    canCancelOrders = false,
     employeeById,
     tokenVisible,
     tokenCopied,
@@ -418,20 +421,28 @@
                 Reactivar
               </button>
             {/if}
-          {:else if (selectedOrder.status === "recibida" || selectedOrder.status === "pendiente_revision") && isAdmin}
+          {:else if canCancelOrders && ["pendiente_revision", "recibida", "en_proceso"].includes(selectedOrder.status)}
+            <!-- Pending online orders are rejected; accepted ones (also in
+                 preparation) are cancelled and their stock goes back. -->
             <button
               class="btn btn-sm min-h-11 btn-soft btn-error"
               type="button"
               onclick={() => onOpenReject(selectedOrder.id)}
             >
-              Rechazar
+              {selectedOrder.status === "pendiente_revision"
+                ? "Rechazar"
+                : "Cancelar orden"}
             </button>
           {/if}
         </div>
 
         {#if selectedOrder.status === "cancelada"}
           <div class="space-y-1">
-            <span class="badge badge-error">Orden rechazada</span>
+            <span class="badge badge-error"
+              >{stepTimestamp("recibida")
+                ? "Orden cancelada"
+                : "Orden rechazada"}</span
+            >
             {#if selectedOrder.rejection_reason}
               <p class="text-base-content/70">
                 Motivo: {selectedOrder.rejection_reason}

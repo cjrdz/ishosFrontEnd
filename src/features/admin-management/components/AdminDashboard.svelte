@@ -1169,6 +1169,7 @@
   });
   const ordersPanelProps = $derived({
     isAdmin,
+    canCancelOrders: isAdmin || session?.role === "manager",
     orders,
     products,
     allProducts,

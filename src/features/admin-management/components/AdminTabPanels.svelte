@@ -31,6 +31,7 @@
 {#if shared.activeTab === "ordenes"}
   <OrdersTab
     isAdmin={orders.isAdmin}
+    canCancelOrders={orders.canCancelOrders}
     orders={orders.orders}
     products={orders.products}
     allProducts={orders.allProducts}

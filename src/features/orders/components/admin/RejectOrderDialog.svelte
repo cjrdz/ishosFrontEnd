@@ -7,6 +7,11 @@
     busy: boolean;
     rejectReason: string;
     rejectError: string;
+    /**
+     * "cancel" for an accepted order (or one in preparation): it is
+     * cancelled and any stock it took goes back to inventory.
+     */
+    mode?: "reject" | "cancel";
     onRejectReasonChange: (value: string) => void;
     onConfirm: () => void;
     onClose: () => void;
@@ -17,6 +22,7 @@
     busy,
     rejectReason,
     rejectError,
+    mode = "reject",
     onRejectReasonChange,
     onConfirm,
     onClose,
@@ -35,13 +41,19 @@
 
 <AdminModalShell
   bind:dialogRef
-  title="Rechazar orden"
+  title={mode === "cancel" ? "Cancelar orden" : "Rechazar orden"}
   icon="lucide:x-circle"
   widthClass="max-w-md"
   {onClose}
 >
   <p class="text-sm text-base-content/70">
-    Indica el motivo del rechazo para dejar registro.
+    {#if mode === "cancel"}
+      La orden se cancela y lo que ya se descontó del inventario vuelve al
+      stock. Si ya se cobró, devuelve el dinero al cliente. Indica el motivo
+      para dejar registro.
+    {:else}
+      Indica el motivo del rechazo para dejar registro.
+    {/if}
   </p>
   <textarea
     class="textarea textarea-bordered w-full"
@@ -55,7 +67,7 @@
     <p class="text-sm text-error">{rejectError}</p>
   {/if}
   <AdminFormActions
-    submitLabel="Rechazar"
+    submitLabel={mode === "cancel" ? "Cancelar orden" : "Rechazar"}
     submitType="button"
     submitVariant="error"
     onSubmit={onConfirm}

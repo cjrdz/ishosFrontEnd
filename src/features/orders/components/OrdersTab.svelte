@@ -203,6 +203,7 @@
 
   let {
     isAdmin,
+    canCancelOrders = false,
     orders,
     products,
     allProducts,
@@ -1230,7 +1231,16 @@
     onClearSelectedOrder();
   }
 
+  /** Accepted orders are cancelled (stock returns); pending ones rejected. */
+  let rejectMode = $state<"reject" | "cancel">("reject");
+
   function openReject(orderId: string) {
+    const order =
+      selectedOrder?.id === orderId
+        ? selectedOrder
+        : orders.find((o) => o.id === orderId);
+    rejectMode =
+      order && order.status !== "pendiente_revision" ? "cancel" : "reject";
     rejectState = DialogState.openReject(orderId);
   }
 
@@ -1259,7 +1269,10 @@
   function confirmReject() {
     if (!rejectState.targetId) return;
     if (!rejectState.reason.trim()) {
-      rejectState.error = "Debes indicar el motivo de rechazo";
+      rejectState.error =
+        rejectMode === "cancel"
+          ? "Indica el motivo de la cancelación"
+          : "Debes indicar el motivo de rechazo";
       return;
     }
     void rejectAndSync(rejectState.targetId, rejectState.reason.trim());
@@ -1631,6 +1644,7 @@
     {/snippet}
 
     <OrderDetailView
+      {canCancelOrders}
       {selectedOrder}
       {isAdmin}
       {tokenVisible}
@@ -1742,6 +1756,7 @@
   {busy}
   rejectReason={rejectState.reason}
   rejectError={rejectState.error}
+  mode={rejectMode}
   onRejectReasonChange={(value) => {
     rejectState.reason = value;
   }}
