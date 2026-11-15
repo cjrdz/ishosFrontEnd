@@ -1114,6 +1114,8 @@ export interface InventoryItem {
   type: "ball_based" | "unit_based";
   current_stock: number;
   low_stock_threshold: number;
+  /** Held by accepted orders not yet in preparation (dashboard only). */
+  reserved?: number;
   product_id?: string;
   product?: { id: string; name: string };
   flavor_id?: string;

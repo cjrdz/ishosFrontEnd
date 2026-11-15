@@ -313,10 +313,19 @@
     step = target;
   }
 
-  /** Counter orders may skip the phone; one that is typed must be real. */
+  /**
+   * Online orders (no staff creator) keep their phone: it is how the shop
+   * reaches the customer. Counter orders may skip it.
+   */
+  const phoneRequired = $derived(
+    isEditing && !!selectedOrder && !selectedOrder.created_by_user_id,
+  );
+
+  /** A typed phone must be real; an empty one only on counter orders. */
   function phoneLooksValid(phone: string): boolean {
     const digits = phone.replace(/\D/g, "").length;
-    return phone.trim() === "" || (digits >= 7 && digits <= 15);
+    if (phone.trim() === "") return !phoneRequired;
+    return digits >= 7 && digits <= 15;
   }
 
   function getStepError(target: EditorStep): string {
@@ -328,7 +337,9 @@
         return "Agrega al menos un producto completo antes de continuar.";
       }
       if (!phoneLooksValid(orderForm.customer_phone)) {
-        return "El teléfono debe tener entre 7 y 15 dígitos, o déjalo vacío.";
+        return phoneRequired
+          ? "Las órdenes en línea necesitan el teléfono del cliente (7 a 15 dígitos)."
+          : "El teléfono debe tener entre 7 y 15 dígitos, o déjalo vacío.";
       }
       if (!isStepValid("customer")) {
         return "Completa los datos del cliente antes de continuar.";
@@ -643,7 +654,11 @@
             </label>
             <label class="form-control">
               <span class="label-text mb-1 text-sm"
-                >Teléfono <span class="text-ink-muted">(opcional)</span></span
+                >Teléfono {#if phoneRequired}<span
+                    class="text-error"
+                    aria-hidden="true">*</span
+                  >{:else}<span class="text-ink-muted">(opcional)</span
+                  >{/if}</span
               >
               <input
                 id="order-customer-phone"
@@ -653,6 +668,7 @@
                 placeholder="7000-0000"
                 autocomplete="off"
                 bind:value={orderForm.customer_phone}
+                required={phoneRequired}
               />
             </label>
             <label class="form-control sm:col-span-2">

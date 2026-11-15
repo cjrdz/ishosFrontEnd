@@ -1016,7 +1016,14 @@
                     >{item.current_stock}<span
                       class="ml-1 text-xs font-normal text-ink-muted"
                       >{item.type === "ball_based" ? "bolas" : "uds."}</span
-                    ></span
+                    >{#if (item.reserved ?? 0) > 0}<span
+                        class="ml-1.5 text-xs font-normal text-ink-muted"
+                        title="Apartadas por órdenes aceptadas que aún no pasan a Preparando"
+                        >· {item.reserved}
+                        {item.type === "ball_based"
+                          ? "apartadas"
+                          : "apartados"}</span
+                      >{/if}</span
                   >
                   <span
                     class={`badge badge-sm border-0 ${status.label === "Agotado" ? "bg-error/15 text-error" : status.label === "Stock bajo" ? "bg-warning/25 text-base-content" : "bg-success/15 text-success"}`}
